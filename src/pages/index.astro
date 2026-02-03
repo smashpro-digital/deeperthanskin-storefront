@@ -23,25 +23,21 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
 ---
 
 <BaseLayout title="Deeper Than Skin — Storefront">
-  {/* NAV (Step 2) */}
+  {/* NAV */}
   <header class="nav nav--light">
     <div class="container nav-inner nav-inner--mock">
-      {/* Left: category nav */}
       <nav class="nav-left" aria-label="Primary">
         <a class="nav-link nav-link--active" href={LINKS.shop}>Shop</a>
         <a class="nav-link" href="#kits">Cleanses</a>
         <a class="nav-link" href="#kits">Juices</a>
         <a class="nav-link" href="#kits">Sea Moss</a>
-        {/* FIXED TYPO HERE */}
         <a class="nav-link" href="#services">Services</a>
       </nav>
 
-      {/* Center: wordmark */}
       <a class="nav-center" href={LINKS.shop} aria-label="Deeper Than Skin Home">
         <span class="nav-wordmark">DeeperThanSkin</span>
       </a>
 
-      {/* Right: utility icons (link to Square for now) */}
       <div class="nav-right" aria-label="Utilities">
         <a class="icon-btn" href={LINKS.shop} aria-label="Search">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
@@ -66,84 +62,99 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
   </header>
 
   <main>
- {/* HERO BANNER (Step 1) */}
-<section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
-  <div class="hero-overlay"></div>
+    {/* HERO BANNER (hero first) */}
+    <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
+      <div class="hero-overlay"></div>
 
-  <div class="hero-content" data-aos="fade-up">
-    <div class="hero-brand">
-      <span class="hero-wordmark">Deeper Than Skin</span>
-      <span class="hero-divider"></span>
-      <span class="hero-tagline">Wellness That Begins Within</span>
-    </div>
-
-    <p class="hero-lead">
-      A flagship storefront for cleanse kits, sea moss, herbal wellness,
-      and ritual services — powered by Square.
-    </p>
-
-    <div class="btns hero-ctas">
-      <a class="btn btn-primary" href={LINKS.shop}>Shop Now</a>
-      <a class="btn btn-ghost" href={LINKS.book}>Book Ionic Footbath</a>
-    </div>
-  </div>
-</section>
-
-{/* STRIP BELOW HERO (cats + ionic) */}
-<section class="strip-section" data-aos="fade-up" data-aos-delay="120">
-  <div class="container strip">
-    <div class="strip-grid">
-      <div class="tile-row">
-        <a class="tile tile--img" href={LINKS.shop} aria-label="Cold-Pressed Juices">
-          <img class="tile-img" src={CAT_JUICES} alt="Cold-pressed juices" loading="lazy" />
-          <div class="tile-text">
-            <div class="label">Cold‑Pressed Juices</div>
-            <p class="sub">Event drops & limited releases</p>
-          </div>
-        </a>
-
-        <a class="tile tile--img" href={LINKS.shop} aria-label="Sea Moss Gel">
-          <img class="tile-img" src={CAT_SEAMOSS} alt="Sea moss gel" loading="lazy" />
-          <div class="tile-text">
-            <div class="label">Sea Moss Gel</div>
-            <p class="sub">Ocean‑rooted daily support</p>
-          </div>
-        </a>
-
-        <a class="tile tile--img" href={LINKS.shop} aria-label="Detox Cleanse Kits">
-          <img class="tile-img" src={CAT_KITS} alt="Detox cleanse kits" loading="lazy" />
-          <div class="tile-text">
-            <div class="label">Detox Cleanse Kits</div>
-            <p class="sub">Reset • restore • renew</p>
-          </div>
-        </a>
-
-        <a class="tile tile--img" href={LINKS.shop} aria-label="Herbal Teas & Oils">
-          <img class="tile-img" src={CAT_HERBS} alt="Herbal teas and oils" loading="lazy" />
-          <div class="tile-text">
-            <div class="label">Herbal Teas & Oils</div>
-            <p class="sub">Calm, clarity, balance</p>
-          </div>
-        </a>
-      </div>
-
-      <div class="feature-card">
-        <h3 class="title">Ionic Footbath Therapy</h3>
-        <p class="desc">Relax, detox & rebalance — book your session and make wellness a ritual.</p>
-
-        <div class="media" aria-label="Ionic Footbath" role="img">
-          <img src={IONIC_IMAGE} alt="Ionic footbath" loading="lazy" />
+      <div class="hero-content" data-aos="fade-up">
+        <div class="hero-brand">
+          <span class="hero-wordmark">Deeper Than Skin</span>
+          <span class="hero-divider"></span>
+          <span class="hero-tagline">Wellness That Begins Within</span>
         </div>
 
-        <div class="cta">
-          <a class="primary" href={LINKS.book}>Book Your Session</a>
-          <a href={LINKS.community}>Member Perks</a>
+        <p class="hero-lead">
+          A flagship storefront for cleanse kits, sea moss, herbal wellness,
+          and ritual services — powered by Square.
+        </p>
+
+        {/* Keep hero calm + premium: one primary CTA */}
+        <div class="btns hero-ctas">
+          <a class="btn btn-primary" href={LINKS.shop}>Shop Now</a>
         </div>
       </div>
-    </div>
-  </div>
-</section>
+    </section>
 
+    {/* STRIP BELOW HERO (cards + shop now + ionic) */}
+    <section class="strip-section" data-aos="fade-up" data-aos-delay="120">
+      <div class="container strip">
+        <div class="strip-grid">
+          {/* LEFT: Category cards + Shop Now */}
+          <div class="strip-left">
+            <div class="cat-grid">
+              <a class="cat-card" href={LINKS.shop} aria-label="Cold-Pressed Juices">
+                <div class="cat-media">
+                  <img src={CAT_JUICES} alt="Cold-pressed juices" loading="lazy" />
+                </div>
+                <div class="cat-body">
+                  <h3>Cold‑Pressed<br />Juices</h3>
+                  <p>Event drops &amp;<br />limited releases</p>
+                </div>
+              </a>
+
+              <a class="cat-card" href={LINKS.shop} aria-label="Sea Moss Gel">
+                <div class="cat-media">
+                  <img src={CAT_SEAMOSS} alt="Sea moss gel" loading="lazy" />
+                </div>
+                <div class="cat-body">
+                  <h3>Sea Moss Gel</h3>
+                  <p>Ocean‑rooted<br />daily support</p>
+                </div>
+              </a>
+
+              <a class="cat-card" href={LINKS.shop} aria-label="Detox Cleanse Kits">
+                <div class="cat-media">
+                  <img src={CAT_KITS} alt="Detox cleanse kits" loading="lazy" />
+                </div>
+                <div class="cat-body">
+                  <h3>Detox Cleanse<br />Kits</h3>
+                  <p>Reset • restore •<br />renew</p>
+                </div>
+              </a>
+
+              <a class="cat-card" href={LINKS.shop} aria-label="Herbal Teas & Oils">
+                <div class="cat-media">
+                  <img src={CAT_HERBS} alt="Herbal teas and oils" loading="lazy" />
+                </div>
+                <div class="cat-body">
+                  <h3>Herbal Teas &amp;<br />Oils</h3>
+                  <p>Calm, clarity,<br />balance</p>
+                </div>
+              </a>
+            </div>
+
+            <div class="shop-now-wrap">
+              <a class="shop-now" href={LINKS.shop}>SHOP NOW</a>
+            </div>
+          </div>
+
+          {/* RIGHT: Ionic card */}
+          <div class="feature-card feature-card--tight">
+            <h3 class="title">Ionic Footbath Therapy</h3>
+
+            <div class="media" aria-label="Ionic Footbath" role="img">
+              <img src={IONIC_IMAGE} alt="Ionic footbath" loading="lazy" />
+            </div>
+
+            <p class="desc">Relax, Detox &amp; Rebalance</p>
+
+            <div class="cta">
+              <a class="primary" href={LINKS.book}>Book Your Session</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     {/* FEATURED / CAROUSEL */}
     <section class="section" id="kits">
@@ -164,7 +175,7 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
 
           <a class="card" data-aos="fade-up" data-aos-delay="80" href={LINKS.shop}>
             <h3>Cold‑Pressed Juices</h3>
-            <p>Event drops & limited releases.</p>
+            <p>Event drops &amp; limited releases.</p>
           </a>
 
           <a class="card" data-aos="fade-up" data-aos-delay="160" href={LINKS.shop}>
