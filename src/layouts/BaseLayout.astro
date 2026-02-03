@@ -1,0 +1,25 @@
+---
+import "../styles/global.css";
+const { title = "Deeper Than Skin — Storefront" } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content="Deeper Than Skin — community-first wellness storefront powered by Square." />
+
+    <!-- AOS -->
+    <link rel="stylesheet" href="/vendor/aos.css" />
+  </head>
+  <body>
+    <slot />
+
+    <!-- AOS -->
+    <script src="/vendor/aos.js"></script>
+    <script is:inline>
+      AOS.init({ duration: 650, easing: "ease-out", once: true, offset: 90 });
+    </script>
+  </body>
+</html>

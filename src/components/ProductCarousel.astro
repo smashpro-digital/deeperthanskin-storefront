@@ -1,0 +1,42 @@
+---
+const products = [
+  { title: "3‑Day Living Waters Cleanse", desc: "Light reset & hydration", href: "YOUR_SQUARE_CHECKOUT_LINK" },
+  { title: "5‑Day Living Waters Cleanse", desc: "Deeper renewal", href: "YOUR_SQUARE_CHECKOUT_LINK" },
+  { title: "Living Sea Moss Gel", desc: "Mineral-rich daily support", href: "YOUR_SQUARE_CHECKOUT_LINK" },
+  { title: "Ionic Footbath", desc: "Book a session", href: "YOUR_SQUARE_APPOINTMENTS_LINK" },
+];
+---
+
+<link rel="stylesheet" href="https://unpkg.com/swiper@11/swiper-bundle.min.css" />
+
+<div class="container" data-aos="fade-up">
+  <div class="swiper product-swiper">
+    <div class="swiper-wrapper">
+      {products.map((p) => (
+        <div class="swiper-slide">
+          <a class="card" href={p.href}>
+            <h3>{p.title}</h3>
+            <p>{p.desc}</p>
+          </a>
+        </div>
+      ))}
+    </div>
+
+    <div class="swiper-pagination"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/swiper@11/swiper-bundle.min.js"></script>
+<script is:inline>
+  new Swiper(".product-swiper", {
+    loop: true,
+    spaceBetween: 16,
+    slidesPerView: 1.12,
+    centeredSlides: true,
+    pagination: { el: ".swiper-pagination", clickable: true },
+    breakpoints: {
+      640: { slidesPerView: 2.1, centeredSlides: false },
+      1024: { slidesPerView: 3.1, centeredSlides: false },
+    }
+  });
+</script>

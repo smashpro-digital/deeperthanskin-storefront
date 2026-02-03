@@ -1,11 +1,120 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ProductCarousel from "../components/ProductCarousel.astro";
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const LINKS = {
+  shop: "YOUR_SQUARE_STORE_OR_CATEGORY_LINK",
+  subscribe: "YOUR_SQUARE_SUBSCRIPTION_LINK",
+  book: "YOUR_SQUARE_APPOINTMENTS_LINK",
+  community: "https://returntothegarden.co"
+};
 ---
 
-<Layout>
-	<Welcome />
-</Layout>
+<BaseLayout title="Deeper Than Skin — Storefront">
+  <header class="nav">
+    <div class="container nav-inner">
+      <div class="brand">
+        <div class="brand-badge">DTS</div>
+        <div>Deeper Than Skin</div>
+      </div>
+      <nav class="nav-links">
+        <a href="#kits">Kits</a>
+        <a href="#services">Services</a>
+        <a href={LINKS.community}>Community</a>
+        <a href={LINKS.shop}>Shop</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div data-aos="fade-up">
+          <div class="kicker">Return to original provision</div>
+          <h1 class="h1">Wellness that begins within.</h1>
+          <p class="p">
+            A flagship storefront experience for event-based drops, cleanse kits, sea moss, and services — powered by Square checkout.
+          </p>
+
+          <div class="btns">
+            <a class="btn btn-primary" href={LINKS.shop}>Shop Drops</a>
+            <a class="btn btn-ghost" href={LINKS.book}>Book Ionic Footbath</a>
+            <a class="btn btn-ghost" href={LINKS.community}>Join Return to the Garden</a>
+          </div>
+
+          <div style="margin-top:14px" class="small">
+            Secure checkout & subscriptions handled by Square.
+          </div>
+        </div>
+
+        <div class="hero-card" data-aos="fade-up" data-aos-delay="120">
+          <div class="hero-img"></div>
+          <div style="margin-top:12px" class="small">
+            Replace this placeholder with your product/brand image in <code>public/images</code>.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="kits">
+      <div class="container" data-aos="fade-up">
+        <div class="kicker">Featured</div>
+        <h2 class="h2">Cleanses • Sea Moss • Kits</h2>
+        <p class="p">Subtle motion, clean cards, and a carousel that stays within Square’s realistic integration.</p>
+      </div>
+
+      <ProductCarousel />
+
+      <div class="section" style="padding-top:26px">
+        <div class="container grid">
+          <a class="card" data-aos="fade-up" href={LINKS.subscribe}>
+            <h3>Wellness Kit Subscription</h3>
+            <p>Monthly or seasonal kits — commit to the journey.</p>
+          </a>
+          <a class="card" data-aos="fade-up" data-aos-delay="80" href={LINKS.shop}>
+            <h3>Cold‑Pressed Juices</h3>
+            <p>Event drops & limited releases.</p>
+          </a>
+          <a class="card" data-aos="fade-up" data-aos-delay="160" href={LINKS.shop}>
+            <h3>Living Sea Moss</h3>
+            <p>Ocean‑rooted nourishment.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="services">
+      <div class="container" data-aos="fade-up">
+        <div class="callout">
+          <div class="kicker">Service</div>
+          <h2 class="h2">Ionic Footbath</h2>
+          <p class="p">Make services a premium ritual: public booking + community perks later.</p>
+          <div class="btns">
+            <a class="btn btn-primary" href={LINKS.book}>Book Now</a>
+            <a class="btn btn-ghost" href={LINKS.community}>See Member Perks</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container" data-aos="fade-up">
+        <div class="kicker">Next layer</div>
+        <h2 class="h2">Return to the Garden</h2>
+        <p class="p">
+          Your community home for the Seed Bearer pledge, education, and governance pages (terms & privacy) —
+          with the mobile app coming later.
+        </p>
+        <div class="btns">
+          <a class="btn btn-primary" href={LINKS.community}>Visit ReturnToTheGarden.co</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      © {new Date().getFullYear()} Deeper Than Skin. All rights reserved.
+    </div>
+  </footer>
+</BaseLayout>
