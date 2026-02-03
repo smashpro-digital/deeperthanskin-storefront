@@ -488,3 +488,27 @@ a{color:inherit}
 .tile--img .sub{
   color: rgba(0,0,0,.60);
 }
+/* --- FIX: stop Ionic card from stretching category tiles --- */
+.strip-grid{
+  align-items: start;           /* key: don't stretch row items */
+}
+
+.tile-row{
+  align-content: start;         /* keep tiles packed at the top */
+}
+
+.feature-card{
+  align-self: start;            /* keep ionic card from forcing height */
+}
+
+/* Make tiles a consistent, mockup-like height */
+.tile--img{
+  grid-template-rows: 92px 1fr; /* image + body */
+  height: 210px;               /* adjust 190–230 to taste */
+}
+
+.tile-text{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;       /* keeps text centered within tile body */
+}
