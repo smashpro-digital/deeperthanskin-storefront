@@ -512,3 +512,34 @@ a{color:inherit}
   flex-direction:column;
   justify-content:center;       /* keeps text centered within tile body */
 }
+.hero-banner{
+  min-height: 92vh;
+  padding: 140px 20px 110px;
+}
+
+.strip-section{
+  padding: 28px 0 64px;
+}
+
+/* keep strip from stretching tiles */
+.strip-grid{ align-items:start; }
+.feature-card{ align-self:start; }
+/* --- Strip background matches nav (balance fix) --- */
+.strip-section{
+  background: rgba(243,239,230,.88);
+  border-top: 1px solid rgba(0,0,0,.08);
+  border-bottom: 1px solid rgba(0,0,0,.08);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+
+}
+
+/* Slight lift so it feels intentional, not heavy */
+.strip{
+  padding-top: 32px;
+}
+
+/* Ensure cards still feel premium on light bg */
+.tile--img,
+.feature-card{
+  background: #f3efe6;
+}
