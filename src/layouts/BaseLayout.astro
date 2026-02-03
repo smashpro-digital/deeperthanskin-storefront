@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 const { title = "Deeper Than Skin — Storefront" } = Astro.props;
+const base = import.meta.env.BASE_URL;
 ---
 
 <!DOCTYPE html>
@@ -13,16 +14,23 @@ const { title = "Deeper Than Skin — Storefront" } = Astro.props;
       name="description"
       content="Deeper Than Skin — community-first wellness storefront powered by Square."
     />
+    <!-- Fonts (mockup vibe) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
-    <!-- AOS (public asset, base-aware for GitHub Pages) -->
-    <link rel="stylesheet" href={`${Astro.base}vendor/aos.css`} />
+    <!-- AOS -->
+    <link rel="stylesheet" href={`${base}vendor/aos.css`} />
   </head>
 
   <body>
     <slot />
 
-    <!-- AOS (public asset, do not bundle) -->
-    <script src={`${Astro.base}vendor/aos.js`} is:inline></script>
+    <!-- AOS -->
+    <script src={`${base}vendor/aos.js`} is:inline></script>
     <script is:inline>
       AOS.init({
         duration: 650,
