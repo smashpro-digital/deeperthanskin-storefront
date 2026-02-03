@@ -459,3 +459,32 @@ a{color:inherit}
   .nav-right{ min-width:auto; }
   .nav-wordmark{ font-size: 26px; }
 }
+/* --- Image tiles (mockup-style) --- */
+.tile--img{
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 92px auto;
+  background: rgba(243,239,230,.88);
+  border: 1px solid rgba(0,0,0,.10);
+}
+
+.tile-img{
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.05) contrast(1.02);
+}
+
+.tile-text{
+  padding: 12px 14px 14px;
+}
+
+.tile--img .label{
+  color: rgba(0,0,0,.82);
+}
+
+.tile--img .sub{
+  color: rgba(0,0,0,.60);
+}
