@@ -4,21 +4,30 @@ import ProductCarousel from "../components/ProductCarousel.astro";
 
 const base = import.meta.env.BASE_URL;
 
+// =========
+// LINKS (Square = commerce engine; Astro = brand front door)
+// =========
 const LINKS = {
+  // Main shop entry
   shop: "https://deeper-than-skin-llc.square.site/s/shop",
 
-  skincare: "https://deeper-than-skin-llc.square.site/shop/skincare/44IGIEWZ24FOIDKGQUNATHBR",
-  wellness: "https://deeper-than-skin-llc.square.site/shop/wellness/LXF7ZMUOVOPLEMJZ6HOJFUPB",
+  // Category landings (stable, no query params)
+  skincare:
+    "https://deeper-than-skin-llc.square.site/shop/skincare/44IGIEWZ24FOIDKGQUNATHBR",
+  wellness:
+    "https://deeper-than-skin-llc.square.site/shop/wellness/LXF7ZMUOVOPLEMJZ6HOJFUPB",
 
+  // Featured products (stable, no tracking params)
   featuredBodyButter:
     "https://deeper-than-skin-llc.square.site/product/4-ounce-body-butter/TNB6D42BBIJFTRHP4L7G7LKU",
-
-  featuredJuice:
+  featuredJuice5Pack:
     "https://deeper-than-skin-llc.square.site/product/cold-pressed-juice-5-/OWDVNZ32XFVEVIAEG24JL3YG",
 
+  // Services
   book: "https://deeper-than-skin-llc.square.site/appointments",
 
-  subscribe: "https://deeper-than-skin-llc.square.site/shop",
+  // Subscription placeholder until Square subs are configured
+  subscribe: "https://deeper-than-skin-llc.square.site/s/shop",
 
   community: "https://returntothegarden.co",
 };
@@ -32,6 +41,13 @@ const CAT_JUICES = `${base}images/cat-juices.jpg`;
 const CAT_SEAMOSS = `${base}images/cat-seamoss.jpg`;
 const CAT_KITS = `${base}images/cat-kits.jpg`;
 const CAT_HERBS = `${base}images/cat-herbs.jpg`;
+
+// Until Square has dedicated category URLs for these,
+// route them into the best available landing (Wellness).
+const FALLBACK_CATEGORY = LINKS.wellness;
+
+// External links should open in a new tab (keep the brand site open).
+const EXT = { target: "_blank", rel: "noopener noreferrer" };
 ---
 
 <BaseLayout title="Deeper Than Skin — Storefront">
@@ -39,33 +55,33 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
   <header class="nav nav--light">
     <div class="container nav-inner nav-inner--mock">
       <nav class="nav-left" aria-label="Primary">
-        <a class="nav-link nav-link--active" href={LINKS.shop}>Shop</a>
-        <a class="nav-link" href="#kits">Cleanses</a>
-        <a class="nav-link" href="#kits">Juices</a>
-        <a class="nav-link" href="#kits">Sea Moss</a>
+        <a class="nav-link nav-link--active" href={LINKS.shop} {...EXT}>Shop</a>
+        <a class="nav-link" href={LINKS.skincare} {...EXT}>Skincare</a>
+        <a class="nav-link" href={LINKS.wellness} {...EXT}>Wellness</a>
+        <a class="nav-link" href="#featured">Featured</a>
         <a class="nav-link" href="#services">Services</a>
       </nav>
 
-      <a class="nav-center" href={LINKS.shop} aria-label="Deeper Than Skin Home">
+      <a class="nav-center" href={LINKS.shop} aria-label="Deeper Than Skin Shop" {...EXT}>
         <span class="nav-wordmark">DeeperThanSkin</span>
       </a>
 
       <div class="nav-right" aria-label="Utilities">
-        <a class="icon-btn" href={LINKS.shop} aria-label="Search">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <a class="icon-btn" href={LINKS.shop} aria-label="Search" {...EXT}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path>
           </svg>
         </a>
 
-        <a class="icon-btn" href={LINKS.shop} aria-label="Cart">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <a class="icon-btn" href={LINKS.shop} aria-label="Cart" {...EXT}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M6 6h15l-2 9H7L6 6z"></path><path d="M6 6L5 3H2"></path>
             <circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle>
           </svg>
         </a>
 
-        <a class="icon-btn" href={LINKS.community} aria-label="Account">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <a class="icon-btn" href={LINKS.community} aria-label="Community / Account" {...EXT}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="8" r="4"></circle>
           </svg>
         </a>
@@ -74,7 +90,7 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
   </header>
 
   <main>
-    {/* HERO BANNER (hero first) */}
+    {/* HERO BANNER */}
     <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
       <div class="hero-overlay"></div>
 
@@ -86,45 +102,50 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
         </div>
 
         <p class="hero-lead">
-          A flagship storefront for cleanse kits, sea moss, herbal wellness,
-          and ritual services — powered by Square.
+          Ritual-grade skincare and wellness essentials, with clean online ordering and booking, powered by Square.
         </p>
 
-        {/* Keep hero calm + premium: one primary CTA */}
+        {/* Calm hero: one strong CTA */}
         <div class="btns hero-ctas">
-          <a class="btn btn-primary" href={LINKS.shop}>Shop Now</a>
+          <a class="btn btn-primary" href={LINKS.shop} {...EXT}>Shop Now</a>
+        </div>
+
+        {/* Soft secondary links (not loud) */}
+        <div class="btns" style="margin-top:12px">
+          <a class="btn btn-ghost" href={LINKS.skincare} {...EXT}>Shop Skincare</a>
+          <a class="btn btn-ghost" href={LINKS.wellness} {...EXT}>Shop Wellness</a>
         </div>
       </div>
     </section>
 
-    {/* STRIP BELOW HERO (cards + shop now + ionic) */}
+    {/* STRIP BELOW HERO */}
     <section class="strip-section" data-aos="fade-up" data-aos-delay="120">
       <div class="container strip">
         <div class="strip-grid">
           {/* LEFT: Category cards + Shop Now */}
           <div class="strip-left">
             <div class="cat-grid">
-              <a class="cat-card" href={LINKS.shop} aria-label="Cold-Pressed Juices">
+              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Cold-Pressed Juices" {...EXT}>
                 <div class="cat-media">
                   <img src={CAT_JUICES} alt="Cold-pressed juices" loading="lazy" />
                 </div>
                 <div class="cat-body">
-                  <h3>Cold‑Pressed<br />Juices</h3>
+                  <h3>Cold-Pressed<br />Juices</h3>
                   <p>Event drops &amp;<br />limited releases</p>
                 </div>
               </a>
 
-              <a class="cat-card" href={LINKS.shop} aria-label="Sea Moss Gel">
+              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Sea Moss Gel" {...EXT}>
                 <div class="cat-media">
                   <img src={CAT_SEAMOSS} alt="Sea moss gel" loading="lazy" />
                 </div>
                 <div class="cat-body">
                   <h3>Sea Moss Gel</h3>
-                  <p>Ocean‑rooted<br />daily support</p>
+                  <p>Ocean-rooted<br />daily support</p>
                 </div>
               </a>
 
-              <a class="cat-card" href={LINKS.shop} aria-label="Detox Cleanse Kits">
+              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Detox Cleanse Kits" {...EXT}>
                 <div class="cat-media">
                   <img src={CAT_KITS} alt="Detox cleanse kits" loading="lazy" />
                 </div>
@@ -134,7 +155,7 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
                 </div>
               </a>
 
-              <a class="cat-card" href={LINKS.shop} aria-label="Herbal Teas & Oils">
+              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Herbal Teas & Oils" {...EXT}>
                 <div class="cat-media">
                   <img src={CAT_HERBS} alt="Herbal teas and oils" loading="lazy" />
                 </div>
@@ -146,7 +167,7 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
             </div>
 
             <div class="shop-now-wrap">
-              <a class="shop-now" href={LINKS.shop}>SHOP NOW</a>
+              <a class="shop-now" href={LINKS.shop} {...EXT}>SHOP NOW</a>
             </div>
           </div>
 
@@ -161,7 +182,7 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
             <p class="desc">Relax, Detox &amp; Rebalance</p>
 
             <div class="cta">
-              <a class="primary" href={LINKS.book}>Book Your Session</a>
+              <a class="primary" href={LINKS.book} {...EXT}>Book Your Session</a>
             </div>
           </div>
         </div>
@@ -169,31 +190,41 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
     </section>
 
     {/* FEATURED / CAROUSEL */}
-    <section class="section" id="kits">
+    <section class="section" id="featured">
       <div class="container" data-aos="fade-up">
         <div class="kicker">Featured</div>
-        <h2 class="h2">Cleanses • Sea Moss • Kits</h2>
-        <p class="p">Subtle motion, clean cards, and a carousel that stays within Square’s realistic integration.</p>
+        <h2 class="h2">Skincare &amp; Wellness Highlights</h2>
+        <p class="p">
+          A clean brand front door that routes into Square for checkout. Keep it simple now, go headless later.
+        </p>
       </div>
 
       <ProductCarousel />
 
+      {/* Featured action tiles (Square deep links) */}
       <div class="section" style="padding-top:26px">
         <div class="container grid">
-          <a class="card" data-aos="fade-up" href={LINKS.subscribe}>
-            <h3>Wellness Kit Subscription</h3>
-            <p>Monthly or seasonal kits — commit to the journey.</p>
+          <a class="card" data-aos="fade-up" href={LINKS.subscribe} {...EXT}>
+            <h3>Wellness Subscription</h3>
+            <p>Recurring support for your routine. (Enable subscriptions in Square when ready.)</p>
           </a>
 
-          <a class="card" data-aos="fade-up" data-aos-delay="80" href={LINKS.shop}>
-            <h3>Cold‑Pressed Juices</h3>
-            <p>Event drops &amp; limited releases.</p>
+          <a class="card" data-aos="fade-up" data-aos-delay="80" href={LINKS.featuredJuice5Pack} {...EXT}>
+            <h3>Cold-Pressed Juice (5-Pack)</h3>
+            <p>Limited releases, built for consistency. Tap to view and order.</p>
           </a>
 
-          <a class="card" data-aos="fade-up" data-aos-delay="160" href={LINKS.shop}>
-            <h3>Living Sea Moss</h3>
-            <p>Ocean‑rooted nourishment.</p>
+          <a class="card" data-aos="fade-up" data-aos-delay="160" href={LINKS.featuredBodyButter} {...EXT}>
+            <h3>4 oz Body Butter</h3>
+            <p>Signature texture, ritual finish. Tap to shop the body butter page.</p>
           </a>
+        </div>
+
+        <div class="container" style="padding-top:18px">
+          <div class="btns" style="justify-content:center">
+            <a class="btn btn-primary" href={LINKS.skincare} {...EXT}>Shop Skincare</a>
+            <a class="btn btn-ghost" href={LINKS.wellness} {...EXT}>Shop Wellness</a>
+          </div>
         </div>
       </div>
     </section>
@@ -204,11 +235,11 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
         <div class="callout">
           <div class="kicker">Service</div>
           <h2 class="h2">Ionic Footbath</h2>
-          <p class="p">Make services a premium ritual: public booking + community perks later.</p>
+          <p class="p">A premium ritual experience. Public booking now, community perks later.</p>
 
           <div class="btns">
-            <a class="btn btn-primary" href={LINKS.book}>Book Now</a>
-            <a class="btn btn-ghost" href={LINKS.community}>See Member Perks</a>
+            <a class="btn btn-primary" href={LINKS.book} {...EXT}>Book Now</a>
+            <a class="btn btn-ghost" href={LINKS.community} {...EXT}>See Member Perks</a>
           </div>
         </div>
       </div>
@@ -220,12 +251,12 @@ const CAT_HERBS = `${base}images/cat-herbs.jpg`;
         <div class="kicker">Next layer</div>
         <h2 class="h2">Return to the Garden</h2>
         <p class="p">
-          Your community home for the Seed Bearer pledge, education, and governance pages (terms & privacy) —
+          Your community home for the Seed Bearer pledge, education, and governance pages (terms &amp; privacy),
           with the mobile app coming later.
         </p>
 
         <div class="btns">
-          <a class="btn btn-primary" href={LINKS.community}>Visit ReturnToTheGarden.co</a>
+          <a class="btn btn-primary" href={LINKS.community} {...EXT}>Visit ReturnToTheGarden.co</a>
         </div>
       </div>
     </section>
