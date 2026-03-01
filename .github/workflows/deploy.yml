@@ -30,6 +30,9 @@ jobs:
         run: npm ci
 
       - name: Build with Astro
+        env:
+          PUBLIC_COMMERCE_API_BASE: ${{ secrets.PUBLIC_COMMERCE_API_BASE }}
+          PUBLIC_COMMERCE_APP_SLUG: ${{ secrets.PUBLIC_COMMERCE_APP_SLUG }}
         run: npm run build
 
       - name: Upload artifact
