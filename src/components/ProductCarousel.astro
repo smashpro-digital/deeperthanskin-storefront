@@ -1,22 +1,21 @@
 ---
 /**
- * ProductCarousel.astro (dynamic, no iframe, mobile friendly)
- * Calls your PHP proxy:
- *   /api/v1/index.php?path=public/commerce/featured&app_slug=deeper-than-skin
- *
- * Expects response:
- *   { ok:true, items:[{ id,name,description,image_ids, ... }] }
- *
- * NOTE: For now we use a safe image fallback if image URLs are not resolved yet.
- * Next step: enhance your endpoints to resolve image URLs via Square (recommended).
+ * ProductCarousel.astro
+ * Dynamic (no iframe), mobile friendly.
  */
-const API_BASE = import.meta.env.PUBLIC_COMMERCE_API_BASE;
-const APP_SLUG = import.meta.env.PUBLIC_COMMERCE_APP_SLUG;
 
-const endpoint = `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURIComponent(APP_SLUG)}&limit=12`;
+const API_BASE =
+  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
+  "https://smashpro.app/api/v1/index.php";
+
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+
+const endpoint =
+  `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURIComponent(APP_SLUG)}&limit=12`;
 ---
 
-<section class="carousel" aria-label="Featured products">
+<section class="carousel" aria-label="Featured products" data-endpoint={endpoint}>
   <div class="carousel-head">
     <h3 class="carousel-title">Featured Drops</h3>
     <div class="carousel-actions">
@@ -25,170 +24,189 @@ const endpoint = `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURI
     </div>
   </div>
 
-  <div class="carousel-track" data-track>
-    {Array.from({ length: 6 }).map(() => (
-      <article class="p-card p-card--skeleton" aria-hidden="true">
-        <div class="p-img skel" />
-        <div class="p-body">
-          <div class="skel skel-line" style="width:70%" />
-          <div class="skel skel-line" style="width:45%" />
-          <div class="skel skel-pill" style="width:90px" />
-        </div>
-      </article>
+  <div class="carousel-rail" role="list" aria-live="polite">
+    <!-- lightweight skeletons (rendered immediately) -->
+    {Array.from({ length: 4 }).map(() => (
+      <div class="card card--skeleton" role="listitem">
+        <div class="img skel"></div>
+        <div class="line skel"></div>
+        <div class="line skel" style="width:70%"></div>
+      </div>
     ))}
   </div>
 
-  <p class="carousel-foot" data-status>
-    Loading featured items…
+  <p class="carousel-note" style="margin-top:10px; opacity:.8;">
+    Powered by Square inventory. Checkout stays on Square.
   </p>
-
-  <script define:vars={{ endpoint }}>
-    const track = document.querySelector("[data-track]");
-    const status = document.querySelector("[data-status]");
-    const btns = document.querySelectorAll(".carousel-btn");
-
-    const FALLBACK_IMG = "/images/product-fallback.jpg"; // add this to /public/images
-
-    const escapeHtml = (s = "") =>
-      String(s).replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
-
-    const makeCard = (p) => {
-      // If you later return image_url + price from API, use those.
-      const name = escapeHtml(p?.name || "Product");
-      const desc = escapeHtml(p?.description || "");
-      const img = escapeHtml(p?.image_url || FALLBACK_IMG);
-
-      // For now, send to Square product page by slug/id if you expose it.
-      // Next step: include `web_url` in the API response (recommended).
-      const url = escapeHtml(p?.web_url || "https://deeper-than-skin-llc.square.site/s/shop");
-
-      return `
-        <article class="p-card">
-          <a class="p-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="View ${name}">
-            <div class="p-img-wrap">
-              <img class="p-img" src="${img}" alt="${name}" loading="lazy" />
-            </div>
-            <div class="p-body">
-              <h4 class="p-title">${name}</h4>
-              <p class="p-desc">${desc}</p>
-              <span class="p-cta">View</span>
-            </div>
-          </a>
-        </article>
-      `;
-    };
-
-    const wireScroll = () => {
-      btns.forEach((b) =>
-        b.addEventListener("click", () => {
-          const dir = Number(b.getAttribute("data-dir") || "1");
-          track.scrollBy({ left: dir * Math.max(280, track.clientWidth * 0.6), behavior: "smooth" });
-        })
-      );
-    };
-
-    async function load() {
-      try {
-        wireScroll();
-        const res = await fetch(endpoint, { headers: { "Accept": "application/json" }});
-        const data = await res.json();
-
-        if (!data?.ok) throw new Error("Bad response");
-        const items = Array.isArray(data.items) ? data.items : [];
-
-        if (!items.length) {
-          status.textContent = "No featured items yet.";
-          track.innerHTML = "";
-          return;
-        }
-
-        track.innerHTML = items.map(makeCard).join("");
-        status.textContent = "Swipe to explore. Tap to view and checkout.";
-      } catch (e) {
-        console.error(e);
-        status.textContent = "Couldn’t load featured items. Please refresh.";
-      }
-    }
-
-    load();
-  </script>
 </section>
 
+<script is:inline>
+  (function () {
+    const root = document.currentScript.closest(".carousel");
+    if (!root) return;
+
+    const rail = root.querySelector(".carousel-rail");
+    const endpoint = root.getAttribute("data-endpoint");
+
+    const money = (pm) => {
+      if (!pm || typeof pm.amount !== "number") return "";
+      const amt = (pm.amount / 100).toFixed(2);
+      const cur = pm.currency || "USD";
+      return `$${amt} ${cur}`;
+    };
+
+    const escapeHtml = (s) =>
+      String(s || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    const render = (items) => {
+      rail.innerHTML = "";
+
+      if (!Array.isArray(items) || items.length === 0) {
+        rail.innerHTML = `<div class="card" role="listitem">
+          <div class="card-body">
+            <h4>Nothing featured yet</h4>
+            <p>Add items in Square and refresh.</p>
+          </div>
+        </div>`;
+        return;
+      }
+
+      items.forEach((it) => {
+        const img = it.image_url || "/images/hero-brandold.png";
+        const title = escapeHtml(it.name);
+        const desc = escapeHtml(it.description || "").slice(0, 120);
+        const price = it.has_price ? money(it.price_money) : "";
+
+        // NOTE: For now we don’t have a Square deep link per item from Catalog.
+        // Next step is to implement a checkout/link endpoint.
+        const href = "https://deeper-than-skin-llc.square.site/s/shop";
+
+        const el = document.createElement("a");
+        el.className = "card";
+        el.href = href;
+        el.target = "_blank";
+        el.rel = "noopener noreferrer";
+        el.setAttribute("role", "listitem");
+
+        el.innerHTML = `
+          <div class="imgwrap">
+            <img src="${img}" alt="${title}" loading="lazy" />
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <h4 class="name">${title}</h4>
+              ${price ? `<div class="price">${escapeHtml(price)}</div>` : ""}
+            </div>
+            ${desc ? `<p class="desc">${desc}</p>` : `<p class="desc" style="opacity:.75">Tap to shop.</p>`}
+          </div>
+        `;
+
+        rail.appendChild(el);
+      });
+    };
+
+    const load = async () => {
+      try {
+        const res = await fetch(endpoint, { headers: { "Accept": "application/json" } });
+        const text = await res.text();
+
+        // If we got HTML (404 page), avoid JSON parse crash
+        if (text.trim().startsWith("<")) throw new Error("Non-JSON response (check endpoint URL / env vars).");
+
+        const data = JSON.parse(text);
+        if (!data || data.ok !== true) throw new Error("API returned not ok.");
+        render(data.items || []);
+      } catch (e) {
+        console.error("[carousel] load failed:", e);
+        rail.innerHTML = `<div class="card" role="listitem">
+          <div class="card-body">
+            <h4>Couldn’t load featured items</h4>
+            <p style="opacity:.8">Check PUBLIC_COMMERCE_API_BASE / PUBLIC_COMMERCE_APP_SLUG and the API route.</p>
+          </div>
+        </div>`;
+      }
+    };
+
+    // Scroll buttons
+    root.querySelectorAll(".carousel-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dir = Number(btn.getAttribute("data-dir") || "1");
+        rail.scrollBy({ left: dir * Math.max(260, rail.clientWidth * 0.8), behavior: "smooth" });
+      });
+    });
+
+    load();
+  })();
+</script>
+
 <style>
-  .carousel { padding: 22px 0; }
-  .carousel-head {
-    display:flex; align-items:center; justify-content:space-between;
-    gap: 12px; margin: 0 auto 12px; max-width: 1120px; padding: 0 18px;
-  }
-  .carousel-title { margin:0; font-size: 18px; letter-spacing: .3px; }
-  .carousel-actions { display:flex; gap: 8px; }
-  .carousel-btn{
-    width: 38px; height: 38px; border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(0,0,0,.35); color: #fff;
-    display:grid; place-items:center; cursor:pointer;
+  .carousel { padding: 14px 0; }
+  .carousel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .carousel-title { margin:0; }
+  .carousel-actions { display:flex; gap:10px; }
+  .carousel-btn {
+    width:40px; height:40px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.18);
+    background: rgba(0,0,0,.22);
+    color: inherit;
+    font-size: 22px;
+    line-height: 1;
   }
 
-  .carousel-track{
-    max-width: 1120px; margin: 0 auto;
-    padding: 6px 18px 8px;
-    display:flex; gap: 14px;
-    overflow-x:auto; scroll-snap-type:x mandatory;
+  .carousel-rail {
+    display:flex;
+    gap:14px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    padding: 14px 2px;
     -webkit-overflow-scrolling: touch;
   }
-  .carousel-track::-webkit-scrollbar{ height: 8px; }
-  .carousel-foot{
-    margin: 10px auto 0; max-width: 1120px; padding: 0 18px;
-    opacity: .78; font-size: 13px;
-  }
+  .carousel-rail::-webkit-scrollbar { height: 8px; }
+  .carousel-rail::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 999px; }
 
-  .p-card{
-    min-width: 220px; max-width: 220px;
+  .card {
     scroll-snap-align: start;
+    flex: 0 0 78%;
+    max-width: 360px;
+    min-width: 260px;
     border-radius: 18px;
-    border: 1px solid rgba(255,255,255,.12);
+    overflow: hidden;
+    text-decoration:none;
+    color: inherit;
+    border: 1px solid rgba(255,255,255,.10);
     background: rgba(0,0,0,.18);
-    overflow:hidden;
+    backdrop-filter: blur(8px);
   }
-  .p-link{ display:block; color: inherit; text-decoration:none; }
-  .p-img-wrap{ aspect-ratio: 1 / 1; background: rgba(255,255,255,.06); }
-  .p-img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .p-body{ padding: 12px 12px 14px; }
-  .p-title{ margin:0 0 6px; font-size: 14px; line-height: 1.2; }
-  .p-desc{
-    margin:0 0 10px; font-size: 12px; line-height: 1.35;
-    opacity:.75; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-  }
-  .p-cta{
-    display:inline-flex; align-items:center; justify-content:center;
-    height: 34px; padding: 0 12px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(255,255,255,.08);
-    font-size: 12px;
+  @media (min-width: 720px) {
+    .card { flex-basis: 320px; }
   }
 
-  /* skeleton */
-  .p-card--skeleton{ pointer-events:none; }
-  .skel{
+  .imgwrap { width:100%; aspect-ratio: 4 / 3; background: rgba(255,255,255,.05); }
+  .imgwrap img { width:100%; height:100%; object-fit: cover; display:block; }
+
+  .card-body { padding: 12px 12px 14px; }
+  .row { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .name { margin:0; font-size: 16px; line-height: 1.2; }
+  .price { font-weight: 600; opacity: .95; white-space: nowrap; }
+  .desc { margin: 8px 0 0; font-size: 13px; opacity: .85; }
+
+  /* Skeleton */
+  .card--skeleton { pointer-events:none; }
+  .skel {
     background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.12), rgba(255,255,255,.06));
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
-    border-radius: 10px;
+    border-radius: 12px;
   }
-  .skel-line{ height: 12px; margin: 10px 0 0; }
-  .skel-pill{ height: 34px; margin-top: 12px; border-radius: 999px; }
-  .p-card--skeleton .p-img{ display:none; }
-  .p-card--skeleton .p-img.skel{ height: 220px; }
-  .p-card--skeleton .p-img.skel{ border-radius:0; }
-  .p-card--skeleton .p-img.skel{ display:block; }
-  .p-card--skeleton .p-img{ display:block; }
-  .p-card--skeleton .p-img.skel{ width:100%; }
-  .p-card--skeleton .p-img.skel{ aspect-ratio:1/1; }
-
-  @keyframes shimmer{ 0%{ background-position: 200% 0 } 100%{ background-position: -200% 0 } }
-
-  @media (min-width: 860px){
-    .p-card{ min-width: 240px; max-width: 240px; }
+  .card--skeleton .img { aspect-ratio:4/3; }
+  .card--skeleton .line { height: 12px; margin: 10px 12px; }
+  @keyframes shimmer {
+    0% { background-position: 0% 0; }
+    100% { background-position: 200% 0; }
   }
 </style>
