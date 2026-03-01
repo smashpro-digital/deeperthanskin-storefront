@@ -1,0 +1,237 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const API_BASE =
+  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+
+const { id } = Astro.params;
+
+const endpoint =
+  `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
+
+// Your Square storefront entry for purchases (until per-item links are wired)
+const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
+---
+
+<BaseLayout title="Product | Deeper Than Skin">
+  <main class="section">
+    <div class="container">
+      <a class="small" href="/shop" style="text-decoration:none;opacity:.85">← Back to Shop</a>
+
+      <div id="product" class="prod" data-endpoint={endpoint} data-square={SQUARE_SHOP}>
+        <div class="prod-left">
+          <div class="prod-media skel" aria-hidden="true"></div>
+        </div>
+        <div class="prod-right">
+          <div class="skel" style="height:14px;width:140px;border-radius:999px"></div>
+          <div class="skel" style="height:34px;margin-top:12px"></div>
+          <div class="skel" style="height:16px;width:180px;margin-top:12px"></div>
+          <div class="skel" style="height:12px;margin-top:18px"></div>
+          <div class="skel" style="height:12px;width:85%;margin-top:10px"></div>
+          <div class="skel" style="height:12px;width:70%;margin-top:10px"></div>
+          <div class="btns" style="margin-top:18px">
+            <span class="btn btn-primary" aria-hidden="true">Loading…</span>
+            <span class="btn btn-ghost" aria-hidden="true">Loading…</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="padding-top:28px">
+        <div class="callout">
+          <div class="kicker">Tip</div>
+          <h2 class="h2">Make it a ritual</h2>
+          <p class="p">Pair a product with a wellness staple for a complete routine.</p>
+          <div class="btns">
+            <a class="btn btn-primary" href="/featured">Browse Featured</a>
+            <a class="btn btn-ghost" href="/category/wellness">Explore Wellness</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script is:inline>
+    (function () {
+      const root = document.getElementById("product");
+      if (!root) return;
+
+      const endpoint = root.getAttribute("data-endpoint");
+      const squareShop = root.getAttribute("data-square") || "#";
+
+      const escapeHtml = (s) =>
+        String(s || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
+      const money = (pm) => {
+        if (!pm || typeof pm.amount !== "number") return "";
+        const amt = pm.amount / 100;
+        const cur = pm.currency || "USD";
+        try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
+        catch { return `$${amt.toFixed(2)}`; }
+      };
+
+      const pickFallback = (name) => {
+        const s = String(name || "").toLowerCase();
+        if (s.includes("juice")) return "/images/cat-juices.jpg";
+        if (s.includes("moss")) return "/images/cat-seamoss.jpg";
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "/images/cat-kits.jpg";
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return "/images/cat-herbs.jpg";
+        return "/images/product-fallback.jpg";
+      };
+
+      const render = (p) => {
+        const name = escapeHtml(p?.name || "Product");
+        const desc = escapeHtml(p?.description || "");
+        const img = (p?.image_url && String(p.image_url).trim()) ? p.image_url : pickFallback(p?.name);
+        const price = p?.has_price ? money(p?.price_money) : "";
+
+        root.innerHTML = `
+          <div class="prod-left">
+            <div class="prod-media">
+              <img src="${img}" alt="${name}" loading="lazy" />
+            </div>
+          </div>
+
+          <div class="prod-right">
+            <div class="prod-pill">Deeper Than Skin</div>
+            <h1 class="prod-title">${name}</h1>
+
+            ${price ? `<div class="prod-price">${escapeHtml(price)}</div>` : `<div class="prod-price" style="opacity:.7">See price on checkout</div>`}
+
+            ${desc ? `<p class="prod-desc">${desc}</p>` : `<p class="prod-desc" style="opacity:.78">No description yet. Tap buy to view on Square.</p>`}
+
+            <div class="btns">
+              <a class="btn btn-primary" href="${squareShop}" target="_blank" rel="noopener noreferrer">Buy on Square</a>
+              <a class="btn btn-ghost" href="/shop">Continue browsing</a>
+            </div>
+
+            <p class="small" style="margin-top:12px;opacity:.8">
+              Checkout is handled securely by Square.
+            </p>
+          </div>
+        `;
+      };
+
+      const load = async () => {
+        try {
+          const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+          const text = await res.text();
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+          const data = JSON.parse(text);
+          if (!data || data.ok !== true) throw new Error("API not ok");
+
+          // expected: { ok:true, item:{...} } OR { ok:true, items:[...] }
+          const p = data.item || (Array.isArray(data.items) ? data.items[0] : null);
+          if (!p) throw new Error("Product not found");
+          render(p);
+        } catch (e) {
+          console.error("[product] load failed:", e);
+          root.innerHTML = `
+            <div class="callout" style="grid-column:1/-1">
+              <div class="kicker">Error</div>
+              <h2 class="h2" style="margin:6px 0 8px">Couldn’t load product</h2>
+              <p class="p">Check the product id and API route.</p>
+              <div class="btns">
+                <a class="btn btn-primary" href="/shop">Back to shop</a>
+                <a class="btn btn-ghost" href="/featured">Featured</a>
+              </div>
+            </div>
+          `;
+        }
+      };
+
+      load();
+    })();
+  </script>
+
+  <style>
+    .prod{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 18px;
+      margin-top: 14px;
+      align-items: start;
+    }
+    @media (max-width: 980px){
+      .prod{ grid-template-columns: 1fr; }
+    }
+
+    .prod-media{
+      border-radius: 24px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.16);
+      box-shadow: 0 26px 70px rgba(0,0,0,.28);
+      aspect-ratio: 4/3;
+      position:relative;
+    }
+    .prod-media img{ width:100%; height:100%; object-fit: cover; display:block; }
+    .prod-media::after{
+      content:"";
+      position:absolute; inset:0;
+      background: radial-gradient(900px 360px at 50% 22%, transparent, rgba(0,0,0,.38));
+      pointer-events:none;
+    }
+
+    .prod-right{
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 46px rgba(0,0,0,.22);
+      padding: 18px;
+    }
+
+    .prod-pill{
+      display:inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      border: 1px solid rgba(200,162,74,.35);
+      background: rgba(200,162,74,.12);
+      color: rgba(255,255,255,.92);
+    }
+
+    .prod-title{
+      font-family: var(--font-display);
+      font-size: clamp(30px, 3.2vw, 44px);
+      line-height: 1.02;
+      margin: 14px 0 8px;
+      letter-spacing: -.01em;
+    }
+
+    .prod-price{
+      font-weight: 750;
+      font-size: 16px;
+      opacity: .95;
+    }
+
+    .prod-desc{
+      margin: 14px 0 0;
+      color: rgba(255,255,255,.80);
+      line-height: 1.65;
+      font-size: 15px;
+      max-width: 62ch;
+      white-space: pre-wrap;
+    }
+
+    /* skeleton */
+    .skel{
+      background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 18px;
+    }
+    @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
+  </style>
+</BaseLayout>

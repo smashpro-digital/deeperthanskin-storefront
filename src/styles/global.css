@@ -1,3 +1,8 @@
+/* =========================================================
+   Deeper Than Skin — Global Stylesheet (FULL DROP-IN)
+   Luxury mode polish + responsive Featured images
+   ========================================================= */
+
 :root{
   /* Brand palette */
   --bg:#07110d;                 /* deeper evergreen */
@@ -11,6 +16,13 @@
   --gold2:#e0c47a;
   --line:rgba(255,255,255,.14);
 
+  /* Luxury surfaces */
+  --glass: rgba(255,255,255,.06);
+  --glass2: rgba(255,255,255,.09);
+  --ink: rgba(0,0,0,.68);
+  --ink2: rgba(0,0,0,.58);
+  --shadow: 0 18px 52px rgba(0,0,0,.42);
+
   /* Typography */
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
   --font-display: "Cormorant Garamond", serif;
@@ -22,11 +34,16 @@
   --r20: 20px;
   --r22: 22px;
   --r24: 24px;
+
+  /* Spacing */
+  --pad: 20px;
+  --pad-lg: 28px;
 }
 
 /* ---------- Base ---------- */
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+html{scroll-behavior:smooth}
 body{
   font-family: var(--font-sans);
   color:#fff;
@@ -37,9 +54,22 @@ body{
     linear-gradient(180deg, var(--bg), var(--bg2));
 }
 
+/* Better default media behavior */
+img,video,canvas,svg{display:block;max-width:100%}
 a{color:inherit}
-.container{max-width:1160px;margin:0 auto;padding:0 20px}
+.container{max-width:1160px;margin:0 auto;padding:0 var(--pad)}
 .section{padding:76px 0}
+
+/* Selection polish */
+::selection{ background: rgba(200,162,74,.28); color: #fff; }
+
+/* Optional luxury divider */
+.hr-lux{
+  height:1px;
+  border:0;
+  background: linear-gradient(90deg, transparent, rgba(200,162,74,.55), transparent);
+  margin: 22px 0;
+}
 
 /* ---------- Type ---------- */
 .kicker{
@@ -86,7 +116,9 @@ a{color:inherit}
   padding:12px 16px;border-radius:14px;border:1px solid var(--line);
   text-decoration:none;font-weight:650;font-size:14px;
   background: rgba(255,255,255,.02);
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease;
 }
+.btn:hover{ transform: translateY(-1px); }
 .btn-primary{
   background: rgba(200,162,74,.18);
   border-color: rgba(200,162,74,.42);
@@ -106,6 +138,7 @@ a{color:inherit}
 .nav--light{
   background: rgba(243,239,230,.88);
   border-bottom: 1px solid rgba(0,0,0,.12);
+  box-shadow: 0 10px 28px rgba(0,0,0,.10);
 }
 .nav-inner{
   display:flex;
@@ -131,6 +164,7 @@ a{color:inherit}
   letter-spacing:.01em;
   padding: 8px 2px;
   border-bottom: 2px solid transparent;
+  transition: color .15s ease, border-color .15s ease;
 }
 .nav-link:hover{ color: rgba(0,0,0,.92); }
 .nav-link--active{
@@ -164,8 +198,10 @@ a{color:inherit}
   border: 1px solid rgba(0,0,0,.10);
   background: rgba(255,255,255,.55);
   text-decoration:none;
+  transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
 }
 .icon-btn:hover{
+  transform: translateY(-1px);
   color: rgba(0,0,0,.92);
   border-color: rgba(0,0,0,.18);
   background: rgba(255,255,255,.75);
@@ -212,6 +248,7 @@ a{color:inherit}
   font-size: clamp(42px, 6vw, 72px);
   letter-spacing: .02em;
   color: var(--gold2);
+  text-shadow: 0 18px 54px rgba(0,0,0,.55);
 }
 .hero-divider{
   display:block;
@@ -347,50 +384,78 @@ a{color:inherit}
   color: rgba(243,239,230,.95);
   border: 1px solid rgba(200,162,74,.55);
   box-shadow: 0 10px 24px rgba(0,0,0,.18);
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
 }
 .shop-now:hover{
+  transform: translateY(-1px);
   background: rgba(12,40,28,1);
   box-shadow: 0 14px 32px rgba(0,0,0,.22);
 }
 
-/* RIGHT column: Ionic card (tight version) */
-.feature-card{ /* base (kept for compatibility) */
+/* ---------- FEATURED (RIGHT column) — Luxury + MOBILE RESPONSIVE FIX ---------- */
+.feature-card{
   background: rgba(243,239,230,.95);
   color: rgba(0,0,0,.82);
   border: 1px solid rgba(0,0,0,.12);
-  border-radius: 18px;
+  border-radius: 22px;
   padding: 14px;
   box-shadow: 0 18px 54px rgba(0,0,0,.14);
   align-self: start;
   display:grid;
-  gap: 10px;
-}
-.feature-card--tight{ /* explicit modifier; same look */
-  align-self: start;
-}
-.feature-card .title{
-  font-family: var(--font-display);
-  font-size: 22px;
-  margin: 0 0 6px;
-  color: rgba(0,0,0,.82);
-}
-.feature-card .media{
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,.10);
-  background: rgba(0,0,0,.06);
-  aspect-ratio: 16/9;
+  gap: 12px;
   overflow:hidden;
 }
+
+/* stronger title presence */
+.feature-card .title{
+  font-family: var(--font-display);
+  font-size: 24px;
+  margin: 0 0 6px;
+  color: rgba(0,0,0,.84);
+  letter-spacing: .01em;
+}
+
+/* KEY FIX: make the featured media responsive and stable */
+.feature-card .media{
+  border-radius: 18px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(0,0,0,.06);
+  overflow:hidden;
+  width: 100%;
+  height: auto;
+
+  /* Mobile friendly defaults */
+  aspect-ratio: 16/10; /* a touch taller than 16:9 so it doesn’t feel cramped */
+}
+
+/* Ensure image never overflows and always scales */
 .feature-card .media img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   display:block;
 }
+
+/* On smaller screens, give it more height (prevents tiny banner look) */
+@media (max-width: 980px){
+  .feature-card .media{ aspect-ratio: 4/3; }
+}
+@media (max-width: 560px){
+  .feature-card{
+    padding: 12px;
+    border-radius: 20px;
+  }
+  .feature-card .title{ font-size: 22px; }
+  .feature-card .media{ aspect-ratio: 1/1; } /* square reads best on mobile */
+}
+
+/* Text + CTA polish */
 .feature-card .desc{
   margin: 0;
   color: rgba(0,0,0,.62);
   text-align:center;
+  line-height: 1.45;
 }
 .feature-card .cta{
   display:flex;
@@ -401,19 +466,117 @@ a{color:inherit}
   align-items:center;
   justify-content:center;
   padding: 10px 14px;
-  border-radius: 12px;
-  font-weight: 650;
+  border-radius: 999px;
+  font-weight: 700;
   font-size: 13px;
   text-decoration:none;
   border: 1px solid rgba(0,0,0,.14);
   color:#111;
   background: rgba(255,255,255,.55);
+  transition: transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.feature-card .cta a:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,.72);
+  border-color: rgba(0,0,0,.18);
+  box-shadow: 0 14px 28px rgba(0,0,0,.14);
 }
 .feature-card .cta a.primary{
   background: rgba(200,162,74,.22);
   border: 1px solid rgba(200,162,74,.55);
   color: rgba(0,0,0,.78);
 }
+.feature-card .cta a.primary:hover{
+  background: rgba(200,162,74,.28);
+  border-color: rgba(200,162,74,.70);
+}
+
+/* ---------- Luxury Product Grid (optional classes, safe to add) ---------- */
+.product-grid{
+  display:grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: clamp(14px, 2vw, 22px);
+}
+
+.product-card{
+  grid-column: span 3;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  border: 1px solid rgba(255,255,255,.12);
+  overflow:hidden;
+  position: relative;
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.product-card:hover{
+  transform: translateY(-6px);
+  box-shadow: var(--shadow);
+  border-color: rgba(200,162,74,.28);
+}
+.product-media{
+  aspect-ratio: 4 / 5;
+  background: rgba(0,0,0,.25);
+  position: relative;
+  overflow:hidden;
+}
+.product-media img{
+  width:100%;
+  height:100%;
+  object-fit: cover;
+  transform: scale(1);
+  transition: transform .45s ease;
+}
+.product-card:hover .product-media img{ transform: scale(1.035); }
+.product-media::after{
+  content:"";
+  position:absolute; inset:0;
+  background: radial-gradient(1200px 400px at 40% -20%, rgba(200,162,74,.18), transparent 55%);
+  pointer-events:none;
+}
+.product-body{ padding: 18px 18px 16px; }
+.product-title{
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.05;
+  margin: 0 0 8px;
+  letter-spacing: .01em;
+}
+.product-desc{
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.product-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.product-price{
+  color: rgba(255,255,255,.92);
+  font-weight: 700;
+  letter-spacing: .3px;
+}
+.btn-lux{
+  border-radius: 999px;
+  padding: 10px 14px;
+  border: 1px solid rgba(200,162,74,.35);
+  background: rgba(200,162,74,.12);
+  color: rgba(255,255,255,.92);
+  cursor:pointer;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  font-weight: 700;
+  font-size: 13px;
+}
+.btn-lux:hover{
+  transform: translateY(-1px);
+  background: rgba(200,162,74,.18);
+  border-color: rgba(200,162,74,.55);
+  box-shadow: 0 14px 28px rgba(0,0,0,.18);
+}
+
+@media (max-width: 1100px){ .product-card{ grid-column: span 4; } }
+@media (max-width: 720px){ .product-card{ grid-column: span 6; } }
+@media (max-width: 520px){ .product-card{ grid-column: span 12; } }
 
 /* ---------- Cards + grid (for Kits section below) ---------- */
 .grid{
@@ -456,4 +619,9 @@ a{color:inherit}
   color: var(--muted);
   padding: 28px 0;
   font-size: 13px;
+}
+
+/* ---------- Reduced motion respect ---------- */
+@media (prefers-reduced-motion: reduce){
+  *{ transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }

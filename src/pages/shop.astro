@@ -1,0 +1,276 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const API_BASE =
+  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+
+const base = import.meta.env.BASE_URL;
+
+// Category fallback images (from /public/images)
+const CAT = {
+  juices: `${base}images/cat-juices.jpg`,
+  seamoss: `${base}images/cat-seamoss.jpg`,
+  kits: `${base}images/cat-kits.jpg`,
+  herbs: `${base}images/cat-herbs.jpg`,
+  skincare: `${base}images/cat-kits.jpg`,
+  wellness: `${base}images/cat-herbs.jpg`,
+};
+
+// In-house category routes
+const categories = [
+  { slug: "skincare", title: "Skincare", subtitle: "Glow rituals & staples", img: CAT.skincare },
+  { slug: "wellness", title: "Wellness", subtitle: "Inside-out support", img: CAT.wellness },
+  { slug: "juices", title: "Cold-Pressed Juices", subtitle: "Limited drops", img: CAT.juices },
+  { slug: "seamoss", title: "Sea Moss Gel", subtitle: "Ocean-rooted daily support", img: CAT.seamoss },
+  { slug: "kits", title: "Detox Cleanse Kits", subtitle: "Reset • restore • renew", img: CAT.kits },
+  { slug: "herbs", title: "Herbal Teas & Oils", subtitle: "Calm, clarity, balance", img: CAT.herbs },
+];
+
+const productsEndpoint = `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=24`;
+---
+
+<BaseLayout title="Shop | Deeper Than Skin">
+  <main class="section">
+    <div class="container">
+      <div class="kicker">Shop</div>
+      <h1 class="h2" style="font-size:40px;margin-top:8px">Browse the collection</h1>
+      <p class="p" style="max-width:70ch">
+        Explore products in-house for a luxury browsing experience. Checkout continues on Square when you’re ready.
+      </p>
+
+      <div class="shop-grid">
+        {categories.map((c) => (
+          <a class="shop-cat" href={`/category/${c.slug}`} aria-label={`${c.title} category`}>
+            <div class="shop-cat-media">
+              <img src={c.img} alt={c.title} loading="lazy" />
+            </div>
+            <div class="shop-cat-body">
+              <h3>{c.title}</h3>
+              <p>{c.subtitle}</p>
+              <span class="shop-cat-pill">Explore</span>
+            </div>
+          </a>
+        ))}
+      </div>
+
+      <div style="margin-top:36px" class="section">
+        <div class="kicker">Latest</div>
+        <h2 class="h2">Fresh from inventory</h2>
+
+        <div class="grid" data-endpoint={productsEndpoint} id="products-grid">
+          {Array.from({ length: 6 }).map(() => (
+            <div class="pgrid-card pgrid-skeleton" aria-hidden="true">
+              <div class="pgrid-media skel"></div>
+              <div class="pgrid-body">
+                <div class="skel line"></div>
+                <div class="skel line" style="width:70%"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div class="btns" style="justify-content:center;margin-top:18px">
+          <a class="btn btn-primary" href="/featured">View Featured</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script is:inline>
+    (function () {
+      const grid = document.getElementById("products-grid");
+      if (!grid) return;
+
+      const endpoint = grid.getAttribute("data-endpoint");
+
+      const escapeHtml = (s) =>
+        String(s || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
+      const money = (pm) => {
+        if (!pm || typeof pm.amount !== "number") return "";
+        const amt = pm.amount / 100;
+        const cur = pm.currency || "USD";
+        try {
+          return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+        } catch {
+          return `$${amt.toFixed(2)}`;
+        }
+      };
+
+      const pickFallback = (name) => {
+        const s = String(name || "").toLowerCase();
+        if (s.includes("juice")) return "/images/cat-juices.jpg";
+        if (s.includes("moss")) return "/images/cat-seamoss.jpg";
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "/images/cat-kits.jpg";
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return "/images/cat-herbs.jpg";
+        return "/images/product-fallback.jpg";
+      };
+
+      const render = (items) => {
+        grid.innerHTML = "";
+        if (!Array.isArray(items) || items.length === 0) {
+          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
+            <div class="kicker">Notice</div>
+            <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
+            <p class="p">Add items in Square and refresh.</p>
+          </div>`;
+          return;
+        }
+
+        items.forEach((it) => {
+          const id = it.id || "";
+          const title = escapeHtml(it.name);
+          const desc = escapeHtml(String(it.description || "")).slice(0, 110);
+          const img = it.image_url && String(it.image_url).trim() ? it.image_url : pickFallback(it.name);
+          const price = it.has_price ? money(it.price_money) : "";
+
+          const a = document.createElement("a");
+          a.className = "pgrid-card";
+          a.href = `/product/${encodeURIComponent(id)}`;
+          a.setAttribute("aria-label", `View ${it.name || "product"}`);
+
+          a.innerHTML = `
+            <div class="pgrid-media">
+              <img src="${img}" alt="${title}" loading="lazy" />
+            </div>
+            <div class="pgrid-body">
+              <div class="pgrid-row">
+                <h3 class="pgrid-title">${title}</h3>
+                ${price ? `<div class="pgrid-price">${escapeHtml(price)}</div>` : `<div class="pgrid-price" style="opacity:.7">Details</div>`}
+              </div>
+              <p class="pgrid-desc">${desc || "Tap to view details."}</p>
+            </div>
+          `;
+          grid.appendChild(a);
+        });
+      };
+
+      const load = async () => {
+        try {
+          const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+          const text = await res.text();
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+          const data = JSON.parse(text);
+          if (!data || data.ok !== true) throw new Error("API not ok");
+          render(data.items || []);
+        } catch (e) {
+          console.error("[shop] products load failed:", e);
+          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
+            <div class="kicker">Error</div>
+            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
+            <p class="p">Check API base/app slug env vars and the route.</p>
+          </div>`;
+        }
+      };
+
+      load();
+    })();
+  </script>
+
+  <style>
+    .shop-grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .shop-cat{
+      grid-column: span 4;
+      border-radius: 22px;
+      overflow:hidden;
+      text-decoration:none;
+      color: rgba(0,0,0,.82);
+      background: rgba(243,239,230,.95);
+      border: 1px solid rgba(0,0,0,.10);
+      box-shadow: 0 18px 54px rgba(0,0,0,.14);
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+      display:flex;
+      flex-direction:column;
+      min-height: 250px;
+    }
+    .shop-cat:hover{
+      transform: translateY(-4px);
+      box-shadow: 0 24px 66px rgba(0,0,0,.18);
+      border-color: rgba(0,0,0,.16);
+    }
+    .shop-cat-media{ aspect-ratio: 16/9; background: rgba(0,0,0,.06); }
+    .shop-cat-media img{ width:100%; height:100%; object-fit: cover; display:block; }
+    .shop-cat-body{ padding: 14px 16px 16px; display:grid; gap:8px; }
+    .shop-cat-body h3{ margin:0; font-family: var(--font-display); font-size: 24px; line-height:1.05; }
+    .shop-cat-body p{ margin:0; color: rgba(0,0,0,.62); font-size: 13px; line-height:1.35; }
+    .shop-cat-pill{
+      justify-self:start;
+      display:inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(200,162,74,.45);
+      background: rgba(200,162,74,.16);
+      color: rgba(0,0,0,.78);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 980px){ .shop-cat{ grid-column: span 6; } }
+    @media (max-width: 560px){ .shop-cat{ grid-column: span 12; } }
+
+    /* product grid cards */
+    .pgrid-card{
+      grid-column: span 4;
+      border-radius: 20px;
+      overflow:hidden;
+      text-decoration:none;
+      color: inherit;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.16);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 46px rgba(0,0,0,.22);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      display:flex;
+      flex-direction:column;
+      min-height: 280px;
+    }
+    .pgrid-card:hover{
+      transform: translateY(-4px);
+      box-shadow: 0 26px 64px rgba(0,0,0,.28);
+      border-color: rgba(200,162,74,.22);
+    }
+    .pgrid-media{ aspect-ratio: 4/3; background: rgba(255,255,255,.04); position:relative; }
+    .pgrid-media img{ width:100%; height:100%; object-fit: cover; display:block; }
+    .pgrid-media::after{
+      content:"";
+      position:absolute; inset:0;
+      background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
+      pointer-events:none;
+    }
+    .pgrid-body{ padding: 12px 12px 14px; }
+    .pgrid-row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .pgrid-title{ margin:0; font-size: 16px; line-height:1.2; }
+    .pgrid-price{ font-weight: 650; white-space:nowrap; opacity:.95; }
+    .pgrid-desc{ margin: 8px 0 0; font-size: 13px; opacity:.85; line-height:1.35; }
+
+    @media (max-width: 900px){ .pgrid-card{ grid-column: span 6; } }
+    @media (max-width: 560px){ .pgrid-card{ grid-column: span 12; } }
+
+    /* skeleton */
+    .pgrid-skeleton{ pointer-events:none; }
+    .skel{
+      background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 14px;
+    }
+    .line{ height: 12px; margin-top: 10px; }
+    @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
+  </style>
+</BaseLayout>

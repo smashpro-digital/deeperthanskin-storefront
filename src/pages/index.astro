@@ -4,35 +4,61 @@ import ProductCarousel from "../components/ProductCarousel.astro";
 
 const base = import.meta.env.BASE_URL;
 
-// =========
-// LINKS (Square = commerce engine; Astro = brand front door)
-// =========
+/**
+ * GOAL:
+ * - Keep users “in-house” for browsing (categories + product detail cards)
+ * - Use Square only at checkout time (or when you explicitly send them out)
+ * - Use your category images as graceful fallbacks when Square has no image_url
+ *
+ * This index now:
+ * - Pulls Featured items from your SmashPro commerce API (Square-backed)
+ * - Builds “Shop in-house” cards + mobile-friendly image ratios
+ * - Replaces Square deep-links in nav with internal routes (you’ll create these pages next)
+ */
+
+/* ================
+   CONFIG
+================ */
+const APP_SLUG = "deeper-than-skin";
+
+// Your headless-ish API (Square behind the curtain)
+const API = "https://smashpro.app/api/v1/index.php";
+
+// Handy helper: build API URLs
+const apiUrl = (path: string, params: Record<string, any> = {}) => {
+  const u = new URL(API);
+  u.searchParams.set("path", path);
+  u.searchParams.set("app_slug", APP_SLUG);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    u.searchParams.set(k, String(v));
+  });
+  return u.toString();
+};
+
+// Internal routes (you’ll build these pages next)
+const ROUTES = {
+  shop: "/shop",
+  featured: "/featured",
+  skincare: "/category/skincare",
+  wellness: "/category/wellness",
+  services: "/services",
+  product: (id: string) => `/product/${id}`,
+};
+
+// External (keep minimal, open in new tab)
 const LINKS = {
-  // Main shop entry
-  shop: "https://deeper-than-skin-llc.square.site/s/shop",
-
-  // Category landings (stable, no query params)
-  skincare:
-    "https://deeper-than-skin-llc.square.site/shop/skincare/44IGIEWZ24FOIDKGQUNATHBR",
-  wellness:
-    "https://deeper-than-skin-llc.square.site/shop/wellness/LXF7ZMUOVOPLEMJZ6HOJFUPB",
-
-  // Featured products (stable, no tracking params)
-  featuredBodyButter:
-    "https://deeper-than-skin-llc.square.site/product/4-ounce-body-butter/TNB6D42BBIJFTRHP4L7G7LKU",
-  featuredJuice5Pack:
-    "https://deeper-than-skin-llc.square.site/product/cold-pressed-juice-5-/OWDVNZ32XFVEVIAEG24JL3YG",
-
-  // Services
+  // Square appointments stays external for now
   book: "https://deeper-than-skin-llc.square.site/appointments",
-
-  // Subscription placeholder until Square subs are configured
-  subscribe: "https://deeper-than-skin-llc.square.site/s/shop",
-
   community: "https://returntothegarden.co",
 };
 
-// Images in /public/images
+const EXT = { target: "_blank", rel: "noopener noreferrer" };
+
+/* ================
+   IMAGES (fallbacks)
+================ */
+// Hero / static
 const HERO_IMAGE = `${base}images/hero-brand.png`;
 const IONIC_IMAGE = `${base}images/ionic-footbath.jpg`;
 
@@ -42,12 +68,107 @@ const CAT_SEAMOSS = `${base}images/cat-seamoss.jpg`;
 const CAT_KITS = `${base}images/cat-kits.jpg`;
 const CAT_HERBS = `${base}images/cat-herbs.jpg`;
 
-// Until Square has dedicated category URLs for these,
-// route them into the best available landing (Wellness).
-const FALLBACK_CATEGORY = LINKS.wellness;
+// Generic fallback if a product image is missing
+const PRODUCT_FALLBACK = `${base}images/product-fallback.jpg`;
 
-// External links should open in a new tab (keep the brand site open).
-const EXT = { target: "_blank", rel: "noopener noreferrer" };
+/* ================
+   DATA FETCH (SSR)
+================ */
+type Money = { amount: number; currency: string };
+type ApiItem = {
+  id: string;
+  name: string;
+  description?: string;
+  image_url?: string | null;
+  primary_image_id?: string | null;
+  variation_id?: string | null;
+  price_money?: Money | null;
+  has_price?: boolean;
+  image_ids?: string[];
+};
+
+type FeaturedResponse = {
+  ok: boolean;
+  app_slug: string;
+  mode: string;
+  count: number;
+  items: ApiItem[];
+};
+
+// Fetch featured items
+let featured: ApiItem[] = [];
+let featuredMode = "fallback";
+let featuredError = "";
+
+try {
+  const res = await fetch(apiUrl("public/commerce/featured", { limit: 12 }), {
+    headers: { Accept: "application/json" },
+  });
+  const json = (await res.json()) as FeaturedResponse;
+  if (json?.ok && Array.isArray(json.items)) {
+    featured = json.items;
+    featuredMode = json.mode || "fallback";
+  } else {
+    featuredError = json?.ok === false ? (json as any)?.error || "Featured unavailable" : "Featured unavailable";
+  }
+} catch (e: any) {
+  featuredError = e?.message || "Featured unavailable";
+}
+
+/* ================
+   CATEGORY MODEL
+================ */
+const CATEGORIES = [
+  {
+    key: "juices",
+    title: "Cold-Pressed\nJuices",
+    subtitle: "Event drops & limited releases",
+    href: "/category/juices",
+    img: CAT_JUICES,
+  },
+  {
+    key: "sea-moss",
+    title: "Sea Moss Gel",
+    subtitle: "Ocean-rooted daily support",
+    href: "/category/sea-moss",
+    img: CAT_SEAMOSS,
+  },
+  {
+    key: "kits",
+    title: "Detox Cleanse\nKits",
+    subtitle: "Reset • restore • renew",
+    href: "/category/kits",
+    img: CAT_KITS,
+  },
+  {
+    key: "herbs",
+    title: "Herbal Teas &\nOils",
+    subtitle: "Calm, clarity, balance",
+    href: "/category/herbs",
+    img: CAT_HERBS,
+  },
+];
+
+// Lightweight heuristic fallback: map product name keywords to a category image
+function imageFallbackForProduct(name: string): string {
+  const s = (name || "").toLowerCase();
+  if (s.includes("juice")) return CAT_JUICES;
+  if (s.includes("moss")) return CAT_SEAMOSS;
+  if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return CAT_KITS;
+  if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return CAT_HERBS;
+  return PRODUCT_FALLBACK;
+}
+
+function formatMoney(pm?: Money | null) {
+  if (!pm || typeof pm.amount !== "number") return "";
+  // Square uses minor units (cents) for USD
+  const dollars = pm.amount / 100;
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: pm.currency || "USD" }).format(dollars);
+  } catch {
+    return `$${dollars.toFixed(2)}`;
+  }
+}
 ---
 
 <BaseLayout title="Deeper Than Skin — Storefront">
@@ -55,25 +176,26 @@ const EXT = { target: "_blank", rel: "noopener noreferrer" };
   <header class="nav nav--light">
     <div class="container nav-inner nav-inner--mock">
       <nav class="nav-left" aria-label="Primary">
-        <a class="nav-link nav-link--active" href={LINKS.shop} {...EXT}>Shop</a>
-        <a class="nav-link" href={LINKS.skincare} {...EXT}>Skincare</a>
-        <a class="nav-link" href={LINKS.wellness} {...EXT}>Wellness</a>
-        <a class="nav-link" href="#featured">Featured</a>
-        <a class="nav-link" href="#services">Services</a>
+        <a class="nav-link nav-link--active" href={ROUTES.shop}>Shop</a>
+        <a class="nav-link" href={ROUTES.skincare}>Skincare</a>
+        <a class="nav-link" href={ROUTES.wellness}>Wellness</a>
+        <a class="nav-link" href={ROUTES.featured}>Featured</a>
+        <a class="nav-link" href={ROUTES.services}>Services</a>
       </nav>
 
-      <a class="nav-center" href={LINKS.shop} aria-label="Deeper Than Skin Shop" {...EXT}>
+      <a class="nav-center" href={ROUTES.shop} aria-label="Deeper Than Skin">
         <span class="nav-wordmark">DeeperThanSkin</span>
       </a>
 
       <div class="nav-right" aria-label="Utilities">
-        <a class="icon-btn" href={LINKS.shop} aria-label="Search" {...EXT}>
+        {/* Keep these internal for now; later wire to in-house search/cart */}
+        <a class="icon-btn" href="/search" aria-label="Search">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path>
           </svg>
         </a>
 
-        <a class="icon-btn" href={LINKS.shop} aria-label="Cart" {...EXT}>
+        <a class="icon-btn" href="/cart" aria-label="Cart">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M6 6h15l-2 9H7L6 6z"></path><path d="M6 6L5 3H2"></path>
             <circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle>
@@ -102,12 +224,12 @@ const EXT = { target: "_blank", rel: "noopener noreferrer" };
         </div>
 
         <p class="hero-lead">
-          Ritual-grade skincare and wellness essentials, with clean online ordering and booking, powered by Square.
+          Browse luxury skincare + wellness essentials right here, then checkout smoothly when you’re ready.
         </p>
 
-        {/* Calm hero: one strong CTA */}
         <div class="btns hero-ctas">
-          <a class="btn btn-primary" href={LINKS.shop} {...EXT}>Shop Now</a>
+          <a class="btn btn-primary" href={ROUTES.shop}>Shop Now</a>
+          <a class="btn btn-ghost" href={ROUTES.featured}>Explore Featured</a>
         </div>
       </div>
     </section>
@@ -119,49 +241,21 @@ const EXT = { target: "_blank", rel: "noopener noreferrer" };
           {/* LEFT: Category cards + Shop Now */}
           <div class="strip-left">
             <div class="cat-grid">
-              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Cold-Pressed Juices" {...EXT}>
-                <div class="cat-media">
-                  <img src={CAT_JUICES} alt="Cold-pressed juices" loading="lazy" />
-                </div>
-                <div class="cat-body">
-                  <h3>Cold-Pressed<br />Juices</h3>
-                  <p>Event drops &amp;<br />limited releases</p>
-                </div>
-              </a>
-
-              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Sea Moss Gel" {...EXT}>
-                <div class="cat-media">
-                  <img src={CAT_SEAMOSS} alt="Sea moss gel" loading="lazy" />
-                </div>
-                <div class="cat-body">
-                  <h3>Sea Moss Gel</h3>
-                  <p>Ocean-rooted<br />daily support</p>
-                </div>
-              </a>
-
-              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Detox Cleanse Kits" {...EXT}>
-                <div class="cat-media">
-                  <img src={CAT_KITS} alt="Detox cleanse kits" loading="lazy" />
-                </div>
-                <div class="cat-body">
-                  <h3>Detox Cleanse<br />Kits</h3>
-                  <p>Reset • restore •<br />renew</p>
-                </div>
-              </a>
-
-              <a class="cat-card" href={FALLBACK_CATEGORY} aria-label="Herbal Teas & Oils" {...EXT}>
-                <div class="cat-media">
-                  <img src={CAT_HERBS} alt="Herbal teas and oils" loading="lazy" />
-                </div>
-                <div class="cat-body">
-                  <h3>Herbal Teas &amp;<br />Oils</h3>
-                  <p>Calm, clarity,<br />balance</p>
-                </div>
-              </a>
+              {CATEGORIES.map((c) => (
+                <a class="cat-card" href={c.href} aria-label={c.title.replace("\n", " ")}>
+                  <div class="cat-media">
+                    <img src={c.img} alt={c.title.replace("\n", " ")} loading="lazy" />
+                  </div>
+                  <div class="cat-body">
+                    <h3 set:html={c.title.replace("\n", "<br />")} />
+                    <p>{c.subtitle.replace(" & ", " & ")}</p>
+                  </div>
+                </a>
+              ))}
             </div>
 
             <div class="shop-now-wrap">
-              <a class="shop-now" href={LINKS.shop} {...EXT}>SHOP NOW</a>
+              <a class="shop-now" href={ROUTES.shop}>SHOP NOW</a>
             </div>
           </div>
 
@@ -183,42 +277,71 @@ const EXT = { target: "_blank", rel: "noopener noreferrer" };
       </div>
     </section>
 
-    {/* FEATURED / CAROUSEL */}
+    {/* IN-HOUSE FEATURED GRID (Square API powered) */}
     <section class="section" id="featured">
       <div class="container" data-aos="fade-up">
         <div class="kicker">Featured</div>
-        <h2 class="h2">Skincare &amp; Wellness Highlights</h2>
+        <h2 class="h2">Shop Highlights</h2>
         <p class="p">
-          A clean brand front door that routes into Square for checkout. Keep it simple now, go headless later.
+          Curated pulls from Square, rendered in-house. Mode: <span style="opacity:.9">{featuredMode}</span>.
         </p>
       </div>
 
-      <ProductCarousel />
-
-      {/* Featured action tiles (Square deep links) */}
-      <div class="section" style="padding-top:26px">
-        <div class="container grid">
-          <a class="card" data-aos="fade-up" href={LINKS.subscribe} {...EXT}>
-            <h3>Wellness Subscription</h3>
-            <p>Recurring support for your routine. (Enable subscriptions in Square when ready.)</p>
-          </a>
-
-          <a class="card" data-aos="fade-up" data-aos-delay="80" href={LINKS.featuredJuice5Pack} {...EXT}>
-            <h3>Cold-Pressed Juice (5-Pack)</h3>
-            <p>Limited releases, built for consistency. Tap to view and order.</p>
-          </a>
-
-          <a class="card" data-aos="fade-up" data-aos-delay="160" href={LINKS.featuredBodyButter} {...EXT}>
-            <h3>4 oz Body Butter</h3>
-            <p>Signature texture, ritual finish. Tap to shop the body butter page.</p>
-          </a>
-        </div>
-
-        <div class="container" style="padding-top:18px">
-          <div class="btns" style="justify-content:center">
-            <a class="btn btn-primary" href={LINKS.skincare} {...EXT}>Shop Skincare</a>
-            <a class="btn btn-ghost" href={LINKS.wellness} {...EXT}>Shop Wellness</a>
+      <div class="container" style="padding-top: 18px">
+        {featuredError ? (
+          <div class="callout" style="background: rgba(200,162,74,.08)">
+            <div class="small" style="color: rgba(0,0,0,.62)">
+              Featured is temporarily unavailable: <strong>{featuredError}</strong>
+            </div>
+            <div class="btns" style="margin-top:12px">
+              <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
+              <a class="btn btn-ghost" href={LINKS.book} {...EXT}>Book Service</a>
+            </div>
           </div>
+        ) : (
+          <div class="product-grid" data-aos="fade-up">
+            {featured.map((p) => {
+              const img = p.image_url || imageFallbackForProduct(p.name);
+              const price = formatMoney(p.price_money || null);
+              return (
+                <a class="product-card" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
+                  <div class="product-media">
+                    <img src={img} alt={p.name} loading="lazy" />
+                  </div>
+                  <div class="product-body">
+                    <h3 class="product-title">{p.name}</h3>
+                    <p class="product-desc">
+                      {p.description && p.description.trim() !== "" ? p.description : "A ritual-grade essential curated for your routine."}
+                    </p>
+
+                    <div class="product-row">
+                      <div class="product-price">{p.has_price && price ? price : <span style="opacity:.75">View details</span>}</div>
+                      <span class="btn-lux" aria-hidden="true">Shop</span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Keep your carousel too (optional). If it already fetches, it can remain. */}
+      <div class="section" style="padding-top: 32px; padding-bottom: 0">
+        <div class="container" data-aos="fade-up">
+          <div class="kicker">Browse</div>
+          <h2 class="h2">More to Explore</h2>
+          <p class="p">
+            Smooth scrolling, mobile-first cards. Checkout later. Browsing stays here.
+          </p>
+        </div>
+        <ProductCarousel />
+      </div>
+
+      <div class="container" style="padding-top:18px">
+        <div class="btns" style="justify-content:center">
+          <a class="btn btn-primary" href={ROUTES.skincare}>Shop Skincare</a>
+          <a class="btn btn-ghost" href={ROUTES.wellness}>Shop Wellness</a>
         </div>
       </div>
     </section>

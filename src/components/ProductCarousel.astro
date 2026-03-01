@@ -1,7 +1,13 @@
 ---
 /**
- * ProductCarousel.astro
- * Dynamic (no iframe), mobile friendly.
+ * ProductCarousel.astro (FULL DROP-IN)
+ * Dynamic (no iframe), mobile friendly, luxury-ish.
+ *
+ * Updates:
+ * - Uses your in-house product route: /product/:id (keeps user on site)
+ * - Better image fallback: category images based on keywords + final generic fallback
+ * - Safer API parsing + better empty/error states
+ * - Optional “View all featured” link
  */
 
 const API_BASE =
@@ -13,12 +19,34 @@ const APP_SLUG =
 
 const endpoint =
   `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURIComponent(APP_SLUG)}&limit=12`;
+
+const base = import.meta.env.BASE_URL;
+
+// Fallback images (from /public/images)
+const FALLBACKS = {
+  juices: `${base}images/cat-juices.jpg`,
+  seamoss: `${base}images/cat-seamoss.jpg`,
+  kits: `${base}images/cat-kits.jpg`,
+  herbs: `${base}images/cat-herbs.jpg`,
+  generic: `${base}images/product-fallback.jpg`, // make sure this exists
+};
+
+// Where product cards should go (in-house)
+const PRODUCT_ROUTE = (id) => `/product/${encodeURIComponent(id)}`;
+
+// Optional "view all" page
+const VIEW_ALL = "/featured";
 ---
 
 <section class="carousel" aria-label="Featured products" data-endpoint={endpoint}>
   <div class="carousel-head">
-    <h3 class="carousel-title">Featured Drops</h3>
+    <div class="carousel-titlewrap">
+      <h3 class="carousel-title">Featured Drops</h3>
+      <p class="carousel-sub">Curated picks, rendered in-house. Checkout later.</p>
+    </div>
+
     <div class="carousel-actions">
+      <a class="carousel-link" href={VIEW_ALL} aria-label="View all featured">View all</a>
       <button class="carousel-btn" type="button" data-dir="-1" aria-label="Scroll left">‹</button>
       <button class="carousel-btn" type="button" data-dir="1" aria-label="Scroll right">›</button>
     </div>
@@ -27,17 +55,15 @@ const endpoint =
   <div class="carousel-rail" role="list" aria-live="polite">
     <!-- lightweight skeletons (rendered immediately) -->
     {Array.from({ length: 4 }).map(() => (
-      <div class="card card--skeleton" role="listitem">
-        <div class="img skel"></div>
-        <div class="line skel"></div>
-        <div class="line skel" style="width:70%"></div>
+      <div class="pcard pcard--skeleton" role="listitem" aria-hidden="true">
+        <div class="pcard-media skel"></div>
+        <div class="pcard-body">
+          <div class="skel line"></div>
+          <div class="skel line" style="width:70%"></div>
+        </div>
       </div>
     ))}
   </div>
-
-  <p class="carousel-note" style="margin-top:10px; opacity:.8;">
-    Powered by Square inventory. Checkout stays on Square.
-  </p>
 </section>
 
 <script is:inline>
@@ -48,11 +74,25 @@ const endpoint =
     const rail = root.querySelector(".carousel-rail");
     const endpoint = root.getAttribute("data-endpoint");
 
+    const FALLBACKS = {
+      juices: "/images/cat-juices.jpg",
+      seamoss: "/images/cat-seamoss.jpg",
+      kits: "/images/cat-kits.jpg",
+      herbs: "/images/cat-herbs.jpg",
+      generic: "/images/product-fallback.jpg",
+    };
+
+    const productHref = (id) => `/product/${encodeURIComponent(id)}`;
+
     const money = (pm) => {
       if (!pm || typeof pm.amount !== "number") return "";
-      const amt = (pm.amount / 100).toFixed(2);
+      const amt = (pm.amount / 100);
       const cur = pm.currency || "USD";
-      return `$${amt} ${cur}`;
+      try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+      } catch {
+        return `$${amt.toFixed(2)}`;
+      }
     };
 
     const escapeHtml = (s) =>
@@ -63,46 +103,75 @@ const endpoint =
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
 
+    const pickFallback = (name) => {
+      const s = String(name || "").toLowerCase();
+      if (s.includes("juice")) return FALLBACKS.juices;
+      if (s.includes("moss")) return FALLBACKS.seamoss;
+      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return FALLBACKS.kits;
+      if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return FALLBACKS.herbs;
+      return FALLBACKS.generic;
+    };
+
+    const renderEmpty = () => {
+      rail.innerHTML = `
+        <div class="pcard pcard--empty" role="listitem">
+          <div class="pcard-body">
+            <h4 class="pcard-title">Nothing featured yet</h4>
+            <p class="pcard-desc">Add items in Square and refresh.</p>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderError = (msg) => {
+      rail.innerHTML = `
+        <div class="pcard pcard--empty" role="listitem">
+          <div class="pcard-body">
+            <h4 class="pcard-title">Couldn’t load featured items</h4>
+            <p class="pcard-desc" style="opacity:.85">${escapeHtml(msg || "Check API settings and try again.")}</p>
+          </div>
+        </div>
+      `;
+    };
+
     const render = (items) => {
       rail.innerHTML = "";
 
       if (!Array.isArray(items) || items.length === 0) {
-        rail.innerHTML = `<div class="card" role="listitem">
-          <div class="card-body">
-            <h4>Nothing featured yet</h4>
-            <p>Add items in Square and refresh.</p>
-          </div>
-        </div>`;
+        renderEmpty();
         return;
       }
 
       items.forEach((it) => {
-        const img = it.image_url || "/images/hero-brandold.png";
+        const id = it.id || "";
         const title = escapeHtml(it.name);
-        const desc = escapeHtml(it.description || "").slice(0, 120);
+        const descRaw = String(it.description || "").trim();
+        const desc = escapeHtml(descRaw).slice(0, 120);
         const price = it.has_price ? money(it.price_money) : "";
 
-        // NOTE: For now we don’t have a Square deep link per item from Catalog.
-        // Next step is to implement a checkout/link endpoint.
-        const href = "https://deeper-than-skin-llc.square.site/s/shop";
+        const img = (it.image_url && String(it.image_url).trim() !== "")
+          ? it.image_url
+          : pickFallback(it.name);
 
         const el = document.createElement("a");
-        el.className = "card";
-        el.href = href;
-        el.target = "_blank";
-        el.rel = "noopener noreferrer";
+        el.className = "pcard";
+        el.href = productHref(id);
         el.setAttribute("role", "listitem");
+        el.setAttribute("aria-label", `View ${it.name || "product"}`);
 
         el.innerHTML = `
-          <div class="imgwrap">
+          <div class="pcard-media">
             <img src="${img}" alt="${title}" loading="lazy" />
           </div>
-          <div class="card-body">
-            <div class="row">
-              <h4 class="name">${title}</h4>
-              ${price ? `<div class="price">${escapeHtml(price)}</div>` : ""}
+          <div class="pcard-body">
+            <div class="pcard-row">
+              <h4 class="pcard-title">${title}</h4>
+              ${price ? `<div class="pcard-price">${escapeHtml(price)}</div>` : `<div class="pcard-price" style="opacity:.7">Details</div>`}
             </div>
-            ${desc ? `<p class="desc">${desc}</p>` : `<p class="desc" style="opacity:.75">Tap to shop.</p>`}
+            ${desc ? `<p class="pcard-desc">${desc}</p>` : `<p class="pcard-desc" style="opacity:.78">Tap to view details.</p>`}
+            <div class="pcard-cta">
+              <span class="pcard-pill" aria-hidden="true">View</span>
+            </div>
           </div>
         `;
 
@@ -113,22 +182,30 @@ const endpoint =
     const load = async () => {
       try {
         const res = await fetch(endpoint, { headers: { "Accept": "application/json" } });
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
         const text = await res.text();
 
-        // If we got HTML (404 page), avoid JSON parse crash
-        if (text.trim().startsWith("<")) throw new Error("Non-JSON response (check endpoint URL / env vars).");
+        if (!res.ok) {
+          // try parse API error payload
+          try {
+            const j = JSON.parse(text);
+            throw new Error(j?.error || `HTTP ${res.status}`);
+          } catch {
+            throw new Error(`HTTP ${res.status}`);
+          }
+        }
+
+        // guard against HTML error pages
+        if (text.trim().startsWith("<") || (contentType && !contentType.includes("application/json"))) {
+          throw new Error("Non-JSON response (endpoint/env mismatch).");
+        }
 
         const data = JSON.parse(text);
-        if (!data || data.ok !== true) throw new Error("API returned not ok.");
+        if (!data || data.ok !== true) throw new Error(data?.error || "API returned not ok.");
         render(data.items || []);
       } catch (e) {
         console.error("[carousel] load failed:", e);
-        rail.innerHTML = `<div class="card" role="listitem">
-          <div class="card-body">
-            <h4>Couldn’t load featured items</h4>
-            <p style="opacity:.8">Check PUBLIC_COMMERCE_API_BASE / PUBLIC_COMMERCE_APP_SLUG and the API route.</p>
-          </div>
-        </div>`;
+        renderError(e?.message || "Unable to load.");
       }
     };
 
@@ -136,7 +213,7 @@ const endpoint =
     root.querySelectorAll(".carousel-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.getAttribute("data-dir") || "1");
-        rail.scrollBy({ left: dir * Math.max(260, rail.clientWidth * 0.8), behavior: "smooth" });
+        rail.scrollBy({ left: dir * Math.max(280, rail.clientWidth * 0.85), behavior: "smooth" });
       });
     });
 
@@ -146,9 +223,29 @@ const endpoint =
 
 <style>
   .carousel { padding: 14px 0; }
-  .carousel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-  .carousel-title { margin:0; }
-  .carousel-actions { display:flex; gap:10px; }
+  .carousel-head {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:14px;
+    margin-bottom: 6px;
+  }
+  .carousel-titlewrap { display:grid; gap:6px; }
+  .carousel-title { margin:0; font-family: var(--font-display); letter-spacing: -.01em; }
+  .carousel-sub { margin:0; font-size: 13px; opacity:.8; max-width: 46ch; }
+
+  .carousel-actions { display:flex; gap:10px; align-items:center; }
+  .carousel-link{
+    font-size: 13px;
+    text-decoration:none;
+    opacity:.85;
+    padding: 8px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.14);
+  }
+  .carousel-link:hover{ opacity:1; background: rgba(0,0,0,.20); }
+
   .carousel-btn {
     width:40px; height:40px; border-radius:999px;
     border:1px solid rgba(255,255,255,.18);
@@ -157,6 +254,7 @@ const endpoint =
     font-size: 22px;
     line-height: 1;
   }
+  .carousel-btn:hover{ background: rgba(0,0,0,.30); }
 
   .carousel-rail {
     display:flex;
@@ -169,42 +267,91 @@ const endpoint =
   .carousel-rail::-webkit-scrollbar { height: 8px; }
   .carousel-rail::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 999px; }
 
-  .card {
+  /* ===== Product Card (lux) ===== */
+  .pcard {
     scroll-snap-align: start;
     flex: 0 0 78%;
-    max-width: 360px;
+    max-width: 380px;
     min-width: 260px;
-    border-radius: 18px;
+    border-radius: 20px;
     overflow: hidden;
     text-decoration:none;
     color: inherit;
-    border: 1px solid rgba(255,255,255,.10);
-    background: rgba(0,0,0,.18);
-    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.16);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 18px 46px rgba(0,0,0,.22);
+    transform: translateY(0);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .pcard:hover{
+    transform: translateY(-4px);
+    box-shadow: 0 26px 64px rgba(0,0,0,.28);
+    border-color: rgba(200,162,74,.22);
   }
   @media (min-width: 720px) {
-    .card { flex-basis: 320px; }
+    .pcard { flex-basis: 320px; }
   }
 
-  .imgwrap { width:100%; aspect-ratio: 4 / 3; background: rgba(255,255,255,.05); }
-  .imgwrap img { width:100%; height:100%; object-fit: cover; display:block; }
+  .pcard-media{
+    width:100%;
+    aspect-ratio: 4 / 3;
+    background: rgba(255,255,255,.04);
+    position: relative;
+  }
+  .pcard-media img{
+    width:100%;
+    height:100%;
+    object-fit: cover;
+    display:block;
+  }
+  /* gentle vignette */
+  .pcard-media::after{
+    content:"";
+    position:absolute; inset:0;
+    background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
+    pointer-events:none;
+  }
 
-  .card-body { padding: 12px 12px 14px; }
-  .row { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-  .name { margin:0; font-size: 16px; line-height: 1.2; }
-  .price { font-weight: 600; opacity: .95; white-space: nowrap; }
-  .desc { margin: 8px 0 0; font-size: 13px; opacity: .85; }
+  .pcard-body { padding: 12px 12px 14px; }
+  .pcard-row { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .pcard-title { margin:0; font-size: 16px; line-height: 1.2; letter-spacing: -.01em; }
+  .pcard-price { font-weight: 650; opacity: .95; white-space: nowrap; color: rgba(255,255,255,.90); }
+  .pcard-desc { margin: 8px 0 0; font-size: 13px; opacity: .85; line-height: 1.35; }
 
-  /* Skeleton */
-  .card--skeleton { pointer-events:none; }
+  .pcard-cta{ display:flex; justify-content:flex-end; margin-top: 10px; }
+  .pcard-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border: 1px solid rgba(200,162,74,.35);
+    background: rgba(200,162,74,.12);
+    color: rgba(255,255,255,.92);
+  }
+
+  /* Empty state card */
+  .pcard--empty{
+    flex: 0 0 100%;
+    max-width: 560px;
+    min-width: 280px;
+    padding: 8px;
+  }
+
+  /* ===== Skeleton ===== */
+  .pcard--skeleton { pointer-events:none; }
   .skel {
-    background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.12), rgba(255,255,255,.06));
+    background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
     background-size: 200% 100%;
     animation: shimmer 1.2s infinite;
-    border-radius: 12px;
+    border-radius: 14px;
   }
-  .card--skeleton .img { aspect-ratio:4/3; }
-  .card--skeleton .line { height: 12px; margin: 10px 12px; }
+  .pcard--skeleton .pcard-media { border-radius: 16px; }
+  .pcard--skeleton .line { height: 12px; margin-top: 10px; }
   @keyframes shimmer {
     0% { background-position: 0% 0; }
     100% { background-position: 200% 0; }
