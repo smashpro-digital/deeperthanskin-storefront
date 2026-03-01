@@ -3,28 +3,39 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 export const prerender = true;
 
-// ✅ DEFINE THESE FIRST
-const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
-  "https://smashpro.app/api/v1/index.php";
-
-const APP_SLUG =
-  import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
-  "deeper-than-skin";
-
 const base = import.meta.env.BASE_URL;
 
-// ✅ THEN use them inside getStaticPaths
+// Your Square storefront entry for purchases (until per-item links are wired)
+const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
+
+const ROUTES = {
+  shop: `${base}shop`,
+  featured: `${base}featured`,
+  wellness: `${base}category/wellness`,
+};
+
+// ✅ Most reliable: declare env + endpoint inside getStaticPaths()
 export async function getStaticPaths() {
+  const API_BASE =
+    import.meta.env.PUBLIC_COMMERCE_API_BASE ||
+    "https://smashpro.app/api/v1/index.php";
+
+  const APP_SLUG =
+    import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
+    "deeper-than-skin";
+
   const endpoint =
-    `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=200`;
+    `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=300`;
 
   try {
-    const res = await fetch(endpoint, {
-      headers: { Accept: "application/json" },
-    });
+    const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+    const text = await res.text();
 
-    const data = await res.json();
+    // Harden build: if API returns HTML or garbage, do not crash build
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (text.trim().startsWith("<")) throw new Error("Non-JSON response (HTML)");
+
+    const data = JSON.parse(text);
     const items = Array.isArray(data?.items) ? data.items : [];
 
     return items
@@ -33,24 +44,25 @@ export async function getStaticPaths() {
         params: { id: String(p.id) },
       }));
   } catch (e) {
-    console.error("getStaticPaths failed:", e);
+    console.error("[product] getStaticPaths failed:", e);
+    // Return empty array so build continues even if API is down
     return [];
   }
 }
 
 const { id } = Astro.params;
 
+// ✅ This part runs per page render, so env vars are fine here too
+const API_BASE =
+  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
+  "https://smashpro.app/api/v1/index.php";
+
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
+  "deeper-than-skin";
+
 const endpoint =
   `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
-
-const SQUARE_SHOP =
-  "https://deeper-than-skin-llc.square.site/s/shop";
-
-const ROUTES = {
-  shop: `${base}shop`,
-  featured: `${base}featured`,
-  wellness: `${base}category/wellness`,
-};
 ---
 
 <BaseLayout title="Product | Deeper Than Skin">
