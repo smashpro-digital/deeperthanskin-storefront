@@ -1,17 +1,29 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 
+export const prerender = true;
+
 const API_BASE =
   import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
+const base = import.meta.env.BASE_URL;
+
+// REAL in-house category slugs (this drives static generation + routing)
+const CATEGORY_SLUGS = ["skincare", "wellness", "juices", "seamoss", "kits", "herbs"];
+
+export async function getStaticPaths() {
+  return CATEGORY_SLUGS.map((slug) => ({ params: { slug } }));
+}
+
 const { slug } = Astro.params;
 
-const endpoint =
-  `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=60&category=${encodeURIComponent(slug)}`;
+// Guard invalid slug (dev typos / direct URL)
+const isValid = CATEGORY_SLUGS.includes(String(slug || ""));
 
-const base = import.meta.env.BASE_URL;
+const endpoint =
+  `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=60&category=${encodeURIComponent(String(slug || ""))}`;
 
 const TITLE_MAP = {
   skincare: "Skincare",
@@ -31,15 +43,19 @@ const HERO_MAP = {
   herbs: `${base}images/cat-herbs.jpg`,
 };
 
-const pageTitle = TITLE_MAP[slug] || "Category";
-const heroImg = HERO_MAP[slug] || `${base}images/product-fallback.jpg`;
+const pageTitle = (TITLE_MAP[String(slug)] || "Category");
+const heroImg = (HERO_MAP[String(slug)] || `${base}images/product-fallback.jpg`);
 const fallbackImg = heroImg;
+
+// BASE-safe internal links
+const SHOP_HREF = `${base}shop`;
+const PRODUCT_HREF = (id) => `${base}product/${encodeURIComponent(id)}`;
 ---
 
 <BaseLayout title={`${pageTitle} | Deeper Than Skin`}>
   <main class="section">
     <div class="container">
-      <a class="small" href="/shop" style="text-decoration:none;opacity:.85">← Back to Shop</a>
+      <a class="small" href={SHOP_HREF} style="text-decoration:none;opacity:.85">← Back to Shop</a>
 
       <div class="cat-hero" style={`background-image:url('${heroImg}');`}>
         <div class="cat-hero-overlay"></div>
@@ -52,23 +68,35 @@ const fallbackImg = heroImg;
         </div>
       </div>
 
-      <div
-        class="grid"
-        id="cat-grid"
-        data-endpoint={endpoint}
-        data-fallback={fallbackImg}
-        style="margin-top:18px"
-      >
-        {Array.from({ length: 6 }).map(() => (
-          <div class="pgrid-card pgrid-skeleton" aria-hidden="true">
-            <div class="pgrid-media skel"></div>
-            <div class="pgrid-body">
-              <div class="skel line"></div>
-              <div class="skel line" style="width:70%"></div>
+      {isValid ? (
+        <div
+          class="grid"
+          id="cat-grid"
+          data-endpoint={endpoint}
+          data-fallback={fallbackImg}
+          data-base={base}
+          style="margin-top:18px"
+        >
+          {Array.from({ length: 6 }).map(() => (
+            <div class="pgrid-card pgrid-skeleton" aria-hidden="true">
+              <div class="pgrid-media skel"></div>
+              <div class="pgrid-body">
+                <div class="skel line"></div>
+                <div class="skel line" style="width:70%"></div>
+              </div>
             </div>
+          ))}
+        </div>
+      ) : (
+        <div class="callout" style="margin-top:18px">
+          <div class="kicker">Not found</div>
+          <h2 class="h2" style="margin:6px 0 8px">That category doesn’t exist</h2>
+          <p class="p">Try browsing from the shop page.</p>
+          <div class="btns" style="margin-top:12px">
+            <a class="btn btn-primary" href={SHOP_HREF}>Back to Shop</a>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   </main>
 
@@ -79,6 +107,9 @@ const fallbackImg = heroImg;
 
       const endpoint = grid.getAttribute("data-endpoint");
       const fallback = grid.getAttribute("data-fallback") || "/images/product-fallback.jpg";
+      const base = grid.getAttribute("data-base") || "/";
+
+      const productHref = (id) => `${base}product/${encodeURIComponent(id)}`;
 
       const escapeHtml = (s) =>
         String(s || "")
@@ -102,7 +133,7 @@ const fallbackImg = heroImg;
           grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
             <div class="kicker">Notice</div>
             <h3 class="h2" style="margin:6px 0 8px">No products in this category</h3>
-            <p class="p">Confirm the Square CATEGORY id mapping in category_map.</p>
+            <p class="p">Confirm the Square CATEGORY id mapping in your API layer (category_map).</p>
           </div>`;
           return;
         }
@@ -116,7 +147,7 @@ const fallbackImg = heroImg;
 
           const a = document.createElement("a");
           a.className = "pgrid-card";
-          a.href = `/product/${encodeURIComponent(id)}`;
+          a.href = productHref(id);
           a.setAttribute("aria-label", `View ${it.name || "product"}`);
 
           a.innerHTML = `

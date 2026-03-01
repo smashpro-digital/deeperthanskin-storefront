@@ -1,26 +1,78 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 
+export const prerender = true;
+
 const API_BASE =
   import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
-const { id } = Astro.params;
-
-const endpoint =
-  `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
+const base = import.meta.env.BASE_URL;
 
 // Your Square storefront entry for purchases (until per-item links are wired)
 const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
+
+// Build-time: generate product pages from inventory
+export async function getStaticPaths() {
+  const mk = (path, params = {}) => {
+    const u = new URL(API_BASE);
+    u.searchParams.set("path", path);
+    u.searchParams.set("app_slug", APP_SLUG);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === "") return;
+      u.searchParams.set(k, String(v));
+    });
+    return u.toString();
+  };
+
+  // Pull a generous amount so GH Pages has pages for most/all items.
+  // If you have more than this, increase limit or implement pagination in your API.
+  const url = mk("public/commerce/products", { limit: 300 });
+
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const data = await res.json();
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const ids = items
+      .map((it) => String(it?.id || "").trim())
+      .filter(Boolean);
+
+    // de-dupe
+    const unique = Array.from(new Set(ids));
+
+    return unique.map((id) => ({ params: { id } }));
+  } catch (e) {
+    // If the API is temporarily down during build, return no paths
+    // (Build will still succeed, but product pages won't exist.)
+    return [];
+  }
+}
+
+const { id } = Astro.params;
+
+const endpoint =
+  `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(String(id || ""))}`;
+
+// BASE-safe internal links
+const SHOP_HREF = `${base}shop`;
+const FEATURED_HREF = `${base}featured`;
+const WELLNESS_HREF = `${base}category/wellness`;
 ---
 
 <BaseLayout title="Product | Deeper Than Skin">
   <main class="section">
     <div class="container">
-      <a class="small" href="/shop" style="text-decoration:none;opacity:.85">← Back to Shop</a>
+      <a class="small" href={SHOP_HREF} style="text-decoration:none;opacity:.85">← Back to Shop</a>
 
-      <div id="product" class="prod" data-endpoint={endpoint} data-square={SQUARE_SHOP}>
+      <div
+        id="product"
+        class="prod"
+        data-endpoint={endpoint}
+        data-square={SQUARE_SHOP}
+        data-base={base}
+      >
         <div class="prod-left">
           <div class="prod-media skel" aria-hidden="true"></div>
         </div>
@@ -44,8 +96,8 @@ const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
           <h2 class="h2">Make it a ritual</h2>
           <p class="p">Pair a product with a wellness staple for a complete routine.</p>
           <div class="btns">
-            <a class="btn btn-primary" href="/featured">Browse Featured</a>
-            <a class="btn btn-ghost" href="/category/wellness">Explore Wellness</a>
+            <a class="btn btn-primary" href={FEATURED_HREF}>Browse Featured</a>
+            <a class="btn btn-ghost" href={WELLNESS_HREF}>Explore Wellness</a>
           </div>
         </div>
       </div>
@@ -59,6 +111,9 @@ const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
 
       const endpoint = root.getAttribute("data-endpoint");
       const squareShop = root.getAttribute("data-square") || "#";
+      const base = root.getAttribute("data-base") || "/";
+
+      const href = (p) => `${base}${String(p).replace(/^\/+/, "")}`;
 
       const escapeHtml = (s) =>
         String(s || "")
@@ -78,11 +133,11 @@ const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
 
       const pickFallback = (name) => {
         const s = String(name || "").toLowerCase();
-        if (s.includes("juice")) return "/images/cat-juices.jpg";
-        if (s.includes("moss")) return "/images/cat-seamoss.jpg";
-        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "/images/cat-kits.jpg";
-        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return "/images/cat-herbs.jpg";
-        return "/images/product-fallback.jpg";
+        if (s.includes("juice")) return href("images/cat-juices.jpg");
+        if (s.includes("moss")) return href("images/cat-seamoss.jpg");
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return href("images/cat-kits.jpg");
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return href("images/cat-herbs.jpg");
+        return href("images/product-fallback.jpg");
       };
 
       const render = (p) => {
@@ -108,7 +163,7 @@ const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
 
             <div class="btns">
               <a class="btn btn-primary" href="${squareShop}" target="_blank" rel="noopener noreferrer">Buy on Square</a>
-              <a class="btn btn-ghost" href="/shop">Continue browsing</a>
+              <a class="btn btn-ghost" href="${href("shop")}">Continue browsing</a>
             </div>
 
             <p class="small" style="margin-top:12px;opacity:.8">
@@ -140,8 +195,8 @@ const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
               <h2 class="h2" style="margin:6px 0 8px">Couldn’t load product</h2>
               <p class="p">Check the product id and API route.</p>
               <div class="btns">
-                <a class="btn btn-primary" href="/shop">Back to shop</a>
-                <a class="btn btn-ghost" href="/featured">Featured</a>
+                <a class="btn btn-primary" href="${href("shop")}">Back to shop</a>
+                <a class="btn btn-ghost" href="${href("featured")}">Featured</a>
               </div>
             </div>
           `;
