@@ -1,42 +1,194 @@
 ---
-const products = [
-  { title: "3‑Day Living Waters Cleanse", desc: "Light reset & hydration", href: "YOUR_SQUARE_CHECKOUT_LINK" },
-  { title: "5‑Day Living Waters Cleanse", desc: "Deeper renewal", href: "YOUR_SQUARE_CHECKOUT_LINK" },
-  { title: "Living Sea Moss Gel", desc: "Mineral-rich daily support", href: "YOUR_SQUARE_CHECKOUT_LINK" },
-  { title: "Ionic Footbath", desc: "Book a session", href: "YOUR_SQUARE_APPOINTMENTS_LINK" },
-];
+/**
+ * ProductCarousel.astro (dynamic, no iframe, mobile friendly)
+ * Calls your PHP proxy:
+ *   /api/v1/index.php?path=public/commerce/featured&app_slug=deeper-than-skin
+ *
+ * Expects response:
+ *   { ok:true, items:[{ id,name,description,image_ids, ... }] }
+ *
+ * NOTE: For now we use a safe image fallback if image URLs are not resolved yet.
+ * Next step: enhance your endpoints to resolve image URLs via Square (recommended).
+ */
+const API_BASE = import.meta.env.PUBLIC_COMMERCE_API_BASE;
+const APP_SLUG = import.meta.env.PUBLIC_COMMERCE_APP_SLUG;
+
+const endpoint = `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURIComponent(APP_SLUG)}&limit=12`;
 ---
 
-<link rel="stylesheet" href="https://unpkg.com/swiper@11/swiper-bundle.min.css" />
-
-<div class="container" data-aos="fade-up">
-  <div class="swiper product-swiper">
-    <div class="swiper-wrapper">
-      {products.map((p) => (
-        <div class="swiper-slide">
-          <a class="card" href={p.href}>
-            <h3>{p.title}</h3>
-            <p>{p.desc}</p>
-          </a>
-        </div>
-      ))}
+<section class="carousel" aria-label="Featured products">
+  <div class="carousel-head">
+    <h3 class="carousel-title">Featured Drops</h3>
+    <div class="carousel-actions">
+      <button class="carousel-btn" type="button" data-dir="-1" aria-label="Scroll left">‹</button>
+      <button class="carousel-btn" type="button" data-dir="1" aria-label="Scroll right">›</button>
     </div>
-
-    <div class="swiper-pagination"></div>
   </div>
-</div>
 
-<script src="https://unpkg.com/swiper@11/swiper-bundle.min.js"></script>
-<script is:inline>
-  new Swiper(".product-swiper", {
-    loop: true,
-    spaceBetween: 16,
-    slidesPerView: 1.12,
-    centeredSlides: true,
-    pagination: { el: ".swiper-pagination", clickable: true },
-    breakpoints: {
-      640: { slidesPerView: 2.1, centeredSlides: false },
-      1024: { slidesPerView: 3.1, centeredSlides: false },
+  <div class="carousel-track" data-track>
+    {Array.from({ length: 6 }).map(() => (
+      <article class="p-card p-card--skeleton" aria-hidden="true">
+        <div class="p-img skel" />
+        <div class="p-body">
+          <div class="skel skel-line" style="width:70%" />
+          <div class="skel skel-line" style="width:45%" />
+          <div class="skel skel-pill" style="width:90px" />
+        </div>
+      </article>
+    ))}
+  </div>
+
+  <p class="carousel-foot" data-status>
+    Loading featured items…
+  </p>
+
+  <script define:vars={{ endpoint }}>
+    const track = document.querySelector("[data-track]");
+    const status = document.querySelector("[data-status]");
+    const btns = document.querySelectorAll(".carousel-btn");
+
+    const FALLBACK_IMG = "/images/product-fallback.jpg"; // add this to /public/images
+
+    const escapeHtml = (s = "") =>
+      String(s).replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+
+    const makeCard = (p) => {
+      // If you later return image_url + price from API, use those.
+      const name = escapeHtml(p?.name || "Product");
+      const desc = escapeHtml(p?.description || "");
+      const img = escapeHtml(p?.image_url || FALLBACK_IMG);
+
+      // For now, send to Square product page by slug/id if you expose it.
+      // Next step: include `web_url` in the API response (recommended).
+      const url = escapeHtml(p?.web_url || "https://deeper-than-skin-llc.square.site/s/shop");
+
+      return `
+        <article class="p-card">
+          <a class="p-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="View ${name}">
+            <div class="p-img-wrap">
+              <img class="p-img" src="${img}" alt="${name}" loading="lazy" />
+            </div>
+            <div class="p-body">
+              <h4 class="p-title">${name}</h4>
+              <p class="p-desc">${desc}</p>
+              <span class="p-cta">View</span>
+            </div>
+          </a>
+        </article>
+      `;
+    };
+
+    const wireScroll = () => {
+      btns.forEach((b) =>
+        b.addEventListener("click", () => {
+          const dir = Number(b.getAttribute("data-dir") || "1");
+          track.scrollBy({ left: dir * Math.max(280, track.clientWidth * 0.6), behavior: "smooth" });
+        })
+      );
+    };
+
+    async function load() {
+      try {
+        wireScroll();
+        const res = await fetch(endpoint, { headers: { "Accept": "application/json" }});
+        const data = await res.json();
+
+        if (!data?.ok) throw new Error("Bad response");
+        const items = Array.isArray(data.items) ? data.items : [];
+
+        if (!items.length) {
+          status.textContent = "No featured items yet.";
+          track.innerHTML = "";
+          return;
+        }
+
+        track.innerHTML = items.map(makeCard).join("");
+        status.textContent = "Swipe to explore. Tap to view and checkout.";
+      } catch (e) {
+        console.error(e);
+        status.textContent = "Couldn’t load featured items. Please refresh.";
+      }
     }
-  });
-</script>
+
+    load();
+  </script>
+</section>
+
+<style>
+  .carousel { padding: 22px 0; }
+  .carousel-head {
+    display:flex; align-items:center; justify-content:space-between;
+    gap: 12px; margin: 0 auto 12px; max-width: 1120px; padding: 0 18px;
+  }
+  .carousel-title { margin:0; font-size: 18px; letter-spacing: .3px; }
+  .carousel-actions { display:flex; gap: 8px; }
+  .carousel-btn{
+    width: 38px; height: 38px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(0,0,0,.35); color: #fff;
+    display:grid; place-items:center; cursor:pointer;
+  }
+
+  .carousel-track{
+    max-width: 1120px; margin: 0 auto;
+    padding: 6px 18px 8px;
+    display:flex; gap: 14px;
+    overflow-x:auto; scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .carousel-track::-webkit-scrollbar{ height: 8px; }
+  .carousel-foot{
+    margin: 10px auto 0; max-width: 1120px; padding: 0 18px;
+    opacity: .78; font-size: 13px;
+  }
+
+  .p-card{
+    min-width: 220px; max-width: 220px;
+    scroll-snap-align: start;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.18);
+    overflow:hidden;
+  }
+  .p-link{ display:block; color: inherit; text-decoration:none; }
+  .p-img-wrap{ aspect-ratio: 1 / 1; background: rgba(255,255,255,.06); }
+  .p-img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .p-body{ padding: 12px 12px 14px; }
+  .p-title{ margin:0 0 6px; font-size: 14px; line-height: 1.2; }
+  .p-desc{
+    margin:0 0 10px; font-size: 12px; line-height: 1.35;
+    opacity:.75; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .p-cta{
+    display:inline-flex; align-items:center; justify-content:center;
+    height: 34px; padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.08);
+    font-size: 12px;
+  }
+
+  /* skeleton */
+  .p-card--skeleton{ pointer-events:none; }
+  .skel{
+    background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.12), rgba(255,255,255,.06));
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+    border-radius: 10px;
+  }
+  .skel-line{ height: 12px; margin: 10px 0 0; }
+  .skel-pill{ height: 34px; margin-top: 12px; border-radius: 999px; }
+  .p-card--skeleton .p-img{ display:none; }
+  .p-card--skeleton .p-img.skel{ height: 220px; }
+  .p-card--skeleton .p-img.skel{ border-radius:0; }
+  .p-card--skeleton .p-img.skel{ display:block; }
+  .p-card--skeleton .p-img{ display:block; }
+  .p-card--skeleton .p-img.skel{ width:100%; }
+  .p-card--skeleton .p-img.skel{ aspect-ratio:1/1; }
+
+  @keyframes shimmer{ 0%{ background-position: 200% 0 } 100%{ background-position: -200% 0 } }
+
+  @media (min-width: 860px){
+    .p-card{ min-width: 240px; max-width: 240px; }
+  }
+</style>
