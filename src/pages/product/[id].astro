@@ -3,27 +3,37 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 export const prerender = true;
 
+// ✅ DEFINE THESE FIRST
 const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
-const APP_SLUG =
-  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
+  "https://smashpro.app/api/v1/index.php";
 
-// ✅ STATIC PATHS REQUIRED (GH Pages / static output)
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
+  "deeper-than-skin";
+
+const base = import.meta.env.BASE_URL;
+
+// ✅ THEN use them inside getStaticPaths
 export async function getStaticPaths() {
   const endpoint =
     `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=200`;
 
   try {
-    const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
-    const data = await res.json();
+    const res = await fetch(endpoint, {
+      headers: { Accept: "application/json" },
+    });
 
+    const data = await res.json();
     const items = Array.isArray(data?.items) ? data.items : [];
+
     return items
       .filter((p) => p && p.id)
-      .map((p) => ({ params: { id: String(p.id) } }));
+      .map((p) => ({
+        params: { id: String(p.id) },
+      }));
   } catch (e) {
-    // If build-time API is unavailable, fail gracefully with zero paths (won’t build product pages)
-    // Better than hard-crashing the entire build.
+    console.error("getStaticPaths failed:", e);
     return [];
   }
 }
@@ -33,10 +43,8 @@ const { id } = Astro.params;
 const endpoint =
   `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
 
-const base = import.meta.env.BASE_URL;
-
-// Your Square storefront entry for purchases (until per-item links are wired)
-const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
+const SQUARE_SHOP =
+  "https://deeper-than-skin-llc.square.site/s/shop";
 
 const ROUTES = {
   shop: `${base}shop`,
