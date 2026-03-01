@@ -8,44 +8,22 @@ const API_BASE =
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
-const base = import.meta.env.BASE_URL;
-
-// Your Square storefront entry for purchases (until per-item links are wired)
-const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
-
-// Build-time: generate product pages from inventory
+// ✅ STATIC PATHS REQUIRED (GH Pages / static output)
 export async function getStaticPaths() {
-  const mk = (path, params = {}) => {
-    const u = new URL(API_BASE);
-    u.searchParams.set("path", path);
-    u.searchParams.set("app_slug", APP_SLUG);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v === undefined || v === null || v === "") return;
-      u.searchParams.set(k, String(v));
-    });
-    return u.toString();
-  };
-
-  // Pull a generous amount so GH Pages has pages for most/all items.
-  // If you have more than this, increase limit or implement pagination in your API.
-  const url = mk("public/commerce/products", { limit: 300 });
+  const endpoint =
+    `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=200`;
 
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
     const data = await res.json();
 
     const items = Array.isArray(data?.items) ? data.items : [];
-    const ids = items
-      .map((it) => String(it?.id || "").trim())
-      .filter(Boolean);
-
-    // de-dupe
-    const unique = Array.from(new Set(ids));
-
-    return unique.map((id) => ({ params: { id } }));
+    return items
+      .filter((p) => p && p.id)
+      .map((p) => ({ params: { id: String(p.id) } }));
   } catch (e) {
-    // If the API is temporarily down during build, return no paths
-    // (Build will still succeed, but product pages won't exist.)
+    // If build-time API is unavailable, fail gracefully with zero paths (won’t build product pages)
+    // Better than hard-crashing the entire build.
     return [];
   }
 }
@@ -53,26 +31,26 @@ export async function getStaticPaths() {
 const { id } = Astro.params;
 
 const endpoint =
-  `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(String(id || ""))}`;
+  `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
 
-// BASE-safe internal links
-const SHOP_HREF = `${base}shop`;
-const FEATURED_HREF = `${base}featured`;
-const WELLNESS_HREF = `${base}category/wellness`;
+const base = import.meta.env.BASE_URL;
+
+// Your Square storefront entry for purchases (until per-item links are wired)
+const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
+
+const ROUTES = {
+  shop: `${base}shop`,
+  featured: `${base}featured`,
+  wellness: `${base}category/wellness`,
+};
 ---
 
 <BaseLayout title="Product | Deeper Than Skin">
   <main class="section">
     <div class="container">
-      <a class="small" href={SHOP_HREF} style="text-decoration:none;opacity:.85">← Back to Shop</a>
+      <a class="small" href={ROUTES.shop} style="text-decoration:none;opacity:.85">← Back to Shop</a>
 
-      <div
-        id="product"
-        class="prod"
-        data-endpoint={endpoint}
-        data-square={SQUARE_SHOP}
-        data-base={base}
-      >
+      <div id="product" class="prod" data-endpoint={endpoint} data-square={SQUARE_SHOP} data-base={base}>
         <div class="prod-left">
           <div class="prod-media skel" aria-hidden="true"></div>
         </div>
@@ -96,8 +74,8 @@ const WELLNESS_HREF = `${base}category/wellness`;
           <h2 class="h2">Make it a ritual</h2>
           <p class="p">Pair a product with a wellness staple for a complete routine.</p>
           <div class="btns">
-            <a class="btn btn-primary" href={FEATURED_HREF}>Browse Featured</a>
-            <a class="btn btn-ghost" href={WELLNESS_HREF}>Explore Wellness</a>
+            <a class="btn btn-primary" href={ROUTES.featured}>Browse Featured</a>
+            <a class="btn btn-ghost" href={ROUTES.wellness}>Explore Wellness</a>
           </div>
         </div>
       </div>
@@ -112,8 +90,6 @@ const WELLNESS_HREF = `${base}category/wellness`;
       const endpoint = root.getAttribute("data-endpoint");
       const squareShop = root.getAttribute("data-square") || "#";
       const base = root.getAttribute("data-base") || "/";
-
-      const href = (p) => `${base}${String(p).replace(/^\/+/, "")}`;
 
       const escapeHtml = (s) =>
         String(s || "")
@@ -133,11 +109,11 @@ const WELLNESS_HREF = `${base}category/wellness`;
 
       const pickFallback = (name) => {
         const s = String(name || "").toLowerCase();
-        if (s.includes("juice")) return href("images/cat-juices.jpg");
-        if (s.includes("moss")) return href("images/cat-seamoss.jpg");
-        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return href("images/cat-kits.jpg");
-        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return href("images/cat-herbs.jpg");
-        return href("images/product-fallback.jpg");
+        if (s.includes("juice")) return `${base}images/cat-juices.jpg`;
+        if (s.includes("moss")) return `${base}images/cat-seamoss.jpg`;
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return `${base}images/cat-kits.jpg`;
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return `${base}images/cat-herbs.jpg`;
+        return `${base}images/product-fallback.jpg`;
       };
 
       const render = (p) => {
@@ -163,7 +139,7 @@ const WELLNESS_HREF = `${base}category/wellness`;
 
             <div class="btns">
               <a class="btn btn-primary" href="${squareShop}" target="_blank" rel="noopener noreferrer">Buy on Square</a>
-              <a class="btn btn-ghost" href="${href("shop")}">Continue browsing</a>
+              <a class="btn btn-ghost" href="${base}shop">Continue browsing</a>
             </div>
 
             <p class="small" style="margin-top:12px;opacity:.8">
@@ -183,7 +159,6 @@ const WELLNESS_HREF = `${base}category/wellness`;
           const data = JSON.parse(text);
           if (!data || data.ok !== true) throw new Error("API not ok");
 
-          // expected: { ok:true, item:{...} } OR { ok:true, items:[...] }
           const p = data.item || (Array.isArray(data.items) ? data.items[0] : null);
           if (!p) throw new Error("Product not found");
           render(p);
@@ -195,8 +170,8 @@ const WELLNESS_HREF = `${base}category/wellness`;
               <h2 class="h2" style="margin:6px 0 8px">Couldn’t load product</h2>
               <p class="p">Check the product id and API route.</p>
               <div class="btns">
-                <a class="btn btn-primary" href="${href("shop")}">Back to shop</a>
-                <a class="btn btn-ghost" href="${href("featured")}">Featured</a>
+                <a class="btn btn-primary" href="${base}shop">Back to shop</a>
+                <a class="btn btn-ghost" href="${base}featured">Featured</a>
               </div>
             </div>
           `;
@@ -280,7 +255,6 @@ const WELLNESS_HREF = `${base}category/wellness`;
       white-space: pre-wrap;
     }
 
-    /* skeleton */
     .skel{
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
       background-size: 200% 100%;
