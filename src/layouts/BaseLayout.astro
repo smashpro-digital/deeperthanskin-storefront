@@ -371,22 +371,58 @@ const isActive = (href) => {
         .nav-burger{ display: inline-flex; }
       }
     </style>
+        <!-- Category DB sync (best-effort, non-blocking) -->
+    <script is:inline>
+      (() => {
+        try {
+          const KEY = "dts_categories_synced_v1";
+          const TS_KEY = "dts_categories_synced_v1_ts";
+
+          // If we already synced successfully, bail.
+          if (localStorage.getItem(KEY) === "1") return;
+
+          // If we attempted recently (ex: within 6 hours), don't spam.
+          const last = parseInt(localStorage.getItem(TS_KEY) || "0", 10);
+          const SIX_HOURS = 6 * 60 * 60 * 1000;
+          if (last && (Date.now() - last) < SIX_HOURS) return;
+
+          // Mark attempt timestamp early (prevents rapid retries on refresh loops)
+          localStorage.setItem(TS_KEY, String(Date.now()));
+
+          const url =
+            "https://smashpro.app/api/v1/routes/public.commerce.categories.get.php" +
+            "?app_slug=deeper-than-skin&sync_db=1&_ts=" + Date.now();
+
+          fetch(url, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            cache: "no-store",
+            mode: "cors",
+          })
+            .then(async (r) => {
+              if (!r.ok) throw new Error("HTTP " + r.status);
+
+              // If it returns HTML for any reason, treat as failure (don’t set KEY=1)
+              const text = await r.text();
+              if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+              // Optional: validate ok flag if present
+              let j = null;
+              try { j = JSON.parse(text); } catch {}
+              if (j && j.ok === false) throw new Error("API ok=false");
+
+              localStorage.setItem(KEY, "1");
+            })
+            .catch(() => {
+              // Leave KEY unset so it can retry later.
+              // TS_KEY prevents hammering.
+            });
+        } catch (e) {
+          // fail silent, site still works
+        }
+      })();
+    </script>
   </body>
 </html>
-<script>
-(async () => {
-  try {
-    const k = "dts_categories_synced_v1";
-    if (localStorage.getItem(k) === "1") return;
-
-    const url = "https://smashpro.app/api/v1/routes/public.commerce.categories.get.php?app_slug=deeper-than-skin&sync_db=1";
-    const r = await fetch(url, { method: "GET" });
-    // optional: console log once
-    // const j = await r.json(); console.log("category sync", j);
-
-    if (r.ok) localStorage.setItem(k, "1");
-  } catch (e) {
-    // fail silent, site still works
-  }
-})();
-</script>
+  </body>
+</html>
