@@ -165,7 +165,9 @@ const isActive = (href) => {
         © {new Date().getFullYear()} Deeper Than Skin. All rights reserved.
       </div>
       <div style="display: flex; justify-content: flex-end;">
-        <a href="https://dashboard.smashpro.app" title="Powered by SmashPro Digital" target="_blank" rel="noopener noreferrer"><img src="/images/smashpro-bot.png" alt="SmashPro Digital" width="24" height="24" loading="lazy" /></a>.
+        <a href="https://dashboard.smashpro.app" title="Powered by SmashPro Digital" target="_blank" rel="noopener noreferrer">
+          <img src={`${base}images/smashpro-bot.png`} alt="SmashPro Digital" width="24" height="24" loading="lazy" />
+        </a>.
       </div>
     </footer>
 
@@ -210,6 +212,40 @@ const isActive = (href) => {
         });
 
         drawer.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+      })();
+    </script>
+
+    <!-- Category DB sync (best-effort, non-blocking, SAME-ORIGIN to avoid CORS) -->
+    <script is:inline>
+      (() => {
+        try {
+          const KEY = "dts_categories_synced_v1";
+          const TS_KEY = "dts_categories_synced_v1_ts";
+
+          if (localStorage.getItem(KEY) === "1") return;
+
+          const last = parseInt(localStorage.getItem(TS_KEY) || "0", 10);
+          const SIX_HOURS = 6 * 60 * 60 * 1000;
+          if (last && (Date.now() - last) < SIX_HOURS) return;
+
+          localStorage.setItem(TS_KEY, String(Date.now()));
+
+          const base = import.meta.env.BASE_URL || "/";
+          const url = base.replace(/\/?$/, "/") + "api/categories-sync?_ts=" + Date.now();
+
+          fetch(url, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            cache: "no-store",
+          })
+            .then(async (r) => {
+              if (!r.ok) throw new Error("HTTP " + r.status);
+              const text = await r.text();
+              if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+              localStorage.setItem(KEY, "1");
+            })
+            .catch(() => {});
+        } catch (e) {}
       })();
     </script>
 
@@ -371,58 +407,5 @@ const isActive = (href) => {
         .nav-burger{ display: inline-flex; }
       }
     </style>
-        <!-- Category DB sync (best-effort, non-blocking) -->
-    <script is:inline>
-      (() => {
-        try {
-          const KEY = "dts_categories_synced_v1";
-          const TS_KEY = "dts_categories_synced_v1_ts";
-
-          // If we already synced successfully, bail.
-          if (localStorage.getItem(KEY) === "1") return;
-
-          // If we attempted recently (ex: within 6 hours), don't spam.
-          const last = parseInt(localStorage.getItem(TS_KEY) || "0", 10);
-          const SIX_HOURS = 6 * 60 * 60 * 1000;
-          if (last && (Date.now() - last) < SIX_HOURS) return;
-
-          // Mark attempt timestamp early (prevents rapid retries on refresh loops)
-          localStorage.setItem(TS_KEY, String(Date.now()));
-
-          const url =
-            "https://smashpro.app/api/v1/routes/public.commerce.categories.get.php" +
-            "?app_slug=deeper-than-skin&sync_db=1&_ts=" + Date.now();
-
-          fetch(url, {
-            method: "GET",
-            headers: { "Accept": "application/json" },
-            cache: "no-store",
-            mode: "cors",
-          })
-            .then(async (r) => {
-              if (!r.ok) throw new Error("HTTP " + r.status);
-
-              // If it returns HTML for any reason, treat as failure (don’t set KEY=1)
-              const text = await r.text();
-              if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
-
-              // Optional: validate ok flag if present
-              let j = null;
-              try { j = JSON.parse(text); } catch {}
-              if (j && j.ok === false) throw new Error("API ok=false");
-
-              localStorage.setItem(KEY, "1");
-            })
-            .catch(() => {
-              // Leave KEY unset so it can retry later.
-              // TS_KEY prevents hammering.
-            });
-        } catch (e) {
-          // fail silent, site still works
-        }
-      })();
-    </script>
-  </body>
-</html>
   </body>
 </html>
