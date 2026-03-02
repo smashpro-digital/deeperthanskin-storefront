@@ -8,7 +8,6 @@ const {
 
 const base = import.meta.env.BASE_URL;
 
-// External links kept minimal
 const LINKS = {
   book: "https://deeper-than-skin-llc.square.site/appointments",
   community: "https://returntothegarden.co",
@@ -16,7 +15,6 @@ const LINKS = {
 };
 const EXT = { target: "_blank", rel: "noopener noreferrer" };
 
-// Internal routes (BASE-safe for GH Pages)
 const ROUTES = {
   home: `${base}`,
   shop: `${base}shop`,
@@ -34,15 +32,11 @@ const strip = (s) => String(s || "").replace(/\/+$/, "");
 const isActive = (href) => {
   const a = strip(href);
   const p = strip(path);
-
-  // exact match
   if (a === p) return true;
 
-  // Don't treat "/" as active for everything
   const baseNorm = strip(base);
   if (a === baseNorm || a === "") return p === baseNorm || p === "";
 
-  // section match
   return p.startsWith(a + "/");
 };
 ---
@@ -57,19 +51,15 @@ const isActive = (href) => {
     <title>{title}</title>
     <meta name="description" content={description} />
 
-    <!-- Canonical (base-safe) -->
     <link rel="canonical" href={new URL(base, Astro.site ?? Astro.url).toString()} />
 
-    <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link rel="icon" type="image/png" href={`${base}favicon.ico`} />
   </head>
 
   <body>
-    {/* ONE NAV to rule them all */}
     <header class="nav nav--light" data-nav>
       <div class="container nav-inner nav-inner--mock">
-        {/* LEFT (desktop) */}
         <nav class="nav-left" aria-label="Primary">
           <a class={`nav-link ${isActive(ROUTES.home) ? "nav-link--active" : ""}`} href={ROUTES.home}>Home</a>
           <a class={`nav-link ${isActive(ROUTES.shop) ? "nav-link--active" : ""}`} href={ROUTES.shop}>Shop</a>
@@ -79,14 +69,11 @@ const isActive = (href) => {
           <a class={`nav-link ${isActive(ROUTES.services) ? "nav-link--active" : ""}`} href={ROUTES.services}>Services</a>
         </nav>
 
-        {/* CENTER */}
         <a class="nav-center" href={ROUTES.home} aria-label="Deeper Than Skin">
           <span class="nav-wordmark">DeeperThanSkin</span>
         </a>
 
-        {/* RIGHT */}
         <div class="nav-right" aria-label="Utilities">
-          {/* Hamburger (mobile) */}
           <button
             class="nav-burger"
             type="button"
@@ -119,7 +106,6 @@ const isActive = (href) => {
         </div>
       </div>
 
-      {/* Mobile Drawer + Backdrop */}
       <div id="mobile-drawer" class="nav-drawer" aria-hidden="true" data-drawer>
         <div class="nav-drawer-inner">
           <div class="nav-drawer-top">
@@ -164,21 +150,19 @@ const isActive = (href) => {
       <div class="container">
         © {new Date().getFullYear()} Deeper Than Skin. All rights reserved.
       </div>
-      <div style="display: flex; justify-content: flex-end;">
+      <div style="display:flex;justify-content:flex-end;">
         <a href="https://dashboard.smashpro.app" title="Powered by SmashPro Digital" target="_blank" rel="noopener noreferrer">
           <img src={`${base}images/smashpro-bot.png`} alt="SmashPro Digital" width="24" height="24" loading="lazy" />
         </a>.
       </div>
     </footer>
 
-    {/* Mobile menu behavior */}
     <script is:inline>
       (() => {
         const burger = document.querySelector("[data-burger]");
         const drawer = document.querySelector("[data-drawer]");
         const closeBtn = document.querySelector("[data-drawer-close]");
         const backdrop = document.querySelector("[data-drawer-backdrop]");
-
         if (!burger || !drawer || !backdrop) return;
 
         const open = () => {
@@ -204,7 +188,7 @@ const isActive = (href) => {
           isOpen ? close() : open();
         });
 
-        closeBtn?.addEventListener("click", close);
+        closeBtn && closeBtn.addEventListener("click", close);
         backdrop.addEventListener("click", close);
 
         window.addEventListener("keydown", (e) => {
@@ -215,7 +199,7 @@ const isActive = (href) => {
       })();
     </script>
 
-    <!-- Category DB sync (best-effort, non-blocking, SAME-ORIGIN to avoid CORS) -->
+    <!-- Category DB sync (best-effort, non-blocking) -->
     <script is:inline>
       (() => {
         try {
@@ -230,182 +214,59 @@ const isActive = (href) => {
 
           localStorage.setItem(TS_KEY, String(Date.now()));
 
-          const base = import.meta.env.BASE_URL || "/";
-          const url = base.replace(/\/?$/, "/") + "api/categories-sync?_ts=" + Date.now();
+          const url =
+            "https://smashpro.app/api/v1/index.php" +
+            "?path=public/commerce/categories" +
+            "&app_slug=deeper-than-skin" +
+            "&sync_db=1" +
+            "&_ts=" + Date.now();
 
           fetch(url, {
             method: "GET",
             headers: { "Accept": "application/json" },
             cache: "no-store",
+            mode: "cors",
           })
-            .then(async (r) => {
-              if (!r.ok) throw new Error("HTTP " + r.status);
-              const text = await r.text();
-              if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
-              localStorage.setItem(KEY, "1");
-            })
-            .catch(() => {});
+          .then(async (r) => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const text = await r.text();
+            if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+            let j = null; try { j = JSON.parse(text); } catch {}
+            if (j && j.ok === false) throw new Error("API ok=false");
+            localStorage.setItem(KEY, "1");
+          })
+          .catch(() => {});
         } catch (e) {}
       })();
     </script>
 
     <style>
-      /* prevent background scroll when drawer is open */
       .no-scroll { overflow: hidden; }
-
-      /* Burger button */
       .nav-burger{
-        display: none;
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
-        border: 1px solid rgba(0,0,0,.10);
-        background: rgba(255,255,255,.55);
-        backdrop-filter: blur(10px);
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
+        display:none;width:42px;height:42px;border-radius:12px;
+        border:1px solid rgba(0,0,0,.10);background:rgba(255,255,255,.55);
+        backdrop-filter:blur(10px);align-items:center;justify-content:center;cursor:pointer;
       }
-
-      .nav-burger-lines{
-        width: 18px;
-        height: 2px;
-        background: rgba(0,0,0,.75);
-        position: relative;
-        display: block;
-        border-radius: 2px;
-      }
-      .nav-burger-lines::before,
-      .nav-burger-lines::after{
-        content:"";
-        position:absolute;
-        left:0;
-        width:18px;
-        height:2px;
-        background: rgba(0,0,0,.75);
-        border-radius: 2px;
-      }
-      .nav-burger-lines::before{ top: -6px; }
-      .nav-burger-lines::after{ top: 6px; }
-
-      /* Drawer */
-      .nav-drawer{
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        transform: translateY(-110%);
-        transition: transform .22s ease;
-        z-index: 9999;
-        padding: 12px;
-      }
-      .nav-drawer.is-open{ transform: translateY(0); }
-
-      .nav-drawer-inner{
-        border-radius: 18px;
-        overflow: hidden;
-        border: 1px solid rgba(0,0,0,.10);
-        background: rgba(243,239,230,.98);
-        box-shadow: 0 24px 70px rgba(0,0,0,.22);
-      }
-
-      .nav-drawer-top{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 14px;
-        border-bottom: 1px solid rgba(0,0,0,.08);
-      }
-
-      .nav-drawer-title{
-        font-family: var(--font-display);
-        font-size: 18px;
-        letter-spacing: .02em;
-        color: rgba(0,0,0,.82);
-      }
-
-      .nav-drawer-close{
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        border: 1px solid rgba(0,0,0,.10);
-        background: rgba(255,255,255,.65);
-        cursor: pointer;
-      }
-
-      .nav-drawer-links{
-        display: grid;
-        padding: 10px;
-        gap: 8px;
-      }
-
-      .nav-drawer-links a{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 14px;
-        border-radius: 14px;
-        text-decoration: none;
-        color: rgba(0,0,0,.82);
-        border: 1px solid rgba(0,0,0,.08);
-        background: rgba(255,255,255,.55);
-      }
-
-      .nav-drawer-links a.is-active{
-        border-color: rgba(200,162,74,.45);
-        background: rgba(200,162,74,.16);
-      }
-
-      .nav-drawer-group{
-        border: 1px solid rgba(0,0,0,.08);
-        border-radius: 16px;
-        background: rgba(255,255,255,.40);
-        padding: 10px;
-        display: grid;
-        gap: 8px;
-      }
-
-      .nav-drawer-group-title{
-        font-size: 12px;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        color: rgba(0,0,0,.58);
-        padding: 4px 6px 2px;
-      }
-
-      .nav-drawer-actions{
-        display: grid;
-        gap: 10px;
-        padding-top: 6px;
-      }
-
-      .nav-drawer-note{
-        margin: 2px 4px 10px;
-        font-size: 12px;
-        color: rgba(0,0,0,.55);
-        line-height: 1.4;
-      }
-
-      /* Backdrop */
-      .nav-drawer-backdrop{
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.35);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity .18s ease;
-        z-index: 9998;
-      }
-      .nav-drawer-backdrop.is-open{
-        opacity: 1;
-        pointer-events: auto;
-      }
-
-      /* Mobile behavior: hide desktop links, show burger */
-      @media (max-width: 820px){
-        .nav-left{ display: none !important; }
-        .nav-burger{ display: inline-flex; }
-      }
+      .nav-burger-lines{width:18px;height:2px;background:rgba(0,0,0,.75);position:relative;display:block;border-radius:2px;}
+      .nav-burger-lines::before,.nav-burger-lines::after{content:"";position:absolute;left:0;width:18px;height:2px;background:rgba(0,0,0,.75);border-radius:2px;}
+      .nav-burger-lines::before{top:-6px;}
+      .nav-burger-lines::after{top:6px;}
+      .nav-drawer{position:fixed;top:0;left:0;right:0;transform:translateY(-110%);transition:transform .22s ease;z-index:9999;padding:12px;}
+      .nav-drawer.is-open{transform:translateY(0);}
+      .nav-drawer-inner{border-radius:18px;overflow:hidden;border:1px solid rgba(0,0,0,.10);background:rgba(243,239,230,.98);box-shadow:0 24px 70px rgba(0,0,0,.22);}
+      .nav-drawer-top{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;border-bottom:1px solid rgba(0,0,0,.08);}
+      .nav-drawer-title{font-family:var(--font-display);font-size:18px;letter-spacing:.02em;color:rgba(0,0,0,.82);}
+      .nav-drawer-close{width:40px;height:40px;border-radius:12px;border:1px solid rgba(0,0,0,.10);background:rgba(255,255,255,.65);cursor:pointer;}
+      .nav-drawer-links{display:grid;padding:10px;gap:8px;}
+      .nav-drawer-links a{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;border-radius:14px;text-decoration:none;color:rgba(0,0,0,.82);border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.55);}
+      .nav-drawer-links a.is-active{border-color:rgba(200,162,74,.45);background:rgba(200,162,74,.16);}
+      .nav-drawer-group{border:1px solid rgba(0,0,0,.08);border-radius:16px;background:rgba(255,255,255,.40);padding:10px;display:grid;gap:8px;}
+      .nav-drawer-group-title{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,0,0,.58);padding:4px 6px 2px;}
+      .nav-drawer-actions{display:grid;gap:10px;padding-top:6px;}
+      .nav-drawer-note{margin:2px 4px 10px;font-size:12px;color:rgba(0,0,0,.55);line-height:1.4;}
+      .nav-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .18s ease;z-index:9998;}
+      .nav-drawer-backdrop.is-open{opacity:1;pointer-events:auto;}
+      @media (max-width:820px){.nav-left{display:none!important;}.nav-burger{display:inline-flex;}}
     </style>
   </body>
 </html>
