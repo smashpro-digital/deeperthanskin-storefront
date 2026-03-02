@@ -1,0 +1,463 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+export const prerender = true;
+
+const base = import.meta.env.BASE_URL || "/";
+
+const API_BASE =
+  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+
+const checkoutEndpoint =
+  `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
+
+const ROUTES = {
+  shop: `${base}shop`,
+  featured: `${base}featured`,
+};
+---
+
+<BaseLayout title="Cart | Deeper Than Skin">
+  <main class="section">
+    <div class="container">
+      <div class="row-top">
+        <a class="small" href={ROUTES.shop} style="text-decoration:none;opacity:.85">
+          ← Continue shopping
+        </a>
+        <div class="pill">Cart</div>
+      </div>
+
+      <div
+        id="cart"
+        class="cart"
+        data-checkout={checkoutEndpoint}
+        data-base={base}
+        data-routes={JSON.stringify(ROUTES)}
+      >
+        <div class="card skel" style="height:220px" aria-hidden="true"></div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" is:inline>
+    import { Cart } from "/src/lib/cart.js";
+
+    const root = document.getElementById("cart");
+    if (!root) return;
+
+    const endpoint = root.getAttribute("data-checkout") || "";
+    const base = root.getAttribute("data-base") || "/";
+    const routes = (() => {
+      try { return JSON.parse(root.getAttribute("data-routes") || "{}"); }
+      catch { return {}; }
+    })();
+
+    if (!endpoint) {
+      root.innerHTML = `<div class="callout">
+        <div class="kicker">Error</div>
+        <h2 class="h2" style="margin:6px 0 8px">Checkout not configured</h2>
+        <p class="p">Missing checkout endpoint.</p>
+      </div>`;
+      return;
+    }
+
+    const escapeHtml = (s) =>
+      String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    const money = (pm) => {
+      if (!pm || typeof pm.amount !== "number") return "";
+      const amt = pm.amount / 100;
+      const cur = pm.currency || "USD";
+      try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+      } catch {
+        return `$${amt.toFixed(2)}`;
+      }
+    };
+
+    const calcSubtotalCents = (items) =>
+      items.reduce((sum, it) => {
+        const amt = it?.price_money?.amount;
+        const q = Number(it?.qty || 0);
+        if (typeof amt !== "number" || !Number.isFinite(q)) return sum;
+        return sum + amt * Math.max(0, q);
+      }, 0);
+
+    const currencyOf = (items) =>
+      (items?.find((x) => x?.price_money?.currency)?.price_money?.currency) || "USD";
+
+    const safeImg = (url) => {
+      const u = String(url || "").trim();
+      return u ? u : `${base}images/product-fallback.jpg`;
+    };
+
+    const keyOf = (it) => `${String(it?.id || "")}::${String(it?.variation_id || "")}`;
+
+    const emptyState = () => {
+      const shop = escapeHtml(routes.shop || `${base}shop`);
+      const featured = escapeHtml(routes.featured || `${base}featured`);
+      root.innerHTML = `
+        <div class="empty">
+          <div class="empty-card">
+            <div class="kicker">Empty</div>
+            <h2 class="h2" style="margin:6px 0 8px">Your cart is empty</h2>
+            <p class="p">Add a few ritual-grade essentials, then come back to checkout.</p>
+            <div class="btns" style="margin-top:12px">
+              <a class="btn btn-primary" href="${shop}">Shop</a>
+              <a class="btn btn-ghost" href="${featured}">Featured</a>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    const render = () => {
+      const { items } = Cart.get();
+
+      if (!Array.isArray(items) || items.length === 0) {
+        emptyState();
+        return;
+      }
+
+      const subCents = calcSubtotalCents(items);
+      const cur = currencyOf(items);
+      const subLabel = money({ amount: subCents, currency: cur });
+
+      const shop = escapeHtml(routes.shop || `${base}shop`);
+
+      root.innerHTML = `
+        <div class="cart-grid">
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <div class="kicker">Items</div>
+                <h2 class="h2" style="margin:6px 0 0">Ready when you are</h2>
+                <div class="small" style="opacity:.78;margin-top:6px">
+                  Update quantities, then checkout securely.
+                </div>
+              </div>
+
+              <div class="head-actions">
+                <a class="btn btn-ghost" href="${shop}">Shop</a>
+                <button class="btn btn-ghost" data-act="clear" type="button">Clear</button>
+              </div>
+            </div>
+
+            <div class="items" role="list">
+              ${items.map((it) => {
+                const id = String(it?.id || "");
+                const vid = String(it?.variation_id || "");
+                const k = escapeHtml(keyOf(it));
+                const name = escapeHtml(it?.name || "Item");
+                const img = escapeHtml(safeImg(it?.image_url));
+                const price = it?.price_money ? money(it.price_money) : "";
+                const qty = Math.max(1, Number(it?.qty || 1));
+                const lineCents =
+                  typeof it?.price_money?.amount === "number"
+                    ? it.price_money.amount * qty
+                    : 0;
+                const lineLabel = lineCents ? money({ amount: lineCents, currency: cur }) : "";
+
+                const missingVar = !vid;
+
+                return `
+                  <article class="item" role="listitem" data-id="${escapeHtml(id)}" data-vid="${escapeHtml(vid)}" data-key="${k}">
+                    <div class="thumb">
+                      <img src="${img}" alt="${name}" loading="lazy" />
+                    </div>
+
+                    <div class="meta">
+                      <div class="toprow">
+                        <div>
+                          <div class="name">${name}</div>
+                          <div class="small" style="opacity:.82;margin-top:3px">
+                            ${price ? `${escapeHtml(price)} each` : "Price calculated at checkout"}
+                          </div>
+                        </div>
+
+                        <div class="line-total">
+                          ${lineLabel ? escapeHtml(lineLabel) : ""}
+                        </div>
+                      </div>
+
+                      ${
+                        missingVar
+                          ? `<div class="warn small">Missing variation_id. Open this product and re-add it to cart.</div>`
+                          : ``
+                      }
+
+                      <div class="qty">
+                        <button class="qbtn" type="button" data-act="dec" aria-label="Decrease quantity">−</button>
+                        <input class="qinp" inputmode="numeric" pattern="[0-9]*" value="${qty}" aria-label="Quantity" />
+                        <button class="qbtn" type="button" data-act="inc" aria-label="Increase quantity">+</button>
+
+                        <button class="link" type="button" data-act="rm">Remove</button>
+                      </div>
+                    </div>
+                  </article>
+                `;
+              }).join("")}
+            </div>
+          </section>
+
+          <aside class="card summary" aria-label="Order summary">
+            <div class="kicker">Summary</div>
+            <h3 class="h2" style="margin:6px 0 10px">Order total</h3>
+
+            <div class="sumline">
+              <div class="small">Subtotal</div>
+              <div class="price">${escapeHtml(subLabel)}</div>
+            </div>
+
+            <div class="small" style="opacity:.78;margin-top:10px;line-height:1.5">
+              Shipping and tax are calculated securely at checkout.
+            </div>
+
+            <div class="divider" aria-hidden="true"></div>
+
+            <button class="btn btn-primary" id="checkout" type="button">
+              Checkout
+            </button>
+
+            <a class="btn btn-ghost" style="margin-top:10px" href="${shop}">
+              Keep shopping
+            </a>
+
+            <div class="error" id="err" style="display:none" role="alert"></div>
+
+            <div class="small" style="opacity:.72;margin-top:12px">
+              Secure payment powered by Square.
+            </div>
+          </aside>
+        </div>
+      `;
+    };
+
+    // Single delegated handler for all cart interactions
+    root.addEventListener("click", async (ev) => {
+      const btn = ev.target?.closest?.("[data-act],#checkout");
+      if (!btn) return;
+
+      const act = btn.id === "checkout" ? "checkout" : btn.getAttribute("data-act");
+      const itemEl = btn.closest?.(".item");
+
+      const showErr = (msg) => {
+        const err = root.querySelector("#err");
+        if (!err) return;
+        err.textContent = msg;
+        err.style.display = "block";
+      };
+
+      const hideErr = () => {
+        const err = root.querySelector("#err");
+        if (!err) return;
+        err.textContent = "";
+        err.style.display = "none";
+      };
+
+      if (act === "clear") {
+        Cart.clear();
+        return;
+      }
+
+      if (act === "checkout") {
+        hideErr();
+        const { items } = Cart.get();
+
+        try {
+          const invalid = items.find((it) => !it?.variation_id);
+          if (invalid) throw new Error(`Item missing variation_id: ${invalid?.name || invalid?.id}`);
+
+          const payload = {
+            cart: items.map((it) => ({
+              variation_id: it.variation_id,
+              qty: Number(it.qty || 1),
+            })),
+          };
+
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const text = await res.text();
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 160)}`);
+          if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+          const data = JSON.parse(text);
+          if (!data?.ok || !data?.checkout_url) throw new Error(data?.error || "Checkout unavailable");
+
+          // Recommended: clear cart on thank-you page instead.
+          window.location.href = data.checkout_url;
+        } catch (e) {
+          showErr(e?.message || "Checkout failed");
+        }
+        return;
+      }
+
+      // Item operations need item context
+      if (!itemEl) return;
+
+      const id = itemEl.getAttribute("data-id") || "";
+      const vid = itemEl.getAttribute("data-vid") || "";
+
+      if (act === "rm") {
+        Cart.remove(id, vid);
+        return;
+      }
+
+      if (act === "inc" || act === "dec") {
+        const { items } = Cart.get();
+        const it = items.find((x) => String(x.id) === String(id) && String(x.variation_id || "") === String(vid || ""));
+        const cur = Math.max(1, Number(it?.qty || 1));
+        const next = act === "inc" ? Math.min(20, cur + 1) : Math.max(1, cur - 1);
+        Cart.setQty(id, vid, next);
+        return;
+      }
+    });
+
+    // Quantity input change handling (delegated)
+    root.addEventListener("change", (ev) => {
+      const inp = ev.target?.closest?.(".qinp");
+      if (!inp) return;
+
+      const itemEl = inp.closest(".item");
+      if (!itemEl) return;
+
+      const id = itemEl.getAttribute("data-id") || "";
+      const vid = itemEl.getAttribute("data-vid") || "";
+      const qRaw = Number(inp.value || 1);
+      const q = Math.min(20, Math.max(1, Number.isFinite(qRaw) ? qRaw : 1));
+
+      inp.value = String(q);
+      Cart.setQty(id, vid, q);
+    });
+
+    render();
+    window.addEventListener("dts:cart", render);
+  </script>
+
+  <style>
+    .row-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .pill{
+      display:inline-flex; padding: 8px 12px; border-radius: 999px;
+      border: 1px solid rgba(200,162,74,.35); background: rgba(200,162,74,.12);
+      color: rgba(255,255,255,.92);
+    }
+
+    .cart-grid{ display:grid; grid-template-columns: 1.2fr .8fr; gap: 16px; margin-top:14px; }
+    @media (max-width: 980px){ .cart-grid{ grid-template-columns: 1fr; } }
+
+    .card{
+      border-radius: 22px; border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14); backdrop-filter: blur(10px);
+      box-shadow: 0 18px 46px rgba(0,0,0,.22); padding: 16px;
+    }
+
+    .card-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .head-actions{ display:flex; gap:10px; align-items:center; }
+
+    .items{ margin-top: 14px; display:grid; gap: 12px; }
+
+    .item{
+      display:grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.03);
+    }
+
+    .thumb{ border-radius: 14px; overflow:hidden; aspect-ratio: 1/1; background: rgba(255,255,255,.04); }
+    .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+    .toprow{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+    .name{ font-weight: 750; letter-spacing: .01em; }
+    .line-total{ font-weight: 750; opacity:.95; white-space:nowrap; }
+
+    .warn{
+      margin-top: 8px;
+      color: rgba(255, 211, 198, .95);
+      background: rgba(255, 211, 198, .08);
+      border: 1px solid rgba(255, 211, 198, .18);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+
+    .qty{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .qbtn{
+      width:34px; height:34px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18); color: rgba(255,255,255,.92);
+      cursor:pointer;
+    }
+    .qinp{
+      width:64px; height:34px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.12); color: rgba(255,255,255,.92);
+      text-align:center;
+    }
+    .link{
+      background: transparent; border: none; cursor:pointer;
+      color: rgba(255,255,255,.78); text-decoration: underline;
+      padding: 6px 8px;
+    }
+
+    .summary{
+      position: sticky;
+      top: 92px;
+      height: fit-content;
+    }
+    @media (max-width: 980px){
+      .summary{ position: static; }
+    }
+
+    .sumline{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .price{ font-weight: 850; }
+
+    .divider{
+      height: 1px;
+      background: rgba(255,255,255,.10);
+      margin: 14px 0;
+    }
+
+    .error{
+      margin-top: 12px;
+      border-radius: 14px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 211, 198, .18);
+      background: rgba(255, 211, 198, .08);
+      color: rgba(255, 211, 198, .95);
+      line-height: 1.45;
+    }
+
+    .empty{ display:flex; justify-content:center; padding: 18px 0 0; }
+    .empty-card{
+      max-width: 720px;
+      width: 100%;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 46px rgba(0,0,0,.22);
+      padding: 18px;
+    }
+
+    .skel{
+      background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 18px;
+    }
+    @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
+  </style>
+</BaseLayout>
