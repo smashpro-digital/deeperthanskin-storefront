@@ -1,44 +1,77 @@
 ---
 import "../styles/global.css";
 
+type Props = {
+  title?: string;
+  description?: string;
+};
+
 const {
   title = "Deeper Than Skin — Storefront",
   description = "Luxury skincare + wellness essentials. Browse in-house, checkout on Square when you’re ready.",
-} = Astro.props;
+} = (Astro.props as Props);
 
-const base = import.meta.env.BASE_URL;
+// Always a string
+const base: string = import.meta.env.BASE_URL || "/";
+
+/** Build internal URLs safe for GitHub Pages subpaths */
+const u = (path: string): string => {
+  const b = base.endsWith("/") ? base.slice(0, -1) : base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  // If base is just "/" -> avoid "//something"
+  if (b === "") return p;
+  return `${b}${p}`;
+};
 
 const LINKS = {
   book: "https://deeper-than-skin-llc.square.site/appointments",
   community: "https://returntothegarden.co",
   squareShop: "https://deeper-than-skin-llc.square.site/s/shop",
 };
-const EXT = { target: "_blank", rel: "noopener noreferrer" };
+const EXT = { target: "_blank", rel: "noopener noreferrer" as const };
 
 const ROUTES = {
-  home: `${base}`,
-  shop: `${base}shop`,
-  featured: `${base}featured`,
-  services: `${base}services`,
-  cart: `${base}cart`,
-  checkout: `${base}checkout`,
-  search: `${base}search`,
-  category: (slug) => `${base}category/${slug}`,
-  product: (id) => `${base}product/${id}`,
+  home: u("/"),
+  shop: u("/shop"),
+  featured: u("/featured"),
+  services: u("/services"),
+  cart: u("/cart"),
+  checkout: u("/checkout"),
+  search: u("/search"),
+  category: (slug: string) => u(`/category/${encodeURIComponent(slug)}`),
+  product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
 };
 
-const path = Astro.url?.pathname || "/";
-const strip = (s) => String(s || "").replace(/\/+$/, "");
-const isActive = (href) => {
+const path: string = Astro.url?.pathname || "/";
+
+/** normalize trailing slashes */
+const strip = (s: string): string => String(s || "").replace(/\/+$/, "");
+
+/** active link matcher */
+const isActive = (href: string): boolean => {
   const a = strip(href);
   const p = strip(path);
+
   if (a === p) return true;
 
+  // handle base "/" or "/subpath/"
   const baseNorm = strip(base);
   if (a === baseNorm || a === "") return p === baseNorm || p === "";
 
   return p.startsWith(a + "/");
 };
+
+// Canonical: prefer Astro.site, fallback to current origin
+const canonical = (() => {
+  try {
+    const origin = Astro.site ? Astro.site.toString() : Astro.url.origin;
+    // Ensure pathname includes base when deployed under subpath
+    // Astro.url.pathname already includes it; so just use current pathname
+    return new URL(Astro.url.pathname, origin).toString();
+  } catch {
+    return "";
+  }
+})();
 ---
 
 <!doctype html>
@@ -51,7 +84,7 @@ const isActive = (href) => {
     <title>{title}</title>
     <meta name="description" content={description} />
 
-    <link rel="canonical" href={new URL(base, Astro.site ?? Astro.url).toString()} />
+    {canonical ? <link rel="canonical" href={canonical} /> : null}
 
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <link rel="icon" type="image/png" href={`${base}favicon.ico`} />
@@ -141,6 +174,7 @@ const isActive = (href) => {
           </nav>
         </div>
       </div>
+
       <div class="nav-drawer-backdrop" data-drawer-backdrop aria-hidden="true"></div>
     </header>
 
