@@ -3,6 +3,8 @@
    Luxury mode polish + responsive Featured images
    + Mobile hamburger + friendly drawer menu
    + Hero text top-position support (index uses .hero-content--top + .hero-bottom-fade)
+   + Mobile: hide nav wordmark title (so it doesn't crowd hamburger/icons)
+   + Mobile FIX: Featured / Latest grids (auto-fit)
    ========================================================= */
 
 :root{
@@ -223,17 +225,24 @@ a{color:inherit}
   display:none;
 }
 
-/* Mobile: hide desktop links, show hamburger + drawer */
+/* Mobile: hide desktop links, show hamburger + drawer
+   ALSO: hide the centered wordmark title on mobile (per latest request)
+*/
 @media (max-width: 860px){
   .nav-left{ display:none; }
   .nav-right{ min-width:auto; }
-  .nav-wordmark{ font-size: 26px; }
+
+  /* REMOVE the nav title on mobile */
+  .nav-center{ display:none !important; }
+
+  /* Slightly tighter header */
+  .nav-inner{ height: 68px; }
 
   .nav-toggle{
     display:grid;
     place-items:center;
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 12px;
     border: 1px solid rgba(0,0,0,.10);
     background: rgba(255,255,255,.55);
@@ -249,6 +258,8 @@ a{color:inherit}
     background: rgba(255,255,255,.75);
   }
   .nav-toggle:active{ transform: translateY(0); }
+
+  .icon-btn{ width: 40px; height: 40px; }
 }
 
 /* Drawer mechanics:
@@ -418,10 +429,8 @@ body[data-menu="open"] .nav-drawer{
   text-align: center;
   margin: 0 auto;
   max-width: 980px;
-
-  /* lift it upward */
-  padding-top: clamp(72px, 10vh, 130px);
-  padding-bottom: clamp(18px, 4vh, 40px);
+  padding-top: clamp(60px, 8vh, 110px);
+  padding-bottom: clamp(12px, 3vh, 28px);
 }
 
 /* NEW: optional bottom fade element inserted in index */
@@ -474,14 +483,19 @@ body[data-menu="open"] .nav-drawer{
   margin-top: 28px;
 }
 
+/* Mobile hero: pull content up a bit more so image shows */
 @media (max-width: 560px){
   .hero-banner{
     min-height: 86vh;
-    padding: 120px 16px 90px;
+    padding: 108px 16px 90px;
+    place-items: start center;
   }
   .hero-content--top{
-    padding-top: 72px;
-    padding-bottom: 18px;
+    padding-top: 56px;
+    padding-bottom: 14px;
+  }
+  .hero-wordmark{
+    font-size: clamp(38px, 9vw, 58px);
   }
   .hero-lead{ max-width: 34ch; }
 }
@@ -633,9 +647,7 @@ body[data-menu="open"] .nav-drawer{
   overflow:hidden;
   width: 100%;
   height: auto;
-
-  /* Mobile friendly defaults */
-  aspect-ratio: 16/10; /* a touch taller than 16:9 so it doesn’t feel cramped */
+  aspect-ratio: 16/10;
 }
 
 /* Ensure image never overflows and always scales */
@@ -701,7 +713,8 @@ body[data-menu="open"] .nav-drawer{
   border-color: rgba(200,162,74,.70);
 }
 
-/* ---------- Luxury Product Grid (optional classes, safe to add) ---------- */
+/* ---------- Luxury Product Grid ---------- */
+/* Desktop defaults (12-col vibe) */
 .product-grid{
   display:grid;
   grid-template-columns: repeat(12, 1fr);
@@ -830,17 +843,16 @@ body[data-menu="open"] .nav-drawer{
   padding: 28px 0;
   font-size: 13px;
 }
+
 /* =========================================================
    MOBILE FIX: Featured / Latest grids
    Put this at the VERY BOTTOM of global.css so it wins.
    ========================================================= */
 
-/* Make featured/latest grids auto-responsive */
+/* Auto-fit prevents tiny columns on phones + fixes "text-only" cramped look */
 .product-grid{
   display: grid;
   gap: 14px;
-
-  /* Auto-fit prevents tiny columns on phones */
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
@@ -877,6 +889,7 @@ body[data-menu="open"] .nav-drawer{
     line-height: 1.12;
   }
 }
+
 /* ---------- Reduced motion respect ---------- */
 @media (prefers-reduced-motion: reduce){
   *{ transition: none !important; animation: none !important; scroll-behavior: auto !important; }
