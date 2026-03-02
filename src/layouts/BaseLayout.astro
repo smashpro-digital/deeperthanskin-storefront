@@ -373,3 +373,20 @@ const isActive = (href) => {
     </style>
   </body>
 </html>
+<script>
+(async () => {
+  try {
+    const k = "dts_categories_synced_v1";
+    if (localStorage.getItem(k) === "1") return;
+
+    const url = "https://smashpro.app/api/v1/index.php?path=public/commerce/categories&app_slug=deeper-than-skin&sync_db=1";
+    const r = await fetch(url, { method: "GET" });
+    // optional: console log once
+    // const j = await r.json(); console.log("category sync", j);
+
+    if (r.ok) localStorage.setItem(k, "1");
+  } catch (e) {
+    // fail silent, site still works
+  }
+})();
+</script>
