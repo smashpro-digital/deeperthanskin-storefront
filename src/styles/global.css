@@ -1,6 +1,8 @@
 /* =========================================================
    Deeper Than Skin — Global Stylesheet (FULL DROP-IN)
    Luxury mode polish + responsive Featured images
+   + Mobile hamburger + friendly drawer menu
+   + Hero text top-position support (index uses .hero-content--top + .hero-bottom-fade)
    ========================================================= */
 
 :root{
@@ -130,7 +132,10 @@ a{color:inherit}
 }
 .btn-ghost:hover{background: rgba(255,255,255,.06)}
 
-/* ---------- NAV (Mockup-style: light bar, centered wordmark) ---------- */
+/* =========================================================
+   NAV (Mockup-style: light bar, centered wordmark)
+   + Mobile hamburger + drawer
+   ========================================================= */
 .nav{
   position:sticky; top:0; z-index:50;
   backdrop-filter: blur(10px);
@@ -207,13 +212,180 @@ a{color:inherit}
   background: rgba(255,255,255,.75);
 }
 
+/* Hamburger button (hidden on desktop) */
+.nav-toggle{
+  display:none;
+}
+
+/* Drawer + backdrop (default hidden) */
+.nav-drawer-backdrop,
+.nav-drawer{
+  display:none;
+}
+
+/* Mobile: hide desktop links, show hamburger + drawer */
 @media (max-width: 860px){
   .nav-left{ display:none; }
   .nav-right{ min-width:auto; }
   .nav-wordmark{ font-size: 26px; }
+
+  .nav-toggle{
+    display:grid;
+    place-items:center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.55);
+    color: rgba(0,0,0,.78);
+    text-decoration:none;
+    cursor:pointer;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .nav-toggle:hover{
+    transform: translateY(-1px);
+    color: rgba(0,0,0,.92);
+    border-color: rgba(0,0,0,.18);
+    background: rgba(255,255,255,.75);
+  }
+  .nav-toggle:active{ transform: translateY(0); }
 }
 
-/* ---------- HERO BANNER (Mockup-style) ---------- */
+/* Drawer mechanics:
+   Your BaseLayout should toggle these attributes:
+   - body[data-menu="open"] OR html[data-menu="open"]
+   (Either works; we support both)
+*/
+html[data-menu="open"] .nav-drawer-backdrop,
+body[data-menu="open"] .nav-drawer-backdrop{
+  display:block;
+}
+html[data-menu="open"] .nav-drawer,
+body[data-menu="open"] .nav-drawer{
+  display:block;
+}
+
+.nav-drawer-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  z-index: 60;
+}
+
+.nav-drawer{
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  left: 10px;
+  max-width: 520px;
+  margin-left: auto;
+  border-radius: 22px;
+  overflow: hidden;
+  z-index: 61;
+  background: rgba(243,239,230,.96);
+  border: 1px solid rgba(0,0,0,.12);
+  box-shadow: 0 24px 70px rgba(0,0,0,.22);
+}
+
+.nav-drawer-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.nav-drawer-brand{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.nav-drawer-brand strong{
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: rgba(0,0,0,.78);
+  letter-spacing: .02em;
+  line-height:1.05;
+}
+.nav-drawer-brand span{
+  font-size: 12px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.55);
+}
+
+.nav-drawer-close{
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display:grid;
+  place-items:center;
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.60);
+  color: rgba(0,0,0,.75);
+  cursor:pointer;
+  transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+}
+.nav-drawer-close:hover{
+  transform: translateY(-1px);
+  color: rgba(0,0,0,.92);
+  border-color: rgba(0,0,0,.18);
+  background: rgba(255,255,255,.78);
+}
+
+.nav-drawer-body{
+  padding: 10px 12px 14px;
+}
+
+.nav-drawer-links{
+  display:grid;
+  gap: 8px;
+}
+
+.nav-drawer-link{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  padding: 12px 12px;
+  border-radius: 16px;
+  text-decoration:none;
+  color: rgba(0,0,0,.78);
+  background: rgba(255,255,255,.55);
+  border: 1px solid rgba(0,0,0,.08);
+  transition: transform .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
+}
+.nav-drawer-link:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,.72);
+  border-color: rgba(0,0,0,.14);
+  color: rgba(0,0,0,.92);
+}
+.nav-drawer-link.is-active{
+  background: rgba(200,162,74,.16);
+  border-color: rgba(200,162,74,.40);
+}
+
+.nav-drawer-divider{
+  height:1px;
+  background: rgba(0,0,0,.10);
+  margin: 10px 2px;
+}
+
+.nav-drawer-actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+}
+.nav-drawer-actions a{
+  flex: 1 1 auto;
+  justify-content:center;
+}
+
+/* =========================================================
+   HERO BANNER (Mockup-style)
+   + Support for index "move text up" change
+   ========================================================= */
 .hero-banner{
   position: relative;
   min-height: 92vh;
@@ -240,6 +412,32 @@ a{color:inherit}
   max-width: 980px;
   text-align: center;
 }
+
+/* NEW: when present, push the hero content up into the top green space */
+.hero-content--top{
+  text-align: center;
+  margin: 0 auto;
+  max-width: 980px;
+
+  /* lift it upward */
+  padding-top: clamp(72px, 10vh, 130px);
+  padding-bottom: clamp(18px, 4vh, 40px);
+}
+
+/* NEW: optional bottom fade element inserted in index */
+.hero-bottom-fade{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  height: 46%;
+  background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.46));
+  pointer-events:none;
+  z-index: 1;
+}
+
+/* Ensure hero content stays above fades/overlays */
+.hero-content{ z-index: 2; }
+.hero-overlay{ z-index: 0; }
+.hero-bottom-fade{ z-index: 1; }
 
 .hero-brand{ margin-bottom: 18px; }
 .hero-wordmark{
@@ -274,6 +472,18 @@ a{color:inherit}
 .hero-ctas{
   justify-content: center;
   margin-top: 28px;
+}
+
+@media (max-width: 560px){
+  .hero-banner{
+    min-height: 86vh;
+    padding: 120px 16px 90px;
+  }
+  .hero-content--top{
+    padding-top: 72px;
+    padding-bottom: 18px;
+  }
+  .hero-lead{ max-width: 34ch; }
 }
 
 /* ---------- STRIP SECTION (paper background + top border) ---------- */
