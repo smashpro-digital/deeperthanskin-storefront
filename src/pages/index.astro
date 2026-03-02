@@ -94,8 +94,7 @@ try {
     featured = json.items;
     featuredMode = json.mode || "fallback";
   } else {
-    featuredError =
-      (json as any)?.error || "Featured unavailable";
+    featuredError = (json as any)?.error || "Featured unavailable";
   }
 } catch (e: any) {
   featuredError = e?.message || "Featured unavailable";
@@ -137,7 +136,8 @@ function formatMoney(pm?: Money | null) {
     <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
       <div class="hero-overlay"></div>
 
-      <div class="hero-content" data-aos="fade-up">
+      {/* moved up into the "green" space: top-aligned instead of center */}
+      <div class="hero-content hero-content--top" data-aos="fade-up">
         <div class="hero-brand">
           <span class="hero-wordmark">Deeper Than Skin</span>
           <span class="hero-divider"></span>
@@ -153,6 +153,9 @@ function formatMoney(pm?: Money | null) {
           <a class="btn btn-ghost" href={ROUTES.featured}>Explore Featured</a>
         </div>
       </div>
+
+      {/* subtle bottom fade so text never fights the product imagery */}
+      <div class="hero-bottom-fade" aria-hidden="true"></div>
     </section>
 
     {/* STRIP */}
@@ -299,6 +302,47 @@ function formatMoney(pm?: Money | null) {
   </main>
 
   <style>
+    /* === HERO: move text up into top green space === */
+    .hero-banner{
+      position: relative;
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* this class is additive: doesn't require changing your existing hero styles */
+    .hero-content.hero-content--top{
+      /* keep your existing spacing, but push content up */
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding-top: clamp(72px, 10vh, 130px);
+      padding-bottom: clamp(18px, 4vh, 40px);
+      max-width: 980px;
+    }
+
+    /* ensure mobile gets text up and readable */
+    @media (max-width: 560px){
+      .hero-content.hero-content--top{
+        padding-top: 72px;
+        padding-bottom: 18px;
+      }
+      .hero-lead{
+        max-width: 34ch;
+      }
+    }
+
+    /* extra fade from mid -> bottom so text stays in “clean” space */
+    .hero-bottom-fade{
+      position:absolute;
+      left:0; right:0; bottom:0;
+      height: 46%;
+      background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.46));
+      pointer-events:none;
+      z-index: 1;
+    }
+
+    /* keep hero content above overlays */
+    .hero-content{ position: relative; z-index: 2; }
+
     /* In-house featured grid (keeps homepage tight + responsive) */
     .product-grid{
       display:grid;
