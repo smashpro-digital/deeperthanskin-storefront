@@ -9,93 +9,137 @@ export async function getStaticPaths() {
   return slugs.map((slug) => ({ params: { slug } }));
 }
 
+const base = import.meta.env.BASE_URL;
+
+// ✅ Prefer routes endpoint (bypass index router)
 const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
+  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
+  "https://smashpro.app/api/v1/routes";
+
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
-const base = import.meta.env.BASE_URL;
-
 const { slug } = Astro.params;
 
+// Try BOTH param names (your backend can accept either)
 const endpoint =
-  `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=60&category=${encodeURIComponent(slug)}`;
+  `${API_BASE}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=120&category_slug=${encodeURIComponent(slug)}&category=${encodeURIComponent(slug)}`;
 
-const TITLE_MAP = {
+const TITLE_MAP: Record<string, string> = {
   skincare: "Skincare",
   wellness: "Wellness",
   juices: "Cold-Pressed Juices",
   seamoss: "Sea Moss Gel",
-  kits: "Detox Cleanse Kits",
+  kits: "Kits & Bundles",
   herbs: "Herbal Teas & Oils",
 };
 
-const HERO_MAP = {
-  skincare: `${base}images/cat-kits.jpg`,
-  wellness: `${base}images/cat-herbs.jpg`,
+const HERO_MAP: Record<string, string> = {
+  skincare: `${base}images/cat-skincare.jpg`,
+  wellness: `${base}images/cat-wellness.jpg`,
   juices: `${base}images/cat-juices.jpg`,
   seamoss: `${base}images/cat-seamoss.jpg`,
   kits: `${base}images/cat-kits.jpg`,
   herbs: `${base}images/cat-herbs.jpg`,
 };
 
+// Fallbacks if you don't have the new hero images yet
 const pageTitle = TITLE_MAP[slug] || "Category";
 const heroImg = HERO_MAP[slug] || `${base}images/product-fallback.jpg`;
 const fallbackImg = heroImg;
 
-// base-safe internal routes
 const ROUTES = {
   shop: `${base}shop`,
-  product: (id) => `${base}product/${id}`,
+  product: (id: string) => `${base}product/${id}`,
+  cart: `${base}cart`,
 };
 ---
 
 <BaseLayout title={`${pageTitle} | Deeper Than Skin`}>
   <main class="section">
     <div class="container">
-      <a class="small" href={ROUTES.shop} style="text-decoration:none;opacity:.85">← Back to Shop</a>
+      <div class="toprow">
+        <a class="crumb" href={ROUTES.shop}>← Back to Shop</a>
+        <button id="cartPill" class="cartpill" type="button" aria-label="View cart">
+          <span class="cartpill-dot" aria-hidden="true"></span>
+          <span>Cart</span>
+          <span id="cartCount" class="cartpill-count">0</span>
+        </button>
+      </div>
 
-      <div class="cat-hero" style={`background-image:url('${heroImg}');`}>
-        <div class="cat-hero-overlay"></div>
-        <div class="cat-hero-inner">
+      <section class="hero" style={`--hero:url('${heroImg}');`}>
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="hero-inner">
           <div class="kicker">Category</div>
-          <h1 class="h2" style="font-size:42px;margin:8px 0 0">{pageTitle}</h1>
-          <p class="p" style="max-width:70ch;margin-top:10px">
-            Browse in-house. Tap a product for details.
+          <h1 class="hero-title">{pageTitle}</h1>
+          <p class="hero-sub">
+            Browse curated essentials. Add to cart, then checkout when ready.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
+            <a class="btn btn-ghost" href={ROUTES.cart}>View Cart</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:18px">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Products</h2>
+            <p class="panel-sub">Tap a card for details, or add straight to your cart.</p>
+          </div>
+          <div class="panel-tools">
+            <input id="q" class="search" type="search" placeholder="Search this category…" />
+          </div>
+        </div>
+
+        <div
+          class="grid"
+          id="cat-grid"
+          data-endpoint={endpoint}
+          data-fallback={fallbackImg}
+          data-base={base}
+          data-product-base={`${base}product/`}
+        >
+          {Array.from({ length: 8 }).map(() => (
+            <div class="card skel-card" aria-hidden="true">
+              <div class="media skel"></div>
+              <div class="body">
+                <div class="skel line"></div>
+                <div class="skel line" style="width:70%"></div>
+                <div class="skel line" style="width:40%; margin-top:14px"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div id="empty" class="empty" hidden>
+          <div class="kicker">Notice</div>
+          <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
+          <p class="p">
+            If this category should have items, it usually means the API mapping needs the Square category IDs.
           </p>
         </div>
-      </div>
-
-      <div
-        class="grid"
-        id="cat-grid"
-        data-endpoint={endpoint}
-        data-fallback={fallbackImg}
-        data-base={base}
-        style="margin-top:18px"
-      >
-        {Array.from({ length: 6 }).map(() => (
-          <div class="pgrid-card pgrid-skeleton" aria-hidden="true">
-            <div class="pgrid-media skel"></div>
-            <div class="pgrid-body">
-              <div class="skel line"></div>
-              <div class="skel line" style="width:70%"></div>
-            </div>
-          </div>
-        ))}
-      </div>
+      </section>
     </div>
   </main>
 
   <script is:inline>
     (function () {
       const grid = document.getElementById("cat-grid");
+      const empty = document.getElementById("empty");
+      const q = document.getElementById("q");
+      const cartPill = document.getElementById("cartPill");
+      const cartCount = document.getElementById("cartCount");
+
       if (!grid) return;
 
       const endpoint = grid.getAttribute("data-endpoint");
       const fallback = grid.getAttribute("data-fallback") || "/images/product-fallback.jpg";
       const base = grid.getAttribute("data-base") || "/";
+      const productBase = grid.getAttribute("data-product-base") || (base + "product/");
 
+      // ---------- tiny helpers ----------
       const escapeHtml = (s) =>
         String(s || "")
           .replaceAll("&", "&amp;")
@@ -112,42 +156,121 @@ const ROUTES = {
         catch { return `$${amt.toFixed(2)}`; }
       };
 
+      const CART_KEY = "dts_cart_v1";
+
+      const readCart = () => {
+        try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") || []; }
+        catch { return []; }
+      };
+
+      const writeCart = (items) => {
+        localStorage.setItem(CART_KEY, JSON.stringify(items));
+        syncCartCount();
+      };
+
+      const syncCartCount = () => {
+        const items = readCart();
+        const n = items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+        if (cartCount) cartCount.textContent = String(n);
+      };
+
+      const addToCart = (p, qty = 1) => {
+        const items = readCart();
+        const id = String(p.id || "");
+        if (!id) return;
+
+        const img = (p.image_url && String(p.image_url).trim()) ? p.image_url : fallback;
+        const price_money = p.price_money || null;
+
+        const found = items.find(x => String(x.id) === id);
+        if (found) {
+          found.qty = (Number(found.qty) || 0) + qty;
+        } else {
+          items.push({
+            id,
+            name: p.name || "Item",
+            image_url: img,
+            price_money,
+            qty
+          });
+        }
+        writeCart(items);
+      };
+
+      if (cartPill) {
+        cartPill.addEventListener("click", () => {
+          // if you create /cart, this will just work
+          window.location.href = base + "cart";
+        });
+      }
+
+      // ---------- render ----------
+      let ALL = [];
+
+      const cardHtml = (it) => {
+        const id = String(it.id || "");
+        const title = escapeHtml(it.name || "Product");
+        const descRaw = String(it.description || "");
+        const desc = escapeHtml(descRaw.length > 120 ? (descRaw.slice(0, 117) + "…") : descRaw);
+        const img = (it.image_url && String(it.image_url).trim()) ? it.image_url : fallback;
+        const price = it.has_price ? money(it.price_money) : "";
+
+        return `
+          <article class="card" data-id="${escapeHtml(id)}">
+            <a class="card-link" href="${productBase}${encodeURIComponent(id)}" aria-label="View ${title}">
+              <div class="media">
+                <img src="${img}" alt="${title}" loading="lazy" />
+                <div class="shine" aria-hidden="true"></div>
+              </div>
+              <div class="body">
+                <div class="row">
+                  <h3 class="title">${title}</h3>
+                  <div class="price">${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}</div>
+                </div>
+                <p class="desc">${desc || "Tap to view details."}</p>
+              </div>
+            </a>
+            <div class="actions">
+              <button class="btn btn-primary add" type="button">Add to cart</button>
+              <a class="btn btn-ghost" href="${productBase}${encodeURIComponent(id)}">View</a>
+            </div>
+          </article>
+        `;
+      };
+
       const render = (items) => {
+        ALL = Array.isArray(items) ? items : [];
+        const query = String(q?.value || "").trim().toLowerCase();
+
+        const filtered = query
+          ? ALL.filter(p =>
+              String(p?.name || "").toLowerCase().includes(query) ||
+              String(p?.description || "").toLowerCase().includes(query)
+            )
+          : ALL;
+
         grid.innerHTML = "";
-        if (!Array.isArray(items) || items.length === 0) {
-          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
-            <div class="kicker">Notice</div>
-            <h3 class="h2" style="margin:6px 0 8px">No products in this category</h3>
-            <p class="p">Confirm the Square CATEGORY id mapping in your commerce API.</p>
-          </div>`;
+
+        if (!filtered.length) {
+          if (empty) empty.hidden = false;
           return;
         }
+        if (empty) empty.hidden = true;
 
-        items.forEach((it) => {
-          const id = it.id || "";
-          const title = escapeHtml(it.name);
-          const desc = escapeHtml(String(it.description || "")).slice(0, 110);
-          const img = it.image_url && String(it.image_url).trim() ? it.image_url : fallback;
-          const price = it.has_price ? money(it.price_money) : "";
+        grid.innerHTML = filtered.map(cardHtml).join("");
 
-          const a = document.createElement("a");
-          a.className = "pgrid-card";
-          a.href = `${base}product/${encodeURIComponent(id)}`;
-          a.setAttribute("aria-label", `View ${it.name || "product"}`);
-
-          a.innerHTML = `
-            <div class="pgrid-media">
-              <img src="${img}" alt="${title}" loading="lazy" />
-            </div>
-            <div class="pgrid-body">
-              <div class="pgrid-row">
-                <h3 class="pgrid-title">${title}</h3>
-                ${price ? `<div class="pgrid-price">${escapeHtml(price)}</div>` : `<div class="pgrid-price" style="opacity:.7">Details</div>`}
-              </div>
-              <p class="pgrid-desc">${desc || "Tap to view details."}</p>
-            </div>
-          `;
-          grid.appendChild(a);
+        // Wire buttons
+        grid.querySelectorAll(".card").forEach((card) => {
+          const id = card.getAttribute("data-id");
+          const btn = card.querySelector("button.add");
+          const p = filtered.find(x => String(x?.id || "") === String(id || ""));
+          if (!btn || !p) return;
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            addToCart(p, 1);
+            btn.textContent = "Added ✓";
+            setTimeout(() => (btn.textContent = "Add to cart"), 900);
+          });
         });
       };
 
@@ -158,80 +281,246 @@ const ROUTES = {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
           const data = JSON.parse(text);
+
           if (!data || data.ok !== true) throw new Error("API not ok");
+
           render(data.items || []);
         } catch (e) {
           console.error("[category] load failed:", e);
           grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
             <div class="kicker">Error</div>
-            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load category</h3>
-            <p class="p">Check API base/app slug and the category mapping.</p>
+            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
+            <p class="p">Check API base/app slug and your category mapping (Square category IDs).</p>
           </div>`;
         }
       };
+
+      if (q) q.addEventListener("input", () => render(ALL));
+      syncCartCount();
+      window.addEventListener("storage", syncCartCount);
 
       load();
     })();
   </script>
 
   <style>
-    .cat-hero{
+    .toprow{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+    .crumb{
+      text-decoration:none;
+      opacity:.9;
+      font-size: 13px;
+    }
+
+    .cartpill{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      border-radius:999px;
+      padding:10px 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      backdrop-filter: blur(10px);
+      color: rgba(255,255,255,.92);
+      cursor:pointer;
+      box-shadow: 0 12px 28px rgba(0,0,0,.22);
+    }
+    .cartpill-dot{
+      width:10px;height:10px;border-radius:999px;
+      background: rgba(200,162,74,.85);
+      box-shadow: 0 0 24px rgba(200,162,74,.35);
+    }
+    .cartpill-count{
+      min-width: 22px;
+      height: 22px;
+      display:inline-flex;
+      justify-content:center;
+      align-items:center;
+      border-radius:999px;
+      padding:0 7px;
+      font-weight: 700;
+      border:1px solid rgba(200,162,74,.35);
+      background: rgba(200,162,74,.12);
+    }
+
+    .hero{
       position:relative;
-      border-radius: 24px;
+      border-radius: 26px;
       overflow:hidden;
-      min-height: 220px;
-      background-size: cover;
-      background-position: center;
       border: 1px solid rgba(255,255,255,.12);
       box-shadow: 0 26px 70px rgba(0,0,0,.28);
       margin-top: 14px;
+      min-height: 260px;
     }
-    .cat-hero-overlay{
+    .hero-bg{
+      position:absolute; inset:0;
+      background-image: var(--hero);
+      background-size: cover;
+      background-position: center;
+      filter: saturate(1.05) contrast(1.03);
+      transform: scale(1.02);
+    }
+    .hero-bg::after{
+      content:"";
       position:absolute; inset:0;
       background:
-        linear-gradient(180deg, rgba(8,14,11,.30), rgba(8,14,11,.82)),
-        radial-gradient(900px 500px at 50% 30%, rgba(200,162,74,.22), transparent 60%);
+        radial-gradient(900px 520px at 50% 28%, rgba(200,162,74,.20), transparent 60%),
+        linear-gradient(180deg, rgba(6,12,9,.22), rgba(6,12,9,.86));
     }
-    .cat-hero-inner{ position:relative; z-index:2; padding: 22px; }
+    .hero-inner{
+      position:relative;
+      z-index:2;
+      padding: 22px;
+      max-width: 760px;
+    }
+    .hero-title{
+      font-family: var(--font-display);
+      font-size: clamp(34px, 4.2vw, 54px);
+      line-height: 1.02;
+      margin: 10px 0 6px;
+      letter-spacing: -.02em;
+    }
+    .hero-sub{
+      margin: 0;
+      opacity: .86;
+      max-width: 64ch;
+      line-height: 1.55;
+    }
+    .hero-actions{
+      display:flex;
+      gap:10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
 
-    .pgrid-card{
-      grid-column: span 4;
-      border-radius: 20px;
-      overflow:hidden;
-      text-decoration:none;
-      color: inherit;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.16);
+    .panel{
+      border-radius: 26px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
       backdrop-filter: blur(10px);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-      display:flex;
-      flex-direction:column;
-      min-height: 280px;
+      padding: 16px;
     }
-    .pgrid-card:hover{
+    .panel-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:12px;
+      flex-wrap: wrap;
+      padding: 6px 4px 14px;
+    }
+    .panel-title{
+      margin:0;
+      font-family: var(--font-display);
+      font-size: 22px;
+    }
+    .panel-sub{
+      margin:6px 0 0;
+      opacity:.82;
+      font-size: 13px;
+    }
+    .search{
+      width: min(360px, 100%);
+      border-radius: 999px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.20);
+      color: rgba(255,255,255,.92);
+      outline: none;
+    }
+    .search::placeholder{ color: rgba(255,255,255,.55); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card{
+      grid-column: span 4;
+      border-radius: 22px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.16);
+      box-shadow: 0 18px 46px rgba(0,0,0,.22);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .card:hover{
       transform: translateY(-4px);
       box-shadow: 0 26px 64px rgba(0,0,0,.28);
       border-color: rgba(200,162,74,.22);
     }
-    .pgrid-media{ aspect-ratio: 4/3; background: rgba(255,255,255,.04); position:relative; }
-    .pgrid-media img{ width:100%; height:100%; object-fit: cover; display:block; }
-    .pgrid-media::after{
-      content:"";
+
+    .card-link{
+      display:block;
+      text-decoration:none;
+      color:inherit;
+    }
+
+    .media{
+      aspect-ratio: 4/3;
+      position:relative;
+      background: rgba(255,255,255,.04);
+    }
+    .media img{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      display:block;
+    }
+    .shine{
       position:absolute; inset:0;
-      background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
+      background: radial-gradient(800px 260px at 50% 18%, transparent, rgba(0,0,0,.38));
       pointer-events:none;
     }
-    .pgrid-body{ padding: 12px 12px 14px; }
-    .pgrid-row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-    .pgrid-title{ margin:0; font-size: 16px; line-height:1.2; }
-    .pgrid-price{ font-weight: 650; white-space:nowrap; opacity:.95; }
-    .pgrid-desc{ margin: 8px 0 0; font-size: 13px; opacity:.85; line-height:1.35; }
 
-    @media (max-width: 900px){ .pgrid-card{ grid-column: span 6; } }
-    @media (max-width: 560px){ .pgrid-card{ grid-column: span 12; } }
+    .body{ padding: 12px 12px 10px; }
+    .row{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .title{
+      margin:0;
+      font-size: 16px;
+      line-height:1.2;
+      letter-spacing: -.01em;
+    }
+    .price{
+      white-space:nowrap;
+      font-weight: 750;
+      opacity:.95;
+    }
+    .desc{
+      margin: 8px 0 0;
+      font-size: 13px;
+      opacity:.85;
+      line-height:1.35;
+      min-height: 2.7em;
+    }
 
-    .pgrid-skeleton{ pointer-events:none; }
+    .actions{
+      display:flex;
+      gap:10px;
+      padding: 10px 12px 14px;
+    }
+    .actions .btn{ flex:1; }
+
+    .empty{
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+    }
+
+    /* skeletons */
+    .skel-card{ pointer-events:none; }
     .skel{
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
       background-size: 200% 100%;
@@ -240,5 +529,8 @@ const ROUTES = {
     }
     .line{ height: 12px; margin-top: 10px; }
     @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
+
+    @media (max-width: 920px){ .card{ grid-column: span 6; } }
+    @media (max-width: 560px){ .card{ grid-column: span 12; } }
   </style>
 </BaseLayout>
