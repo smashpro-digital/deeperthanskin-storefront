@@ -830,7 +830,53 @@ body[data-menu="open"] .nav-drawer{
   padding: 28px 0;
   font-size: 13px;
 }
+/* =========================================================
+   MOBILE FIX: Featured / Latest grids
+   Put this at the VERY BOTTOM of global.css so it wins.
+   ========================================================= */
 
+/* Make featured/latest grids auto-responsive */
+.product-grid{
+  display: grid;
+  gap: 14px;
+
+  /* Auto-fit prevents tiny columns on phones */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* Stop relying on 12-col spans for these cards */
+.product-grid .product-card{
+  grid-column: auto !important;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Keep product images readable (not ultra-tall) */
+.product-grid .product-media{
+  aspect-ratio: 4 / 3;
+}
+
+/* Clamp description so cards don’t become skyscrapers */
+.product-grid .product-desc{
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Mobile: single column feels premium */
+@media (max-width: 560px){
+  .product-grid{
+    grid-template-columns: 1fr;
+  }
+  .product-grid .product-body{
+    padding: 14px;
+  }
+  .product-grid .product-title{
+    font-size: 18px;
+    line-height: 1.12;
+  }
+}
 /* ---------- Reduced motion respect ---------- */
 @media (prefers-reduced-motion: reduce){
   *{ transition: none !important; animation: none !important; scroll-behavior: auto !important; }
