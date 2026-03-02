@@ -16,16 +16,17 @@ const ROUTES = {
 
 // ✅ Most reliable: declare env + endpoint inside getStaticPaths()
 export async function getStaticPaths() {
+  // ✅ IMPORTANT: bypass index.php router (bootstrap str_starts_with crash)
   const API_BASE =
     import.meta.env.PUBLIC_COMMERCE_API_BASE ||
-    "https://smashpro.app/api/v1/index.php";
+    "https://smashpro.app/api/v1/routes";
 
   const APP_SLUG =
     import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
     "deeper-than-skin";
 
   const endpoint =
-    `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=300`;
+    `${API_BASE}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=300`;
 
   try {
     const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
@@ -55,14 +56,14 @@ const { id } = Astro.params;
 // ✅ This part runs per page render, so env vars are fine here too
 const API_BASE =
   import.meta.env.PUBLIC_COMMERCE_API_BASE ||
-  "https://smashpro.app/api/v1/index.php";
+  "https://smashpro.app/api/v1/routes";
 
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
   "deeper-than-skin";
 
 const endpoint =
-  `${API_BASE}?path=public/commerce/product&app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
+  `${API_BASE}/public.commerce.product.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
 ---
 
 <BaseLayout title="Product | Deeper Than Skin">
