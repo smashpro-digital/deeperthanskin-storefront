@@ -25,11 +25,6 @@ type ApiProduct = {
   category?: string | null;
 };
 
-type ApiOkSingle = { ok: true; item?: ApiProduct; items?: ApiProduct[] };
-type ApiOkList = { ok: true; items: ApiProduct[] };
-type ApiFail = { ok?: false; error?: string };
-type AnyApi = ApiOkSingle | ApiOkList | ApiFail;
-
 const base = import.meta.env.BASE_URL || "/";
 
 // Default storefront entry (fallback)
@@ -42,22 +37,19 @@ const ROUTES = {
   cart: `${base}cart`,
 };
 
-// ✅ Helpers (safe in every build context)
-const getApiBase = () =>
+// Runtime endpoints (safe defaults)
+const API_BASE =
   (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
   "https://smashpro.app/api/v1/routes";
 
-const getAppSlug = () =>
+const APP_SLUG =
   (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
   "deeper-than-skin";
 
 // product id
 const { id } = Astro.params;
 
-// Build endpoints (runtime render + client script uses these)
-const API_BASE = getApiBase();
-const APP_SLUG = getAppSlug();
-
+// Build endpoints (used by client script)
 const productEndpoint =
   `${API_BASE}/public.commerce.product.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
 
@@ -67,7 +59,11 @@ const listEndpoint =
 const checkoutEndpoint =
   `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
 
-// ✅ STATIC PATHS (define API vars INSIDE to avoid "API_BASE is not defined")
+/**
+ * ✅ STATIC PATHS (FULLY SELF-CONTAINED)
+ * Do NOT reference outer API_BASE/APP_SLUG or types here.
+ * This prevents “API_BASE is not defined” in CI builds.
+ */
 export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
   const API_BASE_INNER =
     (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
@@ -87,15 +83,15 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (text.trim().startsWith("<")) throw new Error("Non-JSON response (HTML)");
 
-    const data = JSON.parse(text) as AnyApi;
-    const items = Array.isArray((data as any)?.items) ? ((data as any).items as ApiProduct[]) : [];
+    const data = JSON.parse(text) as any;
+    const items = Array.isArray(data?.items) ? data.items : [];
 
     return items
-      .filter((p) => p && p.id)
-      .map((p) => ({ params: { id: String(p.id) } }));
+      .filter((p: any) => p && p.id)
+      .map((p: any) => ({ params: { id: String(p.id) } }));
   } catch (e) {
     console.error("[product] getStaticPaths failed:", e);
-    // IMPORTANT: returning [] should still allow build to succeed
+    // Returning [] should still allow build to succeed.
     return [];
   }
 }
@@ -156,7 +152,7 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
     import { Cart } from "/src/lib/cart.js";
 
     const root = document.getElementById("product");
-    if (!root) return;
+    if (!root) throw new Error("product root missing");
 
     const endpoint = root.getAttribute("data-endpoint") || "";
     const listEndpoint = root.getAttribute("data-list-endpoint") || "";
@@ -164,6 +160,7 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
     const squareShop = root.getAttribute("data-square") || "#";
     const base = root.getAttribute("data-base") || "/";
     const wantedId = root.getAttribute("data-id") || "";
+
     const routes = (() => {
       try { return JSON.parse(root.getAttribute("data-routes") || "{}"); }
       catch { return {}; }
@@ -243,7 +240,6 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
       const price = p?.has_price ? money(p?.price_money) : "";
       const buyUrl = bestBuyUrl(p);
 
-      // variation_id needed for cart -> checkout endpoint
       const variationId = String(p?.variation_id || "").trim();
       const canCart = variationId.length > 0;
 
@@ -277,11 +273,11 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
           ${
             canCart
               ? `<div class="btns">
-                   <button class="btn btn-primary" id="add">Add to cart</button>
+                   <button class="btn btn-primary" id="add" type="button">Add to cart</button>
                    <a class="btn btn-ghost" href="${cartUrl}">View cart <span class="dot"></span><span id="cc" class="cc">${cartCount()}</span></a>
                  </div>
                  <div class="btns" style="margin-top:10px">
-                   <button class="btn btn-ghost" id="checkout">Checkout now</button>
+                   <button class="btn btn-ghost" id="checkout" type="button">Checkout now</button>
                    <a class="btn btn-ghost" href="${shopUrl}">Continue browsing</a>
                  </div>
                  <div class="fineprint">You’ll stay here while shopping. Payment happens securely at Square checkout.</div>
@@ -335,7 +331,6 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
       root.querySelector("#add")?.addEventListener("click", () => {
         hideErr();
         try {
-          // Store enough info for cart UI + checkout payload
           Cart.add({
             id: String(p.id),
             variation_id: variationId,
