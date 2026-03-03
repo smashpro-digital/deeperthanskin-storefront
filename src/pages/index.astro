@@ -39,6 +39,7 @@ const ROUTES = {
 };
 
 const LINKS = {
+  // still used as a fallback if services API fails
   book: "https://deeper-than-skin-llc.square.site/appointments",
   community: "https://returntothegarden.co",
 };
@@ -79,6 +80,7 @@ type FeaturedResponse = {
   mode: string;
   count: number;
   items: ApiItem[];
+  error?: string;
 };
 
 let featured: ApiItem[] = [];
@@ -90,26 +92,192 @@ try {
     headers: { Accept: "application/json" },
   });
   const json = (await res.json()) as FeaturedResponse;
+
   if (json?.ok && Array.isArray(json.items)) {
     featured = json.items;
     featuredMode = json.mode || "fallback";
   } else {
-    featuredError = (json as any)?.error || "Featured unavailable";
+    featuredError = json?.error || "Featured unavailable";
   }
 } catch (e: any) {
   featuredError = e?.message || "Featured unavailable";
 }
 
 /* ================
-   CATEGORY MODEL
+   CATEGORY FETCH (SSR)
+   Uses YOUR PHP response shape:
+   { ok, app_slug, categories: [{name,slug,square_category_id,parent_square_category_id}] }
 ================ */
-const CATEGORIES = [
+type DbCategory = {
+  name: string;
+  slug: string;
+  square_category_id: string;
+  parent_square_category_id: string | null;
+};
+
+type CategoriesResponse = {
+  ok: boolean;
+  app_slug: string;
+  categories: DbCategory[];
+  sync_db?: any;
+  error?: string;
+};
+
+// Safety net (design-first)
+const FALLBACK_CATEGORIES = [
   { title: "Cold-Pressed\nJuices", subtitle: "Event drops & limited releases", href: u("/category/juices"), img: CAT_JUICES },
   { title: "Sea Moss Gel", subtitle: "Ocean-rooted daily support", href: u("/category/sea-moss"), img: CAT_SEAMOSS },
   { title: "Detox Cleanse\nKits", subtitle: "Reset • restore • renew", href: u("/category/kits"), img: CAT_KITS },
   { title: "Herbal Teas &\nOils", subtitle: "Calm, clarity, balance", href: u("/category/herbs"), img: CAT_HERBS },
 ];
 
+// Keep the strip “curated” + stable
+const STRIP_ORDER = ["juices", "sea-moss", "kits", "herbs"];
+
+// Optional: luxe subtitles by slug (so it reads like your mock)
+const SUBTITLE_BY_SLUG: Record<string, string> = {
+  juices: "Event drops & limited releases",
+  "sea-moss": "Ocean-rooted daily support",
+  kits: "Reset • restore • renew",
+  herbs: "Calm, clarity, balance",
+};
+
+type StripCategoryCard = { title: string; subtitle: string; href: string; img: string; slug: string };
+
+function imageFallbackForCategory(slugOrName: string): string {
+  const s = (slugOrName || "").toLowerCase();
+  if (s.includes("juice")) return CAT_JUICES;
+  if (s.includes("moss")) return CAT_SEAMOSS;
+  if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return CAT_KITS;
+  if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return CAT_HERBS;
+  return PRODUCT_FALLBACK;
+}
+
+let shopCategories: StripCategoryCard[] = [];
+let categoriesMode = "fallback";
+let categoriesError = "";
+
+try {
+  const res = await fetch(apiUrl("public/commerce/categories"), {
+    headers: { Accept: "application/json" },
+  });
+
+  const json = (await res.json()) as CategoriesResponse;
+
+  if (json?.ok && Array.isArray(json.categories) && json.categories.length) {
+    categoriesMode = "api";
+
+    // Prefer top-level categories for the strip (parent is null)
+    const top = json.categories.filter((c) => !c.parent_square_category_id);
+
+    const mapped: StripCategoryCard[] = top.map((c) => {
+      const slug = (c.slug || "").trim();
+      const href = u(`/category/${encodeURIComponent(slug)}`);
+
+      // Title line breaks for “lux rhythm”
+      const title = (c.name || "Category")
+        .replace(/\s+\/\s+/g, "\n")
+        .replace(/\s+-\s+/g, "\n");
+
+      const subtitle = SUBTITLE_BY_SLUG[slug] || "Curated essentials for your routine";
+      const img = imageFallbackForCategory(slug || c.name);
+
+      return { title, subtitle, href, img, slug };
+    });
+
+    // Order: match your desired strip order, then fill
+    const ordered: StripCategoryCard[] = [];
+
+    for (const s of STRIP_ORDER) {
+      const match = mapped.find((x) => x.slug === s);
+      if (match) ordered.push(match);
+    }
+
+    for (const x of mapped) {
+      if (ordered.length >= 4) break;
+      if (ordered.some((o) => o.slug === x.slug)) continue;
+      ordered.push(x);
+    }
+
+    shopCategories = ordered.slice(0, 4);
+  } else {
+    categoriesError = json?.error || "Categories unavailable";
+  }
+} catch (e: any) {
+  categoriesError = e?.message || "Categories unavailable";
+}
+
+if (!shopCategories.length) {
+  categoriesMode = "fallback";
+  shopCategories = FALLBACK_CATEGORIES.map((c) => ({
+    title: c.title,
+    subtitle: c.subtitle,
+    href: c.href,
+    img: c.img,
+    slug: c.href.split("/").pop() || "",
+  }));
+}
+
+/* ================
+   SERVICES FETCH (SSR)
+   Uses YOUR services endpoint:
+   GET /public/commerce/services?app_slug=...
+   { ok, featured_service_slug, services:[{slug,name,subtitle,image_url,booking_url,is_featured,sort}] }
+================ */
+type ApiService = {
+  slug: string;
+  name: string;
+  subtitle?: string | null;
+  image_url?: string | null;
+  booking_url?: string | null;
+  is_featured?: boolean;
+  sort?: number;
+};
+
+type ServicesResponse = {
+  ok: boolean;
+  app_slug: string;
+  featured_service_slug?: string;
+  count?: number;
+  services?: ApiService[];
+  error?: string;
+};
+
+let servicesMode = "fallback";
+let servicesError = "";
+let featuredService: ApiService | null = null;
+
+try {
+  const res = await fetch(apiUrl("public/commerce/services"), {
+    headers: { Accept: "application/json" },
+  });
+
+  const json = (await res.json()) as ServicesResponse;
+
+  if (json?.ok && Array.isArray(json.services) && json.services.length) {
+    servicesMode = "api";
+    const wanted = (json.featured_service_slug || "").trim();
+
+    featuredService =
+      json.services.find((s) => s.slug === wanted) ||
+      json.services.find((s) => s.is_featured) ||
+      json.services.slice().sort((a, b) => (a.sort ?? 999) - (b.sort ?? 999))[0] ||
+      null;
+  } else {
+    servicesError = json?.error || "Services unavailable";
+  }
+} catch (e: any) {
+  servicesError = e?.message || "Services unavailable";
+}
+
+const serviceTitle = featuredService?.name || "Ionic Footbath Therapy";
+const serviceSubtitle = featuredService?.subtitle || "Relax, Detox & Rebalance";
+const serviceImg = featuredService?.image_url || IONIC_IMAGE;
+const serviceBookingUrl = featuredService?.booking_url || LINKS.book;
+
+/* ================
+   Helpers
+================ */
 function imageFallbackForProduct(name: string): string {
   const s = (name || "").toLowerCase();
   if (s.includes("juice")) return CAT_JUICES;
@@ -136,7 +304,6 @@ function formatMoney(pm?: Money | null) {
     <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
       <div class="hero-overlay"></div>
 
-      {/* moved up into the "green" space: top-aligned instead of center */}
       <div class="hero-content hero-content--top" data-aos="fade-up">
         <div class="hero-brand">
           <span class="hero-wordmark">Deeper Than Skin</span>
@@ -154,7 +321,6 @@ function formatMoney(pm?: Money | null) {
         </div>
       </div>
 
-      {/* subtle bottom fade so text never fights the product imagery */}
       <div class="hero-bottom-fade" aria-hidden="true"></div>
     </section>
 
@@ -164,7 +330,7 @@ function formatMoney(pm?: Money | null) {
         <div class="strip-grid">
           <div class="strip-left">
             <div class="cat-grid">
-              {CATEGORIES.map((c) => (
+              {shopCategories.map((c) => (
                 <a class="cat-card" href={c.href} aria-label={c.title.replace("\n", " ")}>
                   <div class="cat-media">
                     <img src={c.img} alt={c.title.replace("\n", " ")} loading="lazy" />
@@ -180,19 +346,23 @@ function formatMoney(pm?: Money | null) {
             <div class="shop-now-wrap">
               <a class="shop-now" href={ROUTES.shop}>SHOP NOW</a>
             </div>
+
+            {/* Optional: dev-only sanity check */}
+            {/* <div class="small" style="margin-top:10px; opacity:.7;">strip: {categoriesMode}{categoriesError ? ` (${categoriesError})` : ""} • svc: {servicesMode}{servicesError ? ` (${servicesError})` : ""}</div> */}
           </div>
 
+          {/* FEATURE SERVICE CARD (dynamic from /public/commerce/services) */}
           <div class="feature-card feature-card--tight">
-            <h3 class="title">Ionic Footbath Therapy</h3>
+            <h3 class="title">{serviceTitle}</h3>
 
-            <div class="media" aria-label="Ionic Footbath" role="img">
-              <img src={IONIC_IMAGE} alt="Ionic footbath" loading="lazy" />
+            <div class="media" aria-label={serviceTitle} role="img">
+              <img src={serviceImg} alt={serviceTitle} loading="lazy" />
             </div>
 
-            <p class="desc">Relax, Detox &amp; Rebalance</p>
+            <p class="desc">{serviceSubtitle}</p>
 
             <div class="cta">
-              <a class="primary" href={LINKS.book} {...EXT}>Book Your Session</a>
+              <a class="primary" href={serviceBookingUrl} {...EXT}>Book Your Session</a>
             </div>
           </div>
         </div>
@@ -201,44 +371,49 @@ function formatMoney(pm?: Money | null) {
 
     {/* FEATURED GRID */}
     <section class="section" id="featured">
-      <div class="container" data-aos="fade-up">
+      <div class="container featured-head" data-aos="fade-up">
         <div class="kicker">Featured</div>
         <h2 class="h2">Shop Highlights</h2>
         <p class="p">
-          Curated pulls from Square, rendered in-house. Mode: <span style="opacity:.9">{featuredMode}</span>.
+          Curated pulls from Square, rendered in-house. Mode:{" "}
+          <span class="featured-mode">{featuredMode}</span>.
         </p>
       </div>
 
-      <div class="container" style="padding-top: 18px">
+      <div class="container featured-wrap">
         {featuredError ? (
-          <div class="callout" style="background: rgba(200,162,74,.08)">
-            <div class="small" style="color: rgba(0,0,0,.62)">
+          <div class="callout callout--featured">
+            <div class="small callout__text">
               Featured is temporarily unavailable: <strong>{featuredError}</strong>
             </div>
-            <div class="btns" style="margin-top:12px">
+            <div class="btns callout__btns">
               <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
-              <a class="btn btn-ghost" href={LINKS.book} {...EXT}>Book Service</a>
+              <a class="btn btn-ghost" href={serviceBookingUrl} {...EXT}>Book Service</a>
             </div>
           </div>
         ) : (
-          <div class="product-grid" data-aos="fade-up">
+          <div class="product-grid product-grid--featured" data-aos="fade-up">
             {featured.map((p) => {
               const img = p.image_url || imageFallbackForProduct(p.name);
               const price = formatMoney(p.price_money || null);
+
               return (
-                <a class="product-card" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
+                <a class="product-card product-card--lux" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
                   <div class="product-media">
                     <img src={img} alt={p.name} loading="lazy" />
                   </div>
+
                   <div class="product-body">
                     <h3 class="product-title">{p.name}</h3>
                     <p class="product-desc">
-                      {p.description && p.description.trim() !== "" ? p.description : "A ritual-grade essential curated for your routine."}
+                      {p.description && p.description.trim() !== ""
+                        ? p.description
+                        : "A ritual-grade essential curated for your routine."}
                     </p>
 
                     <div class="product-row">
                       <div class="product-price">
-                        {p.has_price && price ? price : <span style="opacity:.75">View details</span>}
+                        {p.has_price && price ? price : <span class="product-price--muted">View details</span>}
                       </div>
                       <span class="btn-lux" aria-hidden="true">Shop</span>
                     </div>
@@ -251,7 +426,7 @@ function formatMoney(pm?: Money | null) {
       </div>
 
       {/* Carousel */}
-      <div class="section" style="padding-top: 32px; padding-bottom: 0">
+      <div class="section section--tight-top" style="padding-bottom: 0">
         <div class="container" data-aos="fade-up">
           <div class="kicker">Browse</div>
           <h2 class="h2">More to Explore</h2>
@@ -273,11 +448,11 @@ function formatMoney(pm?: Money | null) {
       <div class="container" data-aos="fade-up">
         <div class="callout">
           <div class="kicker">Service</div>
-          <h2 class="h2">Ionic Footbath</h2>
-          <p class="p">A premium ritual experience. Public booking now, community perks later.</p>
+          <h2 class="h2">{serviceTitle.replace(" Therapy", "")}</h2>
+          <p class="p">{serviceSubtitle} Public booking now, community perks later.</p>
 
           <div class="btns">
-            <a class="btn btn-primary" href={LINKS.book} {...EXT}>Book Now</a>
+            <a class="btn btn-primary" href={serviceBookingUrl} {...EXT}>Book Now</a>
             <a class="btn btn-ghost" href={LINKS.community} {...EXT}>See Member Perks</a>
           </div>
         </div>
@@ -300,101 +475,4 @@ function formatMoney(pm?: Money | null) {
       </div>
     </section>
   </main>
-
-  <style>
-    /* === HERO: move text up into top green space === */
-    .hero-banner{
-      position: relative;
-      background-size: cover;
-      background-position: center;
-    }
-
-    /* this class is additive: doesn't require changing your existing hero styles */
-    .hero-content.hero-content--top{
-      /* keep your existing spacing, but push content up */
-      align-items: flex-start;
-      justify-content: flex-start;
-      padding-top: clamp(72px, 10vh, 130px);
-      padding-bottom: clamp(18px, 4vh, 40px);
-      max-width: 980px;
-    }
-
-    /* ensure mobile gets text up and readable */
-    @media (max-width: 560px){
-      .hero-content.hero-content--top{
-        padding-top: 72px;
-        padding-bottom: 18px;
-      }
-      .hero-lead{
-        max-width: 34ch;
-      }
-    }
-
-    /* extra fade from mid -> bottom so text stays in “clean” space */
-    .hero-bottom-fade{
-      position:absolute;
-      left:0; right:0; bottom:0;
-      height: 46%;
-      background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.46));
-      pointer-events:none;
-      z-index: 1;
-    }
-
-    /* keep hero content above overlays */
-    .hero-content{ position: relative; z-index: 2; }
-
-    /* In-house featured grid (keeps homepage tight + responsive) */
-    .product-grid{
-      display:grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 14px;
-    }
-    .product-card{
-      grid-column: span 4;
-      border-radius: 20px;
-      overflow:hidden;
-      text-decoration:none;
-      color: inherit;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.16);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 18px 46px rgba(0,0,0,.22);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-      display:flex;
-      flex-direction:column;
-      min-height: 290px;
-    }
-    .product-card:hover{
-      transform: translateY(-4px);
-      box-shadow: 0 26px 64px rgba(0,0,0,.28);
-      border-color: rgba(200,162,74,.22);
-    }
-    .product-media{ aspect-ratio: 4/3; background: rgba(255,255,255,.04); position:relative; }
-    .product-media img{ width:100%; height:100%; object-fit: cover; display:block; }
-    .product-media::after{
-      content:"";
-      position:absolute; inset:0;
-      background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
-      pointer-events:none;
-    }
-    .product-body{ padding: 12px 12px 14px; display:grid; gap:8px; }
-    .product-title{ margin:0; font-size: 16px; line-height:1.2; }
-    .product-desc{ margin:0; font-size: 13px; opacity:.86; line-height:1.35; }
-    .product-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:2px; }
-    .product-price{ font-weight: 650; white-space:nowrap; opacity:.95; }
-    .btn-lux{
-      display:inline-flex;
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      border: 1px solid rgba(200,162,74,.45);
-      background: rgba(200,162,74,.16);
-      color: rgba(255,255,255,.92);
-    }
-
-    @media (max-width: 900px){ .product-card{ grid-column: span 6; } }
-    @media (max-width: 560px){ .product-card{ grid-column: span 12; } }
-  </style>
 </BaseLayout>

@@ -1,182 +1,579 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
+export const prerender = true;
+
+const base = import.meta.env.BASE_URL || "/";
+
+/** GH Pages safe internal URLs */
+const u = (path: string) => {
+  const b = base.endsWith("/") ? base.slice(0, -1) : base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
+};
+
 const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
+  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
 const endpoint =
-  `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURIComponent(APP_SLUG)}&limit=24`;
+  `${API_BASE}/public.commerce.featured.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=60`;
+
+// Fallback images (base-safe)
+const FALLBACKS = {
+  juices: `${base}images/cat-juices.jpg`,
+  seamoss: `${base}images/cat-seamoss.jpg`,
+  kits: `${base}images/cat-kits.jpg`,
+  herbs: `${base}images/cat-herbs.jpg`,
+  product: `${base}images/product-fallback.jpg`,
+  hero: `${base}images/hero-brand.png`,
+};
+
+const ROUTES = {
+  shop: u("/shop"),
+  cart: u("/cart"),
+  product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
+};
+
+type Money = { amount: number; currency: string };
+type ApiItem = {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+
+  // IMPORTANT: enables add-to-cart from Featured
+  variation_id?: string | null;
+
+  has_price?: boolean;
+  price_money?: Money | null;
+
+  // Optional fields you may add later
+  category?: string | null;
+};
 ---
 
 <BaseLayout title="Featured | Deeper Than Skin">
-  <main class="section">
+  <main class="page">
     <div class="container">
-      <div class="kicker">Featured</div>
-      <h1 class="h2" style="font-size:40px;margin-top:8px">Featured Drops</h1>
-      <p class="p" style="max-width:70ch">
-        A curated lineup for quick browsing. Tap any item to view details right here.
-      </p>
+      <div class="hero" style={`background-image:url('${FALLBACKS.hero}');`}>
+        <div class="hero-overlay"></div>
+        <div class="hero-inner">
+          <div class="kicker">Featured</div>
+          <h1 class="h1">Featured Drops</h1>
+          <p class="lead">
+            Curated pulls, rendered in-house. Add to cart and keep browsing here. Checkout when you’re ready.
+          </p>
 
-      <div class="grid" id="feat-grid" data-endpoint={endpoint}>
-        {Array.from({ length: 6 }).map(() => (
-          <div class="pgrid-card pgrid-skeleton" aria-hidden="true">
-            <div class="pgrid-media skel"></div>
-            <div class="pgrid-body">
+          <div class="hero-actions">
+            <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
+            <a class="btn btn-ghost" href={ROUTES.cart}>
+              View Cart <span class="dot"></span><span id="cartCount" class="cc">0</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar" aria-label="Featured controls">
+        <div class="chips" role="tablist" aria-label="Filter featured">
+          <button class="chip is-on" data-filter="all" type="button">All</button>
+          <button class="chip" data-filter="juices" type="button">Juices</button>
+          <button class="chip" data-filter="seamoss" type="button">Sea Moss</button>
+          <button class="chip" data-filter="kits" type="button">Kits</button>
+          <button class="chip" data-filter="herbs" type="button">Herbs</button>
+        </div>
+
+        <div class="tools">
+          <label class="search">
+            <span class="sr">Search</span>
+            <input id="q" placeholder="Search featured…" autocomplete="off" />
+          </label>
+
+          <label class="select">
+            <span class="sr">Sort</span>
+            <select id="sort">
+              <option value="featured">Curated</option>
+              <option value="price_asc">Price: Low → High</option>
+              <option value="price_desc">Price: High → Low</option>
+              <option value="az">Name: A → Z</option>
+              <option value="za">Name: Z → A</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="grid" id="featGrid" data-endpoint={endpoint} data-base={base}>
+        {Array.from({ length: 9 }).map(() => (
+          <div class="card skel-card" aria-hidden="true">
+            <div class="media skel"></div>
+            <div class="body">
               <div class="skel line"></div>
               <div class="skel line" style="width:70%"></div>
+              <div class="skel line" style="width:40%"></div>
             </div>
           </div>
         ))}
       </div>
 
-      <div class="btns" style="justify-content:center;margin-top:18px">
-        <a class="btn btn-ghost" href="/shop">Back to Shop</a>
+      <div class="foot">
+        <a class="btn btn-ghost" href={ROUTES.shop}>Back to Shop</a>
+        <a class="btn btn-primary" href={ROUTES.cart}>Checkout</a>
       </div>
     </div>
   </main>
 
-  <script is:inline>
-    (function () {
-      const grid = document.getElementById("feat-grid");
-      if (!grid) return;
-      const endpoint = grid.getAttribute("data-endpoint");
+  <script type="module" is:inline>
+    import { Cart } from "/src/lib/cart.js";
 
-      const escapeHtml = (s) =>
-        String(s || "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#039;");
+    const grid = document.getElementById("featGrid");
+    if (!grid) return;
 
-      const money = (pm) => {
-        if (!pm || typeof pm.amount !== "number") return "";
-        const amt = pm.amount / 100;
-        const cur = pm.currency || "USD";
-        try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
-        catch { return `$${amt.toFixed(2)}`; }
-      };
+    const endpoint = grid.getAttribute("data-endpoint") || "";
+    const base = grid.getAttribute("data-base") || "/";
+    const q = document.getElementById("q");
+    const sort = document.getElementById("sort");
+    const countEl = document.getElementById("cartCount");
 
-      const pickFallback = (name) => {
-        const s = String(name || "").toLowerCase();
-        if (s.includes("juice")) return "/images/cat-juices.jpg";
-        if (s.includes("moss")) return "/images/cat-seamoss.jpg";
-        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "/images/cat-kits.jpg";
-        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return "/images/cat-herbs.jpg";
-        return "/images/product-fallback.jpg";
-      };
+    let all = [];
+    let filter = "all";
 
-      const render = (items) => {
-        grid.innerHTML = "";
-        if (!Array.isArray(items) || items.length === 0) {
-          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
-            <div class="kicker">Notice</div>
-            <h3 class="h2" style="margin:6px 0 8px">No featured items yet</h3>
-            <p class="p">Enable featured items in Square (or keep fallback mode) and refresh.</p>
-          </div>`;
-          return;
-        }
+    const escapeHtml = (s) =>
+      String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
-        items.forEach((it) => {
-          const id = it.id || "";
-          const title = escapeHtml(it.name);
-          const desc = escapeHtml(String(it.description || "")).slice(0, 110);
-          const img = it.image_url && String(it.image_url).trim() ? it.image_url : pickFallback(it.name);
-          const price = it.has_price ? money(it.price_money) : "";
+    const money = (pm) => {
+      if (!pm || typeof pm.amount !== "number") return "";
+      const amt = pm.amount / 100;
+      const cur = pm.currency || "USD";
+      try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
+      catch { return `$${amt.toFixed(2)}`; }
+    };
 
-          const a = document.createElement("a");
-          a.className = "pgrid-card";
-          a.href = `/product/${encodeURIComponent(id)}`;
-          a.setAttribute("aria-label", `View ${it.name || "product"}`);
+    const pickFallback = (name) => {
+      const s = String(name || "").toLowerCase();
+      if (s.includes("juice")) return `${base}images/cat-juices.jpg`;
+      if (s.includes("moss")) return `${base}images/cat-seamoss.jpg`;
+      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return `${base}images/cat-kits.jpg`;
+      if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return `${base}images/cat-herbs.jpg`;
+      return `${base}images/product-fallback.jpg`;
+    };
 
-          a.innerHTML = `
-            <div class="pgrid-media">
-              <img src="${img}" alt="${title}" loading="lazy" />
-            </div>
-            <div class="pgrid-body">
-              <div class="pgrid-row">
-                <h3 class="pgrid-title">${title}</h3>
-                ${price ? `<div class="pgrid-price">${escapeHtml(price)}</div>` : `<div class="pgrid-price" style="opacity:.7">Details</div>`}
-              </div>
-              <p class="pgrid-desc">${desc || "Tap to view details."}</p>
-            </div>
-          `;
-          grid.appendChild(a);
+    const inferTag = (it) => {
+      const s = String(it?.category || it?.name || "").toLowerCase();
+      if (s.includes("juice") || s.includes("beverage")) return "juices";
+      if (s.includes("moss")) return "seamoss";
+      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "kits";
+      if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("therapeutic")) return "herbs";
+      return "all";
+    };
+
+    const cartCount = () => {
+      const c = Cart.get?.();
+      const items = Array.isArray(c?.items) ? c.items : [];
+      return items.reduce((sum, it) => sum + Math.max(0, Number(it?.qty || 0)), 0);
+    };
+
+    const updateCartCount = () => {
+      if (countEl) countEl.textContent = String(cartCount());
+    };
+
+    const applySort = (items) => {
+      const mode = String(sort?.value || "featured");
+      const priceVal = (x) => (typeof x?.price_money?.amount === "number" ? x.price_money.amount : null);
+
+      const copy = items.slice();
+      if (mode === "az") copy.sort((a,b) => String(a?.name||"").localeCompare(String(b?.name||"")));
+      if (mode === "za") copy.sort((a,b) => String(b?.name||"").localeCompare(String(a?.name||"")));
+      if (mode === "price_asc") copy.sort((a,b) => (priceVal(a) ?? 1e18) - (priceVal(b) ?? 1e18));
+      if (mode === "price_desc") copy.sort((a,b) => (priceVal(b) ?? -1) - (priceVal(a) ?? -1));
+      return copy;
+    };
+
+    const selectItems = () => {
+      const term = String(q?.value || "").trim().toLowerCase();
+      let items = all.slice();
+
+      if (filter !== "all") {
+        items = items.filter((it) => inferTag(it) === filter);
+      }
+
+      if (term) {
+        items = items.filter((it) => {
+          const n = String(it?.name || "").toLowerCase();
+          const d = String(it?.description || "").toLowerCase();
+          return n.includes(term) || d.includes(term);
         });
-      };
+      }
 
-      const load = async () => {
-        try {
-          const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
-          const text = await res.text();
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
-          const data = JSON.parse(text);
-          if (!data || data.ok !== true) throw new Error("API not ok");
-          render(data.items || []);
-        } catch (e) {
-          console.error("[featured] load failed:", e);
-          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
+      return applySort(items);
+    };
+
+    const toast = (msg) => {
+      let el = document.getElementById("toast");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "toast";
+        el.className = "toast";
+        el.setAttribute("aria-live", "polite");
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.style.display = "block";
+      clearTimeout(el._t);
+      el._t = setTimeout(() => (el.style.display = "none"), 1600);
+    };
+
+    const render = () => {
+      const items = selectItems();
+      grid.innerHTML = "";
+
+      if (!Array.isArray(items) || items.length === 0) {
+        grid.innerHTML = `
+          <div class="callout" style="grid-column:1/-1">
+            <div class="kicker">Notice</div>
+            <h3 class="h2" style="margin:6px 0 8px">Nothing matched</h3>
+            <p class="p">Try clearing filters or searching by a different keyword.</p>
+          </div>`;
+        return;
+      }
+
+      items.forEach((it) => {
+        const id = it?.id || "";
+        const title = escapeHtml(it?.name || "Product");
+        const desc = escapeHtml(String(it?.description || "")).slice(0, 110);
+        const img = it?.image_url && String(it.image_url).trim() ? it.image_url : pickFallback(it?.name);
+        const price = it?.has_price ? money(it?.price_money) : "";
+        const variationId = String(it?.variation_id || "").trim();
+        const canCart = variationId.length > 0;
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        card.innerHTML = `
+          <a class="link" href="${escapeHtml(`${base}product/${encodeURIComponent(id)}`)}" aria-label="View ${title}">
+            <div class="media">
+              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy" />
+              <div class="glow" aria-hidden="true"></div>
+            </div>
+          </a>
+          <div class="body">
+            <div class="row">
+              <div class="ttl">${title}</div>
+              <div class="pr">${price ? escapeHtml(price) : '<span style="opacity:.7">Details</span>'}</div>
+            </div>
+            <div class="ds">${desc || "Tap to view details."}</div>
+
+            <div class="actions">
+              <a class="btn-mini" href="${escapeHtml(`${base}product/${encodeURIComponent(id)}`)}">View</a>
+              ${
+                canCart
+                  ? `<button class="btn-mini btn-mini--gold" data-add="1" data-id="${escapeHtml(id)}" data-vid="${escapeHtml(variationId)}">Add</button>`
+                  : `<span class="chip-mini" title="Requires variation_id">No quick add</span>`
+              }
+            </div>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+
+      grid.querySelectorAll("[data-add]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-id") || "";
+          const vid = btn.getAttribute("data-vid") || "";
+          const it = all.find((x) => String(x?.id || "") === String(id));
+          if (!it || !vid) return;
+
+          try {
+            Cart.add({
+              id: String(it.id),
+              variation_id: vid,
+              name: it.name,
+              image_url: it.image_url || "",
+              price_money: it.price_money || null,
+              has_price: !!it.has_price,
+              qty: 1,
+            });
+            updateCartCount();
+            toast("Added to cart");
+          } catch (e) {
+            toast(e?.message || "Couldn’t add to cart");
+          }
+        });
+      });
+    };
+
+    const load = async () => {
+      try {
+        const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+        const text = await res.text();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+        const data = JSON.parse(text);
+        if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
+
+        all = Array.isArray(data.items) ? data.items : [];
+        render();
+        updateCartCount();
+      } catch (e) {
+        console.error("[featured] load failed:", e);
+        grid.innerHTML = `
+          <div class="callout" style="grid-column:1/-1">
             <div class="kicker">Error</div>
             <h3 class="h2" style="margin:6px 0 8px">Couldn’t load featured</h3>
-            <p class="p">Check API base/app slug env vars and the route.</p>
+            <p class="p">Check API base/app slug and the featured route.</p>
           </div>`;
-        }
-      };
+      }
+    };
 
-      load();
-    })();
+    // filter chips
+    document.querySelectorAll(".chip").forEach((c) => {
+      c.addEventListener("click", () => {
+        document.querySelectorAll(".chip").forEach((x) => x.classList.remove("is-on"));
+        c.classList.add("is-on");
+        filter = c.getAttribute("data-filter") || "all";
+        render();
+      });
+    });
+
+    q?.addEventListener("input", () => render());
+    sort?.addEventListener("change", () => render());
+
+    window.addEventListener("dts:cart", updateCartCount);
+
+    load();
   </script>
 
   <style>
-    /* reuse same card styles from shop page (kept local for drop-in simplicity) */
-    .pgrid-card{
-      grid-column: span 4;
-      border-radius: 20px;
-      overflow:hidden;
-      text-decoration:none;
-      color: inherit;
+    .page{ padding: 22px 0 54px; }
+    .container{ width: min(1120px, calc(100% - 32px)); margin-inline:auto; }
+
+    .hero{
+      position: relative;
+      border-radius: 28px;
+      overflow: hidden;
+      min-height: 260px;
+      background-size: cover;
+      background-position: center;
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 30px 90px rgba(0,0,0,.34);
+    }
+    .hero-overlay{
+      position:absolute; inset:0;
+      background:
+        radial-gradient(1000px 520px at 50% 25%, rgba(200,162,74,.16), transparent 62%),
+        linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.62));
+    }
+    .hero-inner{
+      position: relative;
+      z-index: 2;
+      padding: 26px;
+      max-width: 980px;
+    }
+    .h1{
+      font-family: var(--font-display);
+      font-size: clamp(34px, 3.6vw, 54px);
+      margin: 10px 0 10px;
+      letter-spacing: -.01em;
+      line-height: 1.02;
+    }
+    .lead{
+      margin: 0;
+      max-width: 70ch;
+      opacity: .86;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .hero-actions{ margin-top: 14px; display:flex; gap: 10px; flex-wrap: wrap; align-items:center; }
+
+    .toolbar{
+      margin-top: 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .chips{ display:flex; gap: 8px; flex-wrap: wrap; }
+    .chip{
+      border-radius: 999px;
+      padding: 8px 12px;
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.16);
+      color: rgba(255,255,255,.86);
+      cursor:pointer;
+      font-size: 13px;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    .chip:hover{ transform: translateY(-1px); border-color: rgba(200,162,74,.22); }
+    .chip.is-on{
+      border-color: rgba(200,162,74,.35);
+      background: rgba(200,162,74,.12);
+      color: rgba(255,255,255,.92);
+    }
+
+    .tools{ display:flex; gap: 10px; flex-wrap: wrap; align-items:center; }
+    .search input{
+      height: 38px;
+      width: min(320px, 72vw);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+      color: rgba(255,255,255,.92);
+      padding: 0 14px;
+      outline: none;
+    }
+    .select select{
+      height: 38px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+      color: rgba(255,255,255,.92);
+      padding: 0 14px;
+      outline: none;
+    }
+    .sr{ position:absolute; left:-9999px; }
+
+    .grid{
+      margin-top: 14px;
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+    }
+
+    .card{
+      grid-column: span 4;
+      border-radius: 22px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
       backdrop-filter: blur(10px);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
       display:flex;
       flex-direction:column;
-      min-height: 280px;
+      min-height: 310px;
     }
-    .pgrid-card:hover{
+    .card:hover{
       transform: translateY(-4px);
       box-shadow: 0 26px 64px rgba(0,0,0,.28);
       border-color: rgba(200,162,74,.22);
     }
-    .pgrid-media{ aspect-ratio: 4/3; background: rgba(255,255,255,.04); position:relative; }
-    .pgrid-media img{ width:100%; height:100%; object-fit: cover; display:block; }
-    .pgrid-media::after{
-      content:"";
+    .link{ text-decoration:none; color: inherit; display:block; }
+
+    .media{ aspect-ratio: 4/3; position:relative; background: rgba(255,255,255,.04); }
+    .media img{ width:100%; height:100%; object-fit: cover; display:block; }
+    .glow{
       position:absolute; inset:0;
-      background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
+      background: radial-gradient(800px 280px at 50% 20%, rgba(200,162,74,.12), transparent 55%),
+                  linear-gradient(180deg, transparent, rgba(0,0,0,.38));
       pointer-events:none;
     }
-    .pgrid-body{ padding: 12px 12px 14px; }
-    .pgrid-row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-    .pgrid-title{ margin:0; font-size: 16px; line-height:1.2; }
-    .pgrid-price{ font-weight: 650; white-space:nowrap; opacity:.95; }
-    .pgrid-desc{ margin: 8px 0 0; font-size: 13px; opacity:.85; line-height:1.35; }
 
-    @media (max-width: 900px){ .pgrid-card{ grid-column: span 6; } }
-    @media (max-width: 560px){ .pgrid-card{ grid-column: span 12; } }
+    .body{ padding: 12px 12px 14px; display:grid; gap: 10px; }
+    .row{ display:flex; justify-content:space-between; gap: 10px; align-items:flex-start; }
+    .ttl{ font-weight: 750; font-size: 16px; line-height:1.2; }
+    .pr{ font-weight: 750; white-space:nowrap; opacity:.95; color: rgba(200,162,74,.95); }
+    .ds{ font-size: 13px; opacity:.86; line-height: 1.35; }
 
-    .pgrid-skeleton{ pointer-events:none; }
+    .actions{ display:flex; gap: 10px; align-items:center; justify-content:space-between; margin-top: 2px; }
+    .btn-mini{
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.14);
+      color: rgba(255,255,255,.92);
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .btn-mini--gold{
+      border-color: rgba(200,162,74,.35);
+      background: rgba(200,162,74,.14);
+    }
+    .chip-mini{
+      font-size: 12px;
+      opacity: .75;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.03);
+    }
+
+    .foot{
+      margin-top: 18px;
+      display:flex;
+      gap: 10px;
+      justify-content:center;
+      flex-wrap: wrap;
+    }
+
+    /* Cart count */
+    .dot{
+      display:inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(200,162,74,.9);
+      margin: 0 8px;
+      transform: translateY(-1px);
+      opacity: .7;
+    }
+    .cc{
+      display:inline-flex;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      align-items:center;
+      justify-content:center;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      color: rgba(255,255,255,.92);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    /* Skeletons */
+    .skel-card{ pointer-events:none; }
     .skel{
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
       background-size: 200% 100%;
       animation: shimmer 1.2s infinite;
       border-radius: 14px;
     }
-    .line{ height: 12px; margin-top: 10px; }
+    .line{ height: 12px; }
     @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
+
+    /* Toast */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      padding: 10px 14px;
+      border: 1px solid rgba(200,162,74,.25);
+      background: rgba(0,0,0,.50);
+      backdrop-filter: blur(10px);
+      color: rgba(255,255,255,.92);
+      box-shadow: 0 18px 46px rgba(0,0,0,.28);
+      z-index: 99;
+      display:none;
+    }
+
+    @media (max-width: 900px){ .card{ grid-column: span 6; } }
+    @media (max-width: 560px){ .card{ grid-column: span 12; } }
   </style>
 </BaseLayout>

@@ -3,13 +3,29 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 export const prerender = true;
 
-// ✅ STATIC PATHS REQUIRED (GH Pages / static output)
+/**
+ * ✅ STATIC PATHS REQUIRED (GH Pages / static output)
+ * NOTE:
+ * - Include both "seamoss" and "sea-moss" so old links + new API slugs work.
+ * - Keep these curated, or switch later to build-time fetch categories.
+ */
 export async function getStaticPaths() {
-  const slugs = ["skincare", "wellness", "juices", "seamoss", "kits", "herbs"];
+  const slugs = [
+    "skincare",
+    "wellness",
+    "juices",
+    "seamoss",
+    "sea-moss",
+    "kits",
+    "herbs",
+    "bath-body-oils",
+    "body-butters",
+  ];
   return slugs.map((slug) => ({ params: { slug } }));
 }
 
-const base = import.meta.env.BASE_URL;
+const baseRaw = import.meta.env.BASE_URL || "/";
+const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
 // ✅ Prefer routes endpoint (bypass index router)
 const API_BASE =
@@ -19,28 +35,48 @@ const API_BASE =
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
-const { slug } = Astro.params;
+const { slug: slugParam } = Astro.params;
 
-// Try BOTH param names (your backend can accept either)
+/**
+ * ✅ normalize legacy slugs to API slugs
+ * - seamoss -> sea-moss
+ */
+const SLUG_ALIASES: Record<string, string> = {
+  seamoss: "sea-moss",
+};
+const slug = String(slugParam || "").trim();
+const apiSlug = SLUG_ALIASES[slug] || slug;
+
+// Try BOTH param names (backend can accept either)
 const endpoint =
-  `${API_BASE}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=120&category_slug=${encodeURIComponent(slug)}&category=${encodeURIComponent(slug)}`;
+  `${API_BASE}/public.commerce.products.get.php` +
+  `?app_slug=${encodeURIComponent(APP_SLUG)}` +
+  `&limit=120` +
+  `&category_slug=${encodeURIComponent(apiSlug)}` +
+  `&category=${encodeURIComponent(apiSlug)}`;
 
 const TITLE_MAP: Record<string, string> = {
   skincare: "Skincare",
   wellness: "Wellness",
   juices: "Cold-Pressed Juices",
+  "sea-moss": "Sea Moss Gel",
   seamoss: "Sea Moss Gel",
   kits: "Kits & Bundles",
   herbs: "Herbal Teas & Oils",
+  "bath-body-oils": "Bath & Body Oils",
+  "body-butters": "Body Butters",
 };
 
 const HERO_MAP: Record<string, string> = {
   skincare: `${base}images/cat-skincare.jpg`,
   wellness: `${base}images/cat-wellness.jpg`,
   juices: `${base}images/cat-juices.jpg`,
+  "sea-moss": `${base}images/cat-seamoss.jpg`,
   seamoss: `${base}images/cat-seamoss.jpg`,
   kits: `${base}images/cat-kits.jpg`,
   herbs: `${base}images/cat-herbs.jpg`,
+  "bath-body-oils": `${base}images/cat-herbs.jpg`,
+  "body-butters": `${base}images/cat-skincare.jpg`,
 };
 
 // Fallbacks if you don't have the new hero images yet
@@ -50,7 +86,7 @@ const fallbackImg = heroImg;
 
 const ROUTES = {
   shop: `${base}shop`,
-  product: (id: string) => `${base}product/${id}`,
+  product: (id: string) => `${base}product/${encodeURIComponent(id)}`,
   cart: `${base}cart`,
 };
 ---
@@ -60,6 +96,7 @@ const ROUTES = {
     <div class="container">
       <div class="toprow">
         <a class="crumb" href={ROUTES.shop}>← Back to Shop</a>
+
         <button id="cartPill" class="cartpill" type="button" aria-label="View cart">
           <span class="cartpill-dot" aria-hidden="true"></span>
           <span>Cart</span>
@@ -135,7 +172,7 @@ const ROUTES = {
       if (!grid) return;
 
       const endpoint = grid.getAttribute("data-endpoint");
-      const fallback = grid.getAttribute("data-fallback") || "/images/product-fallback.jpg";
+      const fallback = grid.getAttribute("data-fallback") || "";
       const base = grid.getAttribute("data-base") || "/";
       const productBase = grid.getAttribute("data-product-base") || (base + "product/");
 
@@ -179,27 +216,18 @@ const ROUTES = {
         const id = String(p.id || "");
         if (!id) return;
 
-        const img = (p.image_url && String(p.image_url).trim()) ? p.image_url : fallback;
+        const img = (p.image_url && String(p.image_url).trim()) ? p.image_url : (fallback || (base + "images/product-fallback.jpg"));
         const price_money = p.price_money || null;
 
         const found = items.find(x => String(x.id) === id);
-        if (found) {
-          found.qty = (Number(found.qty) || 0) + qty;
-        } else {
-          items.push({
-            id,
-            name: p.name || "Item",
-            image_url: img,
-            price_money,
-            qty
-          });
-        }
+        if (found) found.qty = (Number(found.qty) || 0) + qty;
+        else items.push({ id, name: p.name || "Item", image_url: img, price_money, qty });
+
         writeCart(items);
       };
 
       if (cartPill) {
         cartPill.addEventListener("click", () => {
-          // if you create /cart, this will just work
           window.location.href = base + "cart";
         });
       }
@@ -212,7 +240,7 @@ const ROUTES = {
         const title = escapeHtml(it.name || "Product");
         const descRaw = String(it.description || "");
         const desc = escapeHtml(descRaw.length > 120 ? (descRaw.slice(0, 117) + "…") : descRaw);
-        const img = (it.image_url && String(it.image_url).trim()) ? it.image_url : fallback;
+        const img = (it.image_url && String(it.image_url).trim()) ? it.image_url : (fallback || (base + "images/product-fallback.jpg"));
         const price = it.has_price ? money(it.price_money) : "";
 
         return `
@@ -282,8 +310,7 @@ const ROUTES = {
           if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
           const data = JSON.parse(text);
 
-          if (!data || data.ok !== true) throw new Error("API not ok");
-
+          if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
           render(data.items || []);
         } catch (e) {
           console.error("[category] load failed:", e);
@@ -298,30 +325,17 @@ const ROUTES = {
       if (q) q.addEventListener("input", () => render(ALL));
       syncCartCount();
       window.addEventListener("storage", syncCartCount);
-
       load();
     })();
   </script>
 
   <style>
-    .toprow{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-    }
-    .crumb{
-      text-decoration:none;
-      opacity:.9;
-      font-size: 13px;
-    }
+    .toprow{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .crumb{ text-decoration:none; opacity:.9; font-size:13px; }
 
     .cartpill{
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-      border-radius:999px;
-      padding:10px 12px;
+      display:inline-flex; align-items:center; gap:10px;
+      border-radius:999px; padding:10px 12px;
       border:1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.18);
       backdrop-filter: blur(10px);
@@ -335,116 +349,75 @@ const ROUTES = {
       box-shadow: 0 0 24px rgba(200,162,74,.35);
     }
     .cartpill-count{
-      min-width: 22px;
-      height: 22px;
-      display:inline-flex;
-      justify-content:center;
-      align-items:center;
-      border-radius:999px;
-      padding:0 7px;
+      min-width: 22px; height: 22px;
+      display:inline-flex; justify-content:center; align-items:center;
+      border-radius:999px; padding:0 7px;
       font-weight: 700;
       border:1px solid rgba(200,162,74,.35);
       background: rgba(200,162,74,.12);
     }
 
     .hero{
-      position:relative;
-      border-radius: 26px;
-      overflow:hidden;
-      border: 1px solid rgba(255,255,255,.12);
+      position:relative; border-radius:26px; overflow:hidden;
+      border:1px solid rgba(255,255,255,.12);
       box-shadow: 0 26px 70px rgba(0,0,0,.28);
-      margin-top: 14px;
-      min-height: 260px;
+      margin-top:14px; min-height:260px;
     }
     .hero-bg{
       position:absolute; inset:0;
       background-image: var(--hero);
-      background-size: cover;
-      background-position: center;
+      background-size: cover; background-position:center;
       filter: saturate(1.05) contrast(1.03);
       transform: scale(1.02);
     }
     .hero-bg::after{
-      content:"";
-      position:absolute; inset:0;
+      content:""; position:absolute; inset:0;
       background:
         radial-gradient(900px 520px at 50% 28%, rgba(200,162,74,.20), transparent 60%),
         linear-gradient(180deg, rgba(6,12,9,.22), rgba(6,12,9,.86));
     }
-    .hero-inner{
-      position:relative;
-      z-index:2;
-      padding: 22px;
-      max-width: 760px;
-    }
+    .hero-inner{ position:relative; z-index:2; padding:22px; max-width:760px; }
     .hero-title{
       font-family: var(--font-display);
       font-size: clamp(34px, 4.2vw, 54px);
-      line-height: 1.02;
-      margin: 10px 0 6px;
-      letter-spacing: -.02em;
+      line-height:1.02;
+      margin:10px 0 6px;
+      letter-spacing:-.02em;
     }
-    .hero-sub{
-      margin: 0;
-      opacity: .86;
-      max-width: 64ch;
-      line-height: 1.55;
-    }
-    .hero-actions{
-      display:flex;
-      gap:10px;
-      margin-top: 14px;
-      flex-wrap: wrap;
-    }
+    .hero-sub{ margin:0; opacity:.86; max-width:64ch; line-height:1.55; }
+    .hero-actions{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
 
     .panel{
-      border-radius: 26px;
+      border-radius:26px;
       border:1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.14);
       backdrop-filter: blur(10px);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
-      padding: 16px;
+      padding:16px;
     }
     .panel-head{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-end;
-      gap:12px;
-      flex-wrap: wrap;
-      padding: 6px 4px 14px;
+      display:flex; justify-content:space-between; align-items:flex-end;
+      gap:12px; flex-wrap:wrap;
+      padding:6px 4px 14px;
     }
-    .panel-title{
-      margin:0;
-      font-family: var(--font-display);
-      font-size: 22px;
-    }
-    .panel-sub{
-      margin:6px 0 0;
-      opacity:.82;
-      font-size: 13px;
-    }
+    .panel-title{ margin:0; font-family: var(--font-display); font-size:22px; }
+    .panel-sub{ margin:6px 0 0; opacity:.82; font-size:13px; }
     .search{
       width: min(360px, 100%);
-      border-radius: 999px;
-      padding: 10px 12px;
-      border: 1px solid rgba(255,255,255,.14);
+      border-radius:999px; padding:10px 12px;
+      border:1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.20);
       color: rgba(255,255,255,.92);
-      outline: none;
+      outline:none;
     }
     .search::placeholder{ color: rgba(255,255,255,.55); }
 
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 14px;
-    }
+    .grid{ display:grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap:14px; }
 
     .card{
       grid-column: span 4;
-      border-radius: 22px;
-      overflow:hidden;
-      border: 1px solid rgba(255,255,255,.12);
+      border-radius:22px; overflow:hidden;
+      border:1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.16);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
       transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
@@ -455,67 +428,36 @@ const ROUTES = {
       border-color: rgba(200,162,74,.22);
     }
 
-    .card-link{
-      display:block;
-      text-decoration:none;
-      color:inherit;
-    }
+    .card-link{ display:block; text-decoration:none; color:inherit; }
 
-    .media{
-      aspect-ratio: 4/3;
-      position:relative;
-      background: rgba(255,255,255,.04);
-    }
-    .media img{
-      width:100%;
-      height:100%;
-      object-fit: cover;
-      display:block;
-    }
+    .media{ aspect-ratio:4/3; position:relative; background: rgba(255,255,255,.04); }
+    .media img{ width:100%; height:100%; object-fit:cover; display:block; }
     .shine{
       position:absolute; inset:0;
       background: radial-gradient(800px 260px at 50% 18%, transparent, rgba(0,0,0,.38));
       pointer-events:none;
     }
 
-    .body{ padding: 12px 12px 10px; }
-    .row{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      align-items:flex-start;
-    }
-    .title{
-      margin:0;
-      font-size: 16px;
-      line-height:1.2;
-      letter-spacing: -.01em;
-    }
-    .price{
-      white-space:nowrap;
-      font-weight: 750;
-      opacity:.95;
-    }
+    .body{ padding:12px 12px 10px; }
+    .row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .title{ margin:0; font-size:16px; line-height:1.2; letter-spacing:-.01em; }
+    .price{ white-space:nowrap; font-weight:750; opacity:.95; }
     .desc{
-      margin: 8px 0 0;
-      font-size: 13px;
+      margin:8px 0 0;
+      font-size:13px;
       opacity:.85;
       line-height:1.35;
-      min-height: 2.7em;
+      min-height:2.7em;
     }
 
-    .actions{
-      display:flex;
-      gap:10px;
-      padding: 10px 12px 14px;
-    }
+    .actions{ display:flex; gap:10px; padding:10px 12px 14px; }
     .actions .btn{ flex:1; }
 
     .empty{
-      margin-top: 14px;
-      padding: 16px;
-      border-radius: 22px;
-      border: 1px solid rgba(255,255,255,.12);
+      margin-top:14px;
+      padding:16px;
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.14);
     }
 
@@ -527,7 +469,7 @@ const ROUTES = {
       animation: shimmer 1.2s infinite;
       border-radius: 14px;
     }
-    .line{ height: 12px; margin-top: 10px; }
+    .line{ height:12px; margin-top:10px; }
     @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
 
     @media (max-width: 920px){ .card{ grid-column: span 6; } }
