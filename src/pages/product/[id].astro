@@ -17,7 +17,7 @@ type ApiProduct = {
   price_money?: Money | null;
   has_price?: boolean;
 
-  // Optional future fields you might add
+  // Optional future fields
   checkout_url?: string | null;
   buy_url?: string | null;
   square_url?: string | null;
@@ -28,7 +28,6 @@ type ApiProduct = {
 type ApiOkSingle = { ok: true; item?: ApiProduct; items?: ApiProduct[] };
 type ApiOkList = { ok: true; items: ApiProduct[] };
 type ApiFail = { ok?: false; error?: string };
-
 type AnyApi = ApiOkSingle | ApiOkList | ApiFail;
 
 const base = import.meta.env.BASE_URL || "/";
@@ -43,31 +42,43 @@ const ROUTES = {
   cart: `${base}cart`,
 };
 
-// Routes API base (no index.php)
-const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
+// ✅ Helpers (safe in every build context)
+const getApiBase = () =>
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
+  "https://smashpro.app/api/v1/routes";
 
-const APP_SLUG =
-  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+const getAppSlug = () =>
+  (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+  "deeper-than-skin";
 
-// product endpoint
+// product id
 const { id } = Astro.params;
+
+// Build endpoints (runtime render + client script uses these)
+const API_BASE = getApiBase();
+const APP_SLUG = getAppSlug();
 
 const productEndpoint =
   `${API_BASE}/public.commerce.product.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&id=${encodeURIComponent(id)}`;
 
-// fallback list endpoint (if product endpoint doesn't return item)
 const listEndpoint =
   `${API_BASE}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=500`;
 
-// checkout endpoint (your PHP that creates order + payment link)
 const checkoutEndpoint =
   `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
 
-// ✅ STATIC PATHS
+// ✅ STATIC PATHS (define API vars INSIDE to avoid "API_BASE is not defined")
 export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
+  const API_BASE_INNER =
+    (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
+    "https://smashpro.app/api/v1/routes";
+
+  const APP_SLUG_INNER =
+    (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+    "deeper-than-skin";
+
   const endpoint =
-    `${API_BASE}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=500`;
+    `${API_BASE_INNER}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG_INNER)}&limit=500`;
 
   try {
     const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
@@ -80,10 +91,11 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
     const items = Array.isArray((data as any)?.items) ? ((data as any).items as ApiProduct[]) : [];
 
     return items
-      .filter((p: ApiProduct) => p && p.id)
-      .map((p: ApiProduct) => ({ params: { id: String(p.id) } }));
+      .filter((p) => p && p.id)
+      .map((p) => ({ params: { id: String(p.id) } }));
   } catch (e) {
     console.error("[product] getStaticPaths failed:", e);
+    // IMPORTANT: returning [] should still allow build to succeed
     return [];
   }
 }
