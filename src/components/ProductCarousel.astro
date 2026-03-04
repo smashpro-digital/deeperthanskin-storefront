@@ -1,359 +1,434 @@
 ---
 /**
- * ProductCarousel.astro (FULL DROP-IN)
- * Dynamic (no iframe), mobile friendly, luxury-ish.
- *
- * Updates:
- * - Uses your in-house product route: /product/:id (keeps user on site)
- * - Better image fallback: category images based on keywords + final generic fallback
- * - Safer API parsing + better empty/error states
- * - Optional “View all featured” link
+ * ProductCarousel.astro (FULL DROP-IN v3)
+ * - Desktop: 2-row "Featured Drops" grid inside container width (lux like Shop Highlights)
+ * - Mobile: swipeable horizontal carousel
+ * - Uses BASE_URL-safe routing (GitHub Pages)
+ * - Fetches featured items client-side (keeps page fast + avoids SSR mismatch)
  */
 
-const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
-  "https://smashpro.app/api/v1/index.php";
+const base = import.meta.env.BASE_URL || "/";
 
-const APP_SLUG =
-  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
-
-const endpoint =
-  `${API_BASE}?path=public/commerce/featured&app_slug=${encodeURIComponent(APP_SLUG)}&limit=12`;
-
-const base = import.meta.env.BASE_URL;
-
-// Fallback images (from /public/images)
-const FALLBACKS = {
-  juices: `${base}images/cat-juices.jpg`,
-  seamoss: `${base}images/cat-seamoss.jpg`,
-  kits: `${base}images/cat-kits.jpg`,
-  herbs: `${base}images/cat-herbs.jpg`,
-  generic: `${base}images/product-fallback.jpg`, // make sure this exists
+/** Build internal URLs safe for GitHub Pages subpaths */
+const u = (path: string) => {
+  const b = base.endsWith("/") ? base.slice(0, -1) : base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
 };
 
-// Where product cards should go (in-house)
-const PRODUCT_ROUTE = (id) => `/product/${encodeURIComponent(id)}`;
+/* ================
+   CONFIG
+================ */
+const APP_SLUG = import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+const API = import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
 
-// Optional "view all" page
-const VIEW_ALL = "/featured";
+const apiUrl = (path: string, params: Record<string, any> = {}) => {
+  const url = new URL(API);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    url.searchParams.set(k, String(v));
+  });
+  return url.toString();
+};
+
+const endpoint = apiUrl("public/commerce/featured", { limit: 12 });
+
+/* Routes / fallbacks */
+const VIEW_ALL = u("/featured");
+const FALLBACKS = {
+  juices: u("/images/cat-juices.jpg"),
+  seamoss: u("/images/cat-seamoss.jpg"),
+  kits: u("/images/cat-kits.jpg"),
+  herbs: u("/images/cat-herbs.jpg"),
+  generic: u("/images/product-fallback.jpg"),
+};
 ---
 
-<section class="carousel" aria-label="Featured products" data-endpoint={endpoint}>
-  <div class="carousel-head">
-    <div class="carousel-titlewrap">
-      <h3 class="carousel-title">Featured Drops</h3>
-      <p class="carousel-sub">Curated picks, rendered in-house. Checkout later.</p>
-    </div>
-
-    <div class="carousel-actions">
-      <a class="carousel-link" href={VIEW_ALL} aria-label="View all featured">View all</a>
-      <button class="carousel-btn" type="button" data-dir="-1" aria-label="Scroll left">‹</button>
-      <button class="carousel-btn" type="button" data-dir="1" aria-label="Scroll right">›</button>
-    </div>
-  </div>
-
-  <div class="carousel-rail" role="list" aria-live="polite">
-    <!-- lightweight skeletons (rendered immediately) -->
-    {Array.from({ length: 4 }).map(() => (
-      <div class="pcard pcard--skeleton" role="listitem" aria-hidden="true">
-        <div class="pcard-media skel"></div>
-        <div class="pcard-body">
-          <div class="skel line"></div>
-          <div class="skel line" style="width:70%"></div>
-        </div>
+<section class="fdrops" aria-label="Featured drops" data-endpoint={endpoint}>
+  <div class="container">
+    <div class="fdrops-head">
+      <div class="fdrops-titlewrap">
+        <h3 class="fdrops-title">Featured Drops</h3>
+        <p class="fdrops-sub">Curated picks, rendered in-house. Checkout later.</p>
       </div>
-    ))}
+
+      <div class="fdrops-actions">
+        <a class="fdrops-link" href={VIEW_ALL} aria-label="View all featured">View all</a>
+        <button class="fdrops-btn" type="button" data-dir="-1" aria-label="Scroll left">‹</button>
+        <button class="fdrops-btn" type="button" data-dir="1" aria-label="Scroll right">›</button>
+      </div>
+    </div>
+
+    {/* Rail: becomes grid on desktop, horizontal scroller on mobile */}
+    <div class="fdrops-rail" role="list" aria-live="polite">
+      {/* skeletons */}
+      {Array.from({ length: 8 }).map(() => (
+        <div class="product-card product-card--lux fdrops-skel" role="listitem" aria-hidden="true">
+          <div class="product-media fdrops-skel-media"></div>
+          <div class="product-body">
+            <div class="fdrops-skel-line"></div>
+            <div class="fdrops-skel-line" style="width:70%"></div>
+            <div class="fdrops-skel-line" style="width:55%"></div>
+          </div>
+        </div>
+      ))}
+    </div>
   </div>
 </section>
 
-<script is:inline>
-  (function () {
-    const root = document.currentScript.closest(".carousel");
-    if (!root) return;
+<script define:vars={{ base, FALLBACKS }}>
+  const roots = document.querySelectorAll(".fdrops[data-endpoint]");
 
-    const rail = root.querySelector(".carousel-rail");
-    const endpoint = root.getAttribute("data-endpoint");
+  const u = (path) => {
+    const b = String(base || "/");
+    const bb = b.endsWith("/") ? b.slice(0, -1) : b;
+    const p = String(path || "/");
+    const pp = p.startsWith("/") ? p : `/${p}`;
+    return `${bb}${pp}`;
+  };
 
-    const FALLBACKS = {
-      juices: "/images/cat-juices.jpg",
-      seamoss: "/images/cat-seamoss.jpg",
-      kits: "/images/cat-kits.jpg",
-      herbs: "/images/cat-herbs.jpg",
-      generic: "/images/product-fallback.jpg",
-    };
+  const productHref = (id) => u(`/product/${encodeURIComponent(id)}`);
 
-    const productHref = (id) => `/product/${encodeURIComponent(id)}`;
+  const money = (pm) => {
+    if (!pm || typeof pm.amount !== "number") return "";
+    const amt = pm.amount / 100;
+    const cur = pm.currency || "USD";
+    try {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+    } catch {
+      return `$${amt.toFixed(2)}`;
+    }
+  };
 
-    const money = (pm) => {
-      if (!pm || typeof pm.amount !== "number") return "";
-      const amt = (pm.amount / 100);
-      const cur = pm.currency || "USD";
-      try {
-        return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
-      } catch {
-        return `$${amt.toFixed(2)}`;
-      }
-    };
+  const escapeHtml = (s) =>
+    String(s || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 
-    const escapeHtml = (s) =>
-      String(s || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+  const pickFallback = (name) => {
+    const s = String(name || "").toLowerCase();
+    if (s.includes("juice")) return FALLBACKS.juices;
+    if (s.includes("moss")) return FALLBACKS.seamoss;
+    if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return FALLBACKS.kits;
+    if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return FALLBACKS.herbs;
+    return FALLBACKS.generic;
+  };
 
-    const pickFallback = (name) => {
-      const s = String(name || "").toLowerCase();
-      if (s.includes("juice")) return FALLBACKS.juices;
-      if (s.includes("moss")) return FALLBACKS.seamoss;
-      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return FALLBACKS.kits;
-      if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return FALLBACKS.herbs;
-      return FALLBACKS.generic;
-    };
+  const renderEmpty = (rail) => {
+    rail.innerHTML = `
+      <div class="fdrops-empty" role="listitem">
+        <div class="fdrops-empty__title">Nothing featured yet</div>
+        <div class="fdrops-empty__sub">Add items in Square and refresh.</div>
+      </div>
+    `;
+  };
 
-    const renderEmpty = () => {
-      rail.innerHTML = `
-        <div class="pcard pcard--empty" role="listitem">
-          <div class="pcard-body">
-            <h4 class="pcard-title">Nothing featured yet</h4>
-            <p class="pcard-desc">Add items in Square and refresh.</p>
-          </div>
-        </div>
-      `;
-    };
+  const renderError = (rail, msg) => {
+    rail.innerHTML = `
+      <div class="fdrops-empty" role="listitem">
+        <div class="fdrops-empty__title">Couldn’t load featured items</div>
+        <div class="fdrops-empty__sub">${escapeHtml(msg || "Check API settings and try again.")}</div>
+      </div>
+    `;
+  };
 
-    const renderError = (msg) => {
-      rail.innerHTML = `
-        <div class="pcard pcard--empty" role="listitem">
-          <div class="pcard-body">
-            <h4 class="pcard-title">Couldn’t load featured items</h4>
-            <p class="pcard-desc" style="opacity:.85">${escapeHtml(msg || "Check API settings and try again.")}</p>
-          </div>
-        </div>
-      `;
-    };
+  const render = (rail, items) => {
+    rail.innerHTML = "";
 
-    const render = (items) => {
-      rail.innerHTML = "";
+    if (!Array.isArray(items) || items.length === 0) {
+      renderEmpty(rail);
+      return;
+    }
 
-      if (!Array.isArray(items) || items.length === 0) {
-        renderEmpty();
-        return;
-      }
+    items.forEach((it) => {
+      const id = it?.id || "";
+      if (!id) return;
 
-      items.forEach((it) => {
-        const id = it.id || "";
-        const title = escapeHtml(it.name);
-        const descRaw = String(it.description || "").trim();
-        const desc = escapeHtml(descRaw).slice(0, 120);
-        const price = it.has_price ? money(it.price_money) : "";
+      const title = escapeHtml(it?.name || "Product");
 
-        const img = (it.image_url && String(it.image_url).trim() !== "")
+      const descRaw = String(it?.description || "").trim();
+      const desc = escapeHtml(descRaw);
+
+      const price = it?.has_price ? money(it?.price_money) : "";
+
+      const img =
+        it?.image_url && String(it.image_url).trim() !== ""
           ? it.image_url
-          : pickFallback(it.name);
+          : pickFallback(it?.name);
 
-        const el = document.createElement("a");
-        el.className = "pcard";
-        el.href = productHref(id);
-        el.setAttribute("role", "listitem");
-        el.setAttribute("aria-label", `View ${it.name || "product"}`);
+      const el = document.createElement("a");
+      el.className = "product-card product-card--lux fdrops-card";
+      el.href = productHref(id);
+      el.setAttribute("role", "listitem");
+      el.setAttribute("aria-label", `View ${it?.name || "product"}`);
 
-        el.innerHTML = `
-          <div class="pcard-media">
-            <img src="${img}" alt="${title}" loading="lazy" />
-          </div>
-          <div class="pcard-body">
-            <div class="pcard-row">
-              <h4 class="pcard-title">${title}</h4>
-              ${price ? `<div class="pcard-price">${escapeHtml(price)}</div>` : `<div class="pcard-price" style="opacity:.7">Details</div>`}
+      el.innerHTML = `
+        <div class="product-media">
+          <img src="${img}" alt="${title}" loading="lazy" />
+        </div>
+
+        <div class="product-body">
+          <h3 class="product-title">${title}</h3>
+
+          <p class="product-desc">
+            ${desc ? desc : "A ritual-grade essential curated for your routine."}
+          </p>
+
+          <div class="product-row">
+            <div class="product-price">
+              ${price ? escapeHtml(price) : `<span class="product-price--muted">View details</span>`}
             </div>
-            ${desc ? `<p class="pcard-desc">${desc}</p>` : `<p class="pcard-desc" style="opacity:.78">Tap to view details.</p>`}
-            <div class="pcard-cta">
-              <span class="pcard-pill" aria-hidden="true">View</span>
-            </div>
+            <span class="btn-lux" aria-hidden="true">Shop</span>
           </div>
-        `;
+        </div>
+      `;
 
-        rail.appendChild(el);
-      });
-    };
+      rail.appendChild(el);
+    });
+  };
 
-    const load = async () => {
-      try {
-        const res = await fetch(endpoint, { headers: { "Accept": "application/json" } });
-        const contentType = (res.headers.get("content-type") || "").toLowerCase();
-        const text = await res.text();
+  async function load(root) {
+    const rail = root.querySelector(".fdrops-rail");
+    const endpoint = root.getAttribute("data-endpoint");
+    if (!rail || !endpoint) return;
 
-        if (!res.ok) {
-          // try parse API error payload
-          try {
-            const j = JSON.parse(text);
-            throw new Error(j?.error || `HTTP ${res.status}`);
-          } catch {
-            throw new Error(`HTTP ${res.status}`);
-          }
+    try {
+      const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      const text = await res.text();
+
+      if (!res.ok) {
+        try {
+          const j = JSON.parse(text);
+          throw new Error(j?.error || `HTTP ${res.status}`);
+        } catch {
+          throw new Error(`HTTP ${res.status}`);
         }
-
-        // guard against HTML error pages
-        if (text.trim().startsWith("<") || (contentType && !contentType.includes("application/json"))) {
-          throw new Error("Non-JSON response (endpoint/env mismatch).");
-        }
-
-        const data = JSON.parse(text);
-        if (!data || data.ok !== true) throw new Error(data?.error || "API returned not ok.");
-        render(data.items || []);
-      } catch (e) {
-        console.error("[carousel] load failed:", e);
-        renderError(e?.message || "Unable to load.");
       }
-    };
 
-    // Scroll buttons
-    root.querySelectorAll(".carousel-btn").forEach((btn) => {
+      if (text.trim().startsWith("<") || (contentType && !contentType.includes("application/json"))) {
+        throw new Error("Non-JSON response (endpoint/env mismatch).");
+      }
+
+      const data = JSON.parse(text);
+      if (!data || data.ok !== true) throw new Error(data?.error || "API returned not ok.");
+
+      render(rail, data.items || []);
+    } catch (e) {
+      console.error("[featured-drops] load failed:", e);
+      renderError(rail, e?.message || "Unable to load.");
+    }
+  }
+
+  roots.forEach((root) => {
+    const rail = root.querySelector(".fdrops-rail");
+
+    // scroll buttons (only really matter on mobile, harmless on desktop)
+    root.querySelectorAll(".fdrops-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.getAttribute("data-dir") || "1");
-        rail.scrollBy({ left: dir * Math.max(280, rail.clientWidth * 0.85), behavior: "smooth" });
+        rail?.scrollBy({ left: dir * Math.max(360, rail.clientWidth * 0.9), behavior: "smooth" });
       });
     });
 
-    load();
-  })();
+    load(root);
+  });
 </script>
 
 <style>
-  .carousel { padding: 14px 0; }
-  .carousel-head {
-    display:flex;
-    align-items:flex-end;
-    justify-content:space-between;
-    gap:14px;
-    margin-bottom: 6px;
-  }
-  .carousel-titlewrap { display:grid; gap:6px; }
-  .carousel-title { margin:0; font-family: var(--font-display); letter-spacing: -.01em; }
-  .carousel-sub { margin:0; font-size: 13px; opacity:.8; max-width: 46ch; }
+  /* =========================================================
+     Featured Drops (container-bound, desktop grid, mobile swipe)
+     ========================================================= */
 
-  .carousel-actions { display:flex; gap:10px; align-items:center; }
-  .carousel-link{
-    font-size: 13px;
-    text-decoration:none;
-    opacity:.85;
-    padding: 8px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.14);
-    background: rgba(0,0,0,.14);
-  }
-  .carousel-link:hover{ opacity:1; background: rgba(0,0,0,.20); }
+  /* =========================================================
+   Featured Drops v4
+   Desktop: REAL grid (matches Shop Highlights)
+   Mobile: swipe rail
+   Fixes: giant cards on desktop
+   ========================================================= */
 
-  .carousel-btn {
-    width:40px; height:40px; border-radius:999px;
-    border:1px solid rgba(255,255,255,.18);
-    background: rgba(0,0,0,.22);
-    color: inherit;
-    font-size: 22px;
-    line-height: 1;
-  }
-  .carousel-btn:hover{ background: rgba(0,0,0,.30); }
+.fdrops{
+  padding: 8px 0 18px;
+}
 
-  .carousel-rail {
-    display:flex;
-    gap:14px;
-    overflow-x:auto;
-    scroll-snap-type:x mandatory;
-    padding: 14px 2px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .carousel-rail::-webkit-scrollbar { height: 8px; }
-  .carousel-rail::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 999px; }
+.fdrops-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom: 10px;
+}
 
-  /* ===== Product Card (lux) ===== */
-  .pcard {
+.fdrops-titlewrap{ display:grid; gap:6px; }
+.fdrops-title{
+  margin:0;
+  font-family: var(--font-display);
+  letter-spacing: -.01em;
+  font-size: 22px;
+}
+.fdrops-sub{
+  margin:0;
+  font-size: 13px;
+  opacity:.80;
+  max-width: 52ch;
+  color: var(--muted);
+}
+
+.fdrops-actions{ display:flex; gap:10px; align-items:center; }
+.fdrops-link{
+  font-size: 13px;
+  text-decoration:none;
+  opacity:.85;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.14);
+}
+.fdrops-link:hover{ opacity:1; background: rgba(0,0,0,.20); }
+
+.fdrops-btn{
+  width:40px; height:40px; border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.22);
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor:pointer;
+}
+.fdrops-btn:hover{ background: rgba(0,0,0,.30); }
+
+/* =========================================================
+   DESKTOP / TABLET: grid (no rail)
+   IMPORTANT: explicitly kill any previous rail styles
+   ========================================================= */
+
+.fdrops .fdrops-rail{
+  /* reset any old "rail" behavior */
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  padding: 0 !important;
+
+  /* force grid like Shop Highlights */
+  display: grid !important;
+  grid-auto-flow: row !important;
+  grid-auto-columns: unset !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: clamp(12px, 2vw, 18px) !important;
+}
+
+/* Desktop doesn't need arrows */
+.fdrops .fdrops-btn{ display:none; }
+
+/* Make sure cards don’t balloon */
+.fdrops .fdrops-card,
+.fdrops .fdrops-skel{
+  width: 100%;
+  max-width: none;
+}
+
+/* Keep card rhythm like Shop Highlights */
+.fdrops .fdrops-card .product-body{ min-height: 150px; }
+.fdrops .fdrops-card .product-title{ font-size: 20px; }
+.fdrops .fdrops-card .product-desc{
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* =========================================================
+   Skeletons
+   ========================================================= */
+
+.fdrops-skel{
+  pointer-events:none;
+  border-color: rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+}
+.fdrops-skel-media{
+  aspect-ratio: 4 / 3;
+  background: rgba(255,255,255,.06);
+}
+.fdrops-skel-line{
+  height: 12px;
+  margin-top: 10px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
+  background-size: 200% 100%;
+  animation: fdropsShimmer 1.2s infinite;
+}
+@keyframes fdropsShimmer{
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Empty/Error */
+.fdrops-empty{
+  grid-column: 1 / -1;
+  border: 1px solid rgba(200,162,74,.22);
+  background: rgba(200,162,74,.10);
+  border-radius: 22px;
+  padding: 16px;
+}
+.fdrops-empty__title{
+  font-family: var(--font-display);
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+.fdrops-empty__sub{
+  opacity:.85;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* =========================================================
+   Breakpoints (grid steps down)
+   ========================================================= */
+
+@media (max-width: 1100px){
+  .fdrops .fdrops-rail{
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 820px){
+  .fdrops .fdrops-rail{
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* =========================================================
+   MOBILE: switch to swipe rail at <=620px
+   ========================================================= */
+
+@media (max-width: 620px){
+  .fdrops .fdrops-rail{
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(78%, 420px) !important;
+    grid-template-columns: unset !important;
+    gap: clamp(12px, 2vw, 18px) !important;
+
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 12px 2px 16px !important;
+  }
+
+  .fdrops .fdrops-rail > *{
     scroll-snap-align: start;
-    flex: 0 0 78%;
-    max-width: 380px;
-    min-width: 260px;
-    border-radius: 20px;
-    overflow: hidden;
-    text-decoration:none;
-    color: inherit;
-    border: 1px solid rgba(255,255,255,.12);
-    background: rgba(0,0,0,.16);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 18px 46px rgba(0,0,0,.22);
-    transform: translateY(0);
-    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-  }
-  .pcard:hover{
-    transform: translateY(-4px);
-    box-shadow: 0 26px 64px rgba(0,0,0,.28);
-    border-color: rgba(200,162,74,.22);
-  }
-  @media (min-width: 720px) {
-    .pcard { flex-basis: 320px; }
   }
 
-  .pcard-media{
-    width:100%;
-    aspect-ratio: 4 / 3;
-    background: rgba(255,255,255,.04);
-    position: relative;
-  }
-  .pcard-media img{
-    width:100%;
-    height:100%;
-    object-fit: cover;
-    display:block;
-  }
-  /* gentle vignette */
-  .pcard-media::after{
-    content:"";
-    position:absolute; inset:0;
-    background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
-    pointer-events:none;
-  }
+  .fdrops .fdrops-btn{ display:inline-flex; }
 
-  .pcard-body { padding: 12px 12px 14px; }
-  .pcard-row { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-  .pcard-title { margin:0; font-size: 16px; line-height: 1.2; letter-spacing: -.01em; }
-  .pcard-price { font-weight: 650; opacity: .95; white-space: nowrap; color: rgba(255,255,255,.90); }
-  .pcard-desc { margin: 8px 0 0; font-size: 13px; opacity: .85; line-height: 1.35; }
-
-  .pcard-cta{ display:flex; justify-content:flex-end; margin-top: 10px; }
-  .pcard-pill{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding: 8px 12px;
+  .fdrops .fdrops-rail::-webkit-scrollbar{ height: 8px; }
+  .fdrops .fdrops-rail::-webkit-scrollbar-thumb{
+    background: rgba(255,255,255,.18);
     border-radius: 999px;
-    font-size: 12px;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    border: 1px solid rgba(200,162,74,.35);
-    background: rgba(200,162,74,.12);
-    color: rgba(255,255,255,.92);
   }
-
-  /* Empty state card */
-  .pcard--empty{
-    flex: 0 0 100%;
-    max-width: 560px;
-    min-width: 280px;
-    padding: 8px;
-  }
-
-  /* ===== Skeleton ===== */
-  .pcard--skeleton { pointer-events:none; }
-  .skel {
-    background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
-    background-size: 200% 100%;
-    animation: shimmer 1.2s infinite;
-    border-radius: 14px;
-  }
-  .pcard--skeleton .pcard-media { border-radius: 16px; }
-  .pcard--skeleton .line { height: 12px; margin-top: 10px; }
-  @keyframes shimmer {
-    0% { background-position: 0% 0; }
-    100% { background-position: 200% 0; }
-  }
+}
 </style>

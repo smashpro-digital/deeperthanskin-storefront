@@ -3,7 +3,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
 export const prerender = true;
 
-const base = import.meta.env.BASE_URL || "/";
+const baseRaw = import.meta.env.BASE_URL || "/";
+const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
 /** GH Pages safe internal URLs */
 const u = (path: string) => {
@@ -18,7 +19,10 @@ const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
 const endpoint =
-  `${API_BASE}/public.commerce.featured.get.php?app_slug=${encodeURIComponent(APP_SLUG)}&limit=60`;
+  `${API_BASE}/public.commerce.featured.get.php` +
+  `?app_slug=${encodeURIComponent(APP_SLUG)}` +
+  `&limit=60` +
+  `&_ts=${Date.now()}`;
 
 // Fallback images (base-safe)
 const FALLBACKS = {
@@ -27,7 +31,7 @@ const FALLBACKS = {
   kits: `${base}images/cat-kits.jpg`,
   herbs: `${base}images/cat-herbs.jpg`,
   product: `${base}images/product-fallback.jpg`,
-  hero: `${base}images/hero-brand.png`,
+  hero: `${base}images/hero-brand.png`, // fallback ONLY (Square will override)
 };
 
 const ROUTES = {
@@ -57,7 +61,13 @@ type ApiItem = {
 <BaseLayout title="Featured | Deeper Than Skin">
   <main class="page">
     <div class="container">
-      <div class="hero" style={`background-image:url('${FALLBACKS.hero}');`}>
+      {/* ✅ hero starts with local fallback, then JS swaps to Square image */}
+      <div
+        id="featHero"
+        class="hero"
+        data-fallback-hero={FALLBACKS.hero}
+        style={`background-image:url('${FALLBACKS.hero}');`}
+      >
         <div class="hero-overlay"></div>
         <div class="hero-inner">
           <div class="kicker">Featured</div>
@@ -127,6 +137,7 @@ type ApiItem = {
     import { Cart } from "/src/lib/cart.js";
 
     const grid = document.getElementById("featGrid");
+    const hero = document.getElementById("featHero");
     if (!grid) return;
 
     const endpoint = grid.getAttribute("data-endpoint") || "";
@@ -173,6 +184,10 @@ type ApiItem = {
     };
 
     const cartCount = () => {
+      // Prefer Cart.count() if available
+      if (typeof Cart?.count === "function") return Number(Cart.count() || 0);
+
+      // Fallback to stored structure
       const c = Cart.get?.();
       const items = Array.isArray(c?.items) ? c.items : [];
       return items.reduce((sum, it) => sum + Math.max(0, Number(it?.qty || 0)), 0);
@@ -198,9 +213,7 @@ type ApiItem = {
       const term = String(q?.value || "").trim().toLowerCase();
       let items = all.slice();
 
-      if (filter !== "all") {
-        items = items.filter((it) => inferTag(it) === filter);
-      }
+      if (filter !== "all") items = items.filter((it) => inferTag(it) === filter);
 
       if (term) {
         items = items.filter((it) => {
@@ -228,6 +241,16 @@ type ApiItem = {
       el._t = setTimeout(() => (el.style.display = "none"), 1600);
     };
 
+    // ✅ Square-driven hero: pick first strong image_url
+    const setHeroFromItems = (items) => {
+      if (!hero) return;
+      const fallbackHero = hero.getAttribute("data-fallback-hero") || "";
+      const first = (items || []).find((x) => x?.image_url && String(x.image_url).trim());
+      const img = first?.image_url ? String(first.image_url).trim() : fallbackHero;
+      if (!img) return;
+      hero.style.backgroundImage = `url('${img}')`;
+    };
+
     const render = () => {
       const items = selectItems();
       grid.innerHTML = "";
@@ -246,7 +269,7 @@ type ApiItem = {
         const id = it?.id || "";
         const title = escapeHtml(it?.name || "Product");
         const desc = escapeHtml(String(it?.description || "")).slice(0, 110);
-        const img = it?.image_url && String(it.image_url).trim() ? it.image_url : pickFallback(it?.name);
+        const img = it?.image_url && String(it.image_url).trim() ? String(it.image_url).trim() : pickFallback(it?.name);
         const price = it?.has_price ? money(it?.price_money) : "";
         const variationId = String(it?.variation_id || "").trim();
         const canCart = variationId.length > 0;
@@ -257,7 +280,8 @@ type ApiItem = {
         card.innerHTML = `
           <a class="link" href="${escapeHtml(`${base}product/${encodeURIComponent(id)}`)}" aria-label="View ${title}">
             <div class="media">
-              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy" />
+              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy"
+                   onerror="this.onerror=null;this.src='${escapeHtml(pickFallback(it?.name))}';" />
               <div class="glow" aria-hidden="true"></div>
             </div>
           </a>
@@ -319,6 +343,10 @@ type ApiItem = {
         if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
 
         all = Array.isArray(data.items) ? data.items : [];
+
+        // ✅ Square hero image
+        setHeroFromItems(all);
+
         render();
         updateCartCount();
       } catch (e) {
@@ -345,6 +373,8 @@ type ApiItem = {
     q?.addEventListener("input", () => render());
     sort?.addEventListener("change", () => render());
 
+    // keep cart count synced across tabs + custom event
+    window.addEventListener("storage", updateCartCount);
     window.addEventListener("dts:cart", updateCartCount);
 
     load();
@@ -364,11 +394,19 @@ type ApiItem = {
       border: 1px solid rgba(255,255,255,.12);
       box-shadow: 0 30px 90px rgba(0,0,0,.34);
     }
-    .hero-overlay{
+    .hero::after{
+      content:"";
       position:absolute; inset:0;
       background:
-        radial-gradient(1000px 520px at 50% 25%, rgba(200,162,74,.16), transparent 62%),
-        linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.62));
+        radial-gradient(1200px 520px at 50% 18%, rgba(200,162,74,.16), transparent 62%),
+        radial-gradient(900px 600px at 70% 80%, rgba(0,0,0,.22), transparent 55%);
+      pointer-events:none;
+      z-index: 1;
+    }
+    .hero-overlay{
+      position:absolute; inset:0;
+      background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.62));
+      z-index: 0;
     }
     .hero-inner{
       position: relative;

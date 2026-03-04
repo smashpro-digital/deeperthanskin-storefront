@@ -1,12 +1,23 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
+export const prerender = true;
+
+const baseRaw = import.meta.env.BASE_URL || "/";
+const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
+
 const API_BASE =
   import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/index.php";
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
-const base = import.meta.env.BASE_URL;
+/** Internal routes (GH Pages safe) */
+const ROUTES = {
+  featured: `${base}featured`,
+  shop: `${base}shop`,
+  category: (slug: string) => `${base}category/${encodeURIComponent(slug)}`,
+  product: (id: string) => `${base}product/${encodeURIComponent(id)}`,
+};
 
 // Category fallback images (from /public/images)
 const CAT = {
@@ -18,7 +29,6 @@ const CAT = {
   wellness: `${base}images/cat-herbs.jpg`,
 };
 
-// In-house category routes
 const categories = [
   { slug: "skincare", title: "Skincare", subtitle: "Glow rituals & staples", img: CAT.skincare },
   { slug: "wellness", title: "Wellness", subtitle: "Inside-out support", img: CAT.wellness },
@@ -28,7 +38,11 @@ const categories = [
   { slug: "herbs", title: "Herbal Teas & Oils", subtitle: "Calm, clarity, balance", img: CAT.herbs },
 ];
 
-const productsEndpoint = `${API_BASE}?path=public/commerce/products&app_slug=${encodeURIComponent(APP_SLUG)}&limit=24`;
+const productsEndpoint =
+  `${API_BASE}?path=public/commerce/products` +
+  `&app_slug=${encodeURIComponent(APP_SLUG)}` +
+  `&limit=24` +
+  `&_ts=${Date.now()}`;
 ---
 
 <BaseLayout title="Shop | Deeper Than Skin">
@@ -42,7 +56,7 @@ const productsEndpoint = `${API_BASE}?path=public/commerce/products&app_slug=${e
 
       <div class="shop-grid">
         {categories.map((c) => (
-          <a class="shop-cat" href={`/category/${c.slug}`} aria-label={`${c.title} category`}>
+          <a class="shop-cat" href={ROUTES.category(c.slug)} aria-label={`${c.title} category`}>
             <div class="shop-cat-media">
               <img src={c.img} alt={c.title} loading="lazy" />
             </div>
@@ -55,38 +69,55 @@ const productsEndpoint = `${API_BASE}?path=public/commerce/products&app_slug=${e
         ))}
       </div>
 
-      <div style="margin-top:36px" class="section">
-        <div class="kicker">Latest</div>
-        <h2 class="h2">Fresh from inventory</h2>
+      {/* ✅ LATEST now matches Featured Drops styling (carousel + pcard) */}
+      <section class="carousel" style="margin-top:30px">
+        <div class="carousel-head">
+          <div class="kicker">Latest</div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h2 class="carousel-title">Fresh from inventory</h2>
+              <p class="carousel-sub">Newly added essentials, styled to match the rest of the storefront.</p>
+            </div>
 
-        <div class="grid" data-endpoint={productsEndpoint} id="products-grid">
+            <div class="btns" style="margin-top:0">
+              <a class="btn btn-ghost" href={ROUTES.featured}>View Featured</a>
+            </div>
+          </div>
+        </div>
+
+        <div
+          id="latest-rail"
+          class="carousel-rail"
+          data-endpoint={productsEndpoint}
+          data-base={base}
+        >
           {Array.from({ length: 6 }).map(() => (
-            <div class="pgrid-card pgrid-skeleton" aria-hidden="true">
-              <div class="pgrid-media skel"></div>
-              <div class="pgrid-body">
+            <a class="pcard pcard--skeleton" href="javascript:void(0)" aria-hidden="true" tabindex="-1">
+              <div class="pcard-media"></div>
+              <div class="pcard-body">
                 <div class="skel line"></div>
                 <div class="skel line" style="width:70%"></div>
+                <div class="pcard-cta" style="margin-top:12px">
+                  <span class="pcard-pill">Shop</span>
+                </div>
               </div>
-            </div>
+            </a>
           ))}
         </div>
-
-        <div class="btns" style="justify-content:center;margin-top:18px">
-          <a class="btn btn-primary" href="/featured">View Featured</a>
-        </div>
-      </div>
+      </section>
     </div>
   </main>
 
   <script is:inline>
     (function () {
-      const grid = document.getElementById("products-grid");
-      if (!grid) return;
+      const rail = document.getElementById("latest-rail");
+      if (!rail) return;
 
-      const endpoint = grid.getAttribute("data-endpoint");
+      const endpoint = rail.getAttribute("data-endpoint") || "";
+      const base = rail.getAttribute("data-base") || "/";
 
       const escapeHtml = (s) =>
-        String(s || "")
+        String(s ?? "")
           .replaceAll("&", "&amp;")
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;")
@@ -106,69 +137,80 @@ const productsEndpoint = `${API_BASE}?path=public/commerce/products&app_slug=${e
 
       const pickFallback = (name) => {
         const s = String(name || "").toLowerCase();
-        if (s.includes("juice")) return "/images/cat-juices.jpg";
-        if (s.includes("moss")) return "/images/cat-seamoss.jpg";
-        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "/images/cat-kits.jpg";
-        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return "/images/cat-herbs.jpg";
-        return "/images/product-fallback.jpg";
+        if (s.includes("juice")) return `${base}images/cat-juices.jpg`;
+        if (s.includes("moss")) return `${base}images/cat-seamoss.jpg`;
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return `${base}images/cat-kits.jpg`;
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return `${base}images/cat-herbs.jpg`;
+        return `${base}images/product-fallback.jpg`;
+      };
+
+      const productUrl = (id) => `${base}product/${encodeURIComponent(String(id || ""))}`;
+
+      const cardHtml = (it) => {
+        const id = String(it?.id || "");
+        const title = escapeHtml(it?.name || "Product");
+        const descRaw = String(it?.description || "");
+        const desc = escapeHtml(descRaw);
+        const img = (it?.image_url && String(it.image_url).trim()) ? String(it.image_url).trim() : pickFallback(it?.name);
+        const price = it?.has_price ? money(it?.price_money) : "";
+
+        return `
+          <a class="pcard" href="${productUrl(id)}" aria-label="View ${title}">
+            <div class="pcard-media">
+              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy"
+                   onerror="this.onerror=null;this.src='${escapeHtml(pickFallback(it?.name))}';" />
+            </div>
+            <div class="pcard-body">
+              <div class="pcard-row">
+                <h3 class="pcard-title">${title}</h3>
+                <div class="pcard-price">${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}</div>
+              </div>
+              <p class="pcard-desc">${desc || "Tap to view details."}</p>
+              <div class="pcard-cta">
+                <span class="pcard-pill">Shop</span>
+              </div>
+            </div>
+          </a>
+        `;
       };
 
       const render = (items) => {
-        grid.innerHTML = "";
+        rail.innerHTML = "";
+
         if (!Array.isArray(items) || items.length === 0) {
-          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
-            <div class="kicker">Notice</div>
-            <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
-            <p class="p">Add items in Square and refresh.</p>
-          </div>`;
+          rail.innerHTML = `
+            <div class="pcard pcard--empty">
+              <div class="kicker">Notice</div>
+              <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
+              <p class="p" style="margin:0">Add items in Square and refresh.</p>
+            </div>
+          `;
           return;
         }
 
-        items.forEach((it) => {
-          const id = it.id || "";
-          const title = escapeHtml(it.name);
-          const desc = escapeHtml(String(it.description || "")).slice(0, 110);
-          const img = it.image_url && String(it.image_url).trim() ? it.image_url : pickFallback(it.name);
-          const price = it.has_price ? money(it.price_money) : "";
-
-          const a = document.createElement("a");
-          a.className = "pgrid-card";
-          a.href = `/product/${encodeURIComponent(id)}`;
-          a.setAttribute("aria-label", `View ${it.name || "product"}`);
-
-          a.innerHTML = `
-            <div class="pgrid-media">
-              <img src="${img}" alt="${title}" loading="lazy" />
-            </div>
-            <div class="pgrid-body">
-              <div class="pgrid-row">
-                <h3 class="pgrid-title">${title}</h3>
-                ${price ? `<div class="pgrid-price">${escapeHtml(price)}</div>` : `<div class="pgrid-price" style="opacity:.7">Details</div>`}
-              </div>
-              <p class="pgrid-desc">${desc || "Tap to view details."}</p>
-            </div>
-          `;
-          grid.appendChild(a);
-        });
+        rail.innerHTML = items.map(cardHtml).join("");
       };
 
       const load = async () => {
         try {
+          if (!endpoint) throw new Error("Missing endpoint");
           const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
           const text = await res.text();
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
 
           const data = JSON.parse(text);
-          if (!data || data.ok !== true) throw new Error("API not ok");
+          if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
           render(data.items || []);
         } catch (e) {
-          console.error("[shop] products load failed:", e);
-          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
-            <div class="kicker">Error</div>
-            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
-            <p class="p">Check API base/app slug env vars and the route.</p>
-          </div>`;
+          console.error("[shop] latest load failed:", e);
+          rail.innerHTML = `
+            <div class="pcard pcard--empty">
+              <div class="kicker">Error</div>
+              <h3 class="h2" style="margin:6px 0 8px">Couldn’t load latest</h3>
+              <p class="p" style="margin:0">Check API base/app slug env vars and the route.</p>
+            </div>
+          `;
         }
       };
 
@@ -223,54 +265,5 @@ const productsEndpoint = `${API_BASE}?path=public/commerce/products&app_slug=${e
 
     @media (max-width: 980px){ .shop-cat{ grid-column: span 6; } }
     @media (max-width: 560px){ .shop-cat{ grid-column: span 12; } }
-
-    /* product grid cards */
-    .pgrid-card{
-      grid-column: span 4;
-      border-radius: 20px;
-      overflow:hidden;
-      text-decoration:none;
-      color: inherit;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.16);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 18px 46px rgba(0,0,0,.22);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-      display:flex;
-      flex-direction:column;
-      min-height: 280px;
-    }
-    .pgrid-card:hover{
-      transform: translateY(-4px);
-      box-shadow: 0 26px 64px rgba(0,0,0,.28);
-      border-color: rgba(200,162,74,.22);
-    }
-    .pgrid-media{ aspect-ratio: 4/3; background: rgba(255,255,255,.04); position:relative; }
-    .pgrid-media img{ width:100%; height:100%; object-fit: cover; display:block; }
-    .pgrid-media::after{
-      content:"";
-      position:absolute; inset:0;
-      background: radial-gradient(800px 260px at 50% 20%, transparent, rgba(0,0,0,.34));
-      pointer-events:none;
-    }
-    .pgrid-body{ padding: 12px 12px 14px; }
-    .pgrid-row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-    .pgrid-title{ margin:0; font-size: 16px; line-height:1.2; }
-    .pgrid-price{ font-weight: 650; white-space:nowrap; opacity:.95; }
-    .pgrid-desc{ margin: 8px 0 0; font-size: 13px; opacity:.85; line-height:1.35; }
-
-    @media (max-width: 900px){ .pgrid-card{ grid-column: span 6; } }
-    @media (max-width: 560px){ .pgrid-card{ grid-column: span 12; } }
-
-    /* skeleton */
-    .pgrid-skeleton{ pointer-events:none; }
-    .skel{
-      background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
-      background-size: 200% 100%;
-      animation: shimmer 1.2s infinite;
-      border-radius: 14px;
-    }
-    .line{ height: 12px; margin-top: 10px; }
-    @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
   </style>
 </BaseLayout>

@@ -3,51 +3,49 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 export const prerender = true;
 
-/**
- * ✅ STATIC PATHS REQUIRED (GH Pages / static output)
- * NOTE:
- * - Include both "seamoss" and "sea-moss" so old links + new API slugs work.
- * - Keep these curated, or switch later to build-time fetch categories.
- */
-export async function getStaticPaths() {
-  const slugs = [
-    "skincare",
-    "wellness",
-    "juices",
-    "seamoss",
-    "sea-moss",
-    "kits",
-    "herbs",
-    "bath-body-oils",
-    "body-butters",
-  ];
-  return slugs.map((slug) => ({ params: { slug } }));
-}
-
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
-// ✅ Prefer routes endpoint (bypass index router)
 const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE ||
-  "https://smashpro.app/api/v1/routes";
+  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
 
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
 const { slug: slugParam } = Astro.params;
 
-/**
- * ✅ normalize legacy slugs to API slugs
- * - seamoss -> sea-moss
- */
+// Normalize legacy slugs to API slugs
 const SLUG_ALIASES: Record<string, string> = {
   seamoss: "sea-moss",
 };
+
 const slug = String(slugParam || "").trim();
 const apiSlug = SLUG_ALIASES[slug] || slug;
 
-// Try BOTH param names (backend can accept either)
+const prettyTitleFromSlug = (s: string) =>
+  String(s || "")
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+
+export async function getStaticPaths() {
+  // Keep stable for GH Pages builds
+  const fallback = [
+    "skincare",
+    "wellness",
+    "juices",
+    "beverages",
+    "kits",
+    "herbs",
+    "bath-body-oils",
+    "body-butters",
+    "sea-moss",
+    "seamoss",
+  ];
+  return fallback.map((slug) => ({ params: { slug } }));
+}
+
+// Products endpoint
 const endpoint =
   `${API_BASE}/public.commerce.products.get.php` +
   `?app_slug=${encodeURIComponent(APP_SLUG)}` +
@@ -59,6 +57,7 @@ const TITLE_MAP: Record<string, string> = {
   skincare: "Skincare",
   wellness: "Wellness",
   juices: "Cold-Pressed Juices",
+  beverages: "Beverages",
   "sea-moss": "Sea Moss Gel",
   seamoss: "Sea Moss Gel",
   kits: "Kits & Bundles",
@@ -67,26 +66,16 @@ const TITLE_MAP: Record<string, string> = {
   "body-butters": "Body Butters",
 };
 
-const HERO_MAP: Record<string, string> = {
-  skincare: `${base}images/cat-skincare.jpg`,
-  wellness: `${base}images/cat-wellness.jpg`,
-  juices: `${base}images/cat-juices.jpg`,
-  "sea-moss": `${base}images/cat-seamoss.jpg`,
-  seamoss: `${base}images/cat-seamoss.jpg`,
-  kits: `${base}images/cat-kits.jpg`,
-  herbs: `${base}images/cat-herbs.jpg`,
-  "bath-body-oils": `${base}images/cat-herbs.jpg`,
-  "body-butters": `${base}images/cat-skincare.jpg`,
-};
+const pageTitle = TITLE_MAP[slug] || prettyTitleFromSlug(slug) || "Category";
 
-// Fallbacks if you don't have the new hero images yet
-const pageTitle = TITLE_MAP[slug] || "Category";
-const heroImg = HERO_MAP[slug] || `${base}images/product-fallback.jpg`;
-const fallbackImg = heroImg;
+// ✅ Hero should come from Square via categories endpoint at runtime.
+// Start with a safe fallback so page never flashes broken background.
+const heroImg = `${base}images/product-fallback.jpg`;
+const fallbackImg = `${base}images/product-fallback.jpg`;
 
 const ROUTES = {
   shop: `${base}shop`,
-  product: (id: string) => `${base}product/${encodeURIComponent(id)}`,
+  productBase: `${base}product/`,
   cart: `${base}cart`,
 };
 ---
@@ -104,14 +93,19 @@ const ROUTES = {
         </button>
       </div>
 
-      <section class="hero" style={`--hero:url('${heroImg}');`}>
+      <section
+        class="hero"
+        style={`--hero:url('${heroImg}');`}
+        data-cat-slug={apiSlug}
+        data-api-base={API_BASE}
+        data-app-slug={APP_SLUG}
+        data-base={base}
+      >
         <div class="hero-bg" aria-hidden="true"></div>
         <div class="hero-inner">
           <div class="kicker">Category</div>
           <h1 class="hero-title">{pageTitle}</h1>
-          <p class="hero-sub">
-            Browse curated essentials. Add to cart, then checkout when ready.
-          </p>
+          <p class="hero-sub">Browse curated essentials. Add to cart, then checkout when ready.</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
             <a class="btn btn-ghost" href={ROUTES.cart}>View Cart</a>
@@ -136,7 +130,7 @@ const ROUTES = {
           data-endpoint={endpoint}
           data-fallback={fallbackImg}
           data-base={base}
-          data-product-base={`${base}product/`}
+          data-product-base={ROUTES.productBase}
         >
           {Array.from({ length: 8 }).map(() => (
             <div class="card skel-card" aria-hidden="true">
@@ -153,180 +147,248 @@ const ROUTES = {
         <div id="empty" class="empty" hidden>
           <div class="kicker">Notice</div>
           <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
-          <p class="p">
-            If this category should have items, it usually means the API mapping needs the Square category IDs.
-          </p>
+          <p class="p">If this category should have items, it usually means the API mapping needs the Square category IDs.</p>
         </div>
       </section>
     </div>
   </main>
 
-  <script is:inline>
-    (function () {
-      const grid = document.getElementById("cat-grid");
-      const empty = document.getElementById("empty");
-      const q = document.getElementById("q");
-      const cartPill = document.getElementById("cartPill");
-      const cartCount = document.getElementById("cartCount");
+  <script type="module" is:inline>
+    import { Cart } from "/src/lib/cart.js";
 
-      if (!grid) return;
+    const grid = document.getElementById("cat-grid");
+    const empty = document.getElementById("empty");
+    const q = document.getElementById("q");
+    const cartPill = document.getElementById("cartPill");
+    const cartCount = document.getElementById("cartCount");
 
-      const endpoint = grid.getAttribute("data-endpoint");
-      const fallback = grid.getAttribute("data-fallback") || "";
-      const base = grid.getAttribute("data-base") || "/";
-      const productBase = grid.getAttribute("data-product-base") || (base + "product/");
+    if (!grid) throw new Error("cat-grid missing");
 
-      // ---------- tiny helpers ----------
-      const escapeHtml = (s) =>
+    const endpoint = grid.getAttribute("data-endpoint") || "";
+    const fallback = grid.getAttribute("data-fallback") || "";
+    const base = grid.getAttribute("data-base") || "/";
+    const productBase = grid.getAttribute("data-product-base") || (base + "product/");
+
+    const escapeHtml = (s) =>
+      String(s || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    const money = (pm) => {
+      if (!pm || typeof pm.amount !== "number") return "";
+      const amt = pm.amount / 100;
+      const cur = pm.currency || "USD";
+      try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
+      catch { return `$${amt.toFixed(2)}`; }
+    };
+
+    const syncCartCount = () => {
+      if (cartCount) cartCount.textContent = String(Cart.count());
+    };
+
+    if (cartPill) {
+      cartPill.addEventListener("click", () => {
+        window.location.href = base + "cart";
+      });
+    }
+
+    // ✅ HERO: pull category image from Square (via API routes)
+    async function syncHeroFromSquareCategory() {
+      const hero = document.querySelector(".hero");
+      if (!hero) return;
+
+      const catSlug = hero.getAttribute("data-cat-slug") || "";
+      const apiBase = hero.getAttribute("data-api-base") || "";
+      const appSlug = hero.getAttribute("data-app-slug") || "";
+      const baseLocal = hero.getAttribute("data-base") || "/";
+
+      if (!catSlug || !apiBase || !appSlug) return;
+
+      const candidates = [
+        `${apiBase}/public.commerce.categories.list.php?app_slug=${encodeURIComponent(appSlug)}&limit=250`,
+        `${apiBase}/public.commerce.categories.get.php?app_slug=${encodeURIComponent(appSlug)}&limit=250`,
+        `${apiBase}/public.commerce.categories.php?app_slug=${encodeURIComponent(appSlug)}&limit=250`,
+        // optional "index router" fallbacks (if you ever move endpoints behind index.php again)
+        `https://smashpro.app/api/v1/index.php?path=public/commerce/categories&app_slug=${encodeURIComponent(appSlug)}&limit=250`,
+      ];
+
+      const pickArray = (data) =>
+        (Array.isArray(data?.items) && data.items) ||
+        (Array.isArray(data?.categories) && data.categories) ||
+        (Array.isArray(data?.data) && data.data) ||
+        (Array.isArray(data) && data) ||
+        [];
+
+      const norm = (s) =>
         String(s || "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#039;");
+          .trim()
+          .toLowerCase()
+          .replace(/[-_]+/g, "-");
 
-      const money = (pm) => {
-        if (!pm || typeof pm.amount !== "number") return "";
-        const amt = pm.amount / 100;
-        const cur = pm.currency || "USD";
-        try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
-        catch { return `$${amt.toFixed(2)}`; }
-      };
+      const target = norm(catSlug);
 
-      const CART_KEY = "dts_cart_v1";
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
+          const text = await res.text();
+          if (!res.ok) continue;
+          if (text.trim().startsWith("<")) continue;
 
-      const readCart = () => {
-        try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") || []; }
-        catch { return []; }
-      };
+          const data = JSON.parse(text);
+          const arr = pickArray(data);
 
-      const writeCart = (items) => {
-        localStorage.setItem(CART_KEY, JSON.stringify(items));
-        syncCartCount();
-      };
+          const found =
+            arr.find((c) => norm(c?.slug) === target || norm(c?.category_slug) === target) ||
+            arr.find((c) => norm(c?.name) === target);
 
-      const syncCartCount = () => {
-        const items = readCart();
-        const n = items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
-        if (cartCount) cartCount.textContent = String(n);
-      };
+          const img =
+            String(found?.image_url || found?.hero_image_url || found?.image || found?.square_image_url || "").trim();
 
-      const addToCart = (p, qty = 1) => {
-        const items = readCart();
-        const id = String(p.id || "");
-        if (!id) return;
-
-        const img = (p.image_url && String(p.image_url).trim()) ? p.image_url : (fallback || (base + "images/product-fallback.jpg"));
-        const price_money = p.price_money || null;
-
-        const found = items.find(x => String(x.id) === id);
-        if (found) found.qty = (Number(found.qty) || 0) + qty;
-        else items.push({ id, name: p.name || "Item", image_url: img, price_money, qty });
-
-        writeCart(items);
-      };
-
-      if (cartPill) {
-        cartPill.addEventListener("click", () => {
-          window.location.href = base + "cart";
-        });
+          if (img) {
+            hero.style.setProperty("--hero", `url('${img}')`);
+            return;
+          }
+        } catch {
+          // try next candidate
+        }
       }
 
-      // ---------- render ----------
-      let ALL = [];
-
-      const cardHtml = (it) => {
-        const id = String(it.id || "");
-        const title = escapeHtml(it.name || "Product");
-        const descRaw = String(it.description || "");
-        const desc = escapeHtml(descRaw.length > 120 ? (descRaw.slice(0, 117) + "…") : descRaw);
-        const img = (it.image_url && String(it.image_url).trim()) ? it.image_url : (fallback || (base + "images/product-fallback.jpg"));
-        const price = it.has_price ? money(it.price_money) : "";
-
-        return `
-          <article class="card" data-id="${escapeHtml(id)}">
-            <a class="card-link" href="${productBase}${encodeURIComponent(id)}" aria-label="View ${title}">
-              <div class="media">
-                <img src="${img}" alt="${title}" loading="lazy" />
-                <div class="shine" aria-hidden="true"></div>
-              </div>
-              <div class="body">
-                <div class="row">
-                  <h3 class="title">${title}</h3>
-                  <div class="price">${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}</div>
-                </div>
-                <p class="desc">${desc || "Tap to view details."}</p>
-              </div>
-            </a>
-            <div class="actions">
-              <button class="btn btn-primary add" type="button">Add to cart</button>
-              <a class="btn btn-ghost" href="${productBase}${encodeURIComponent(id)}">View</a>
-            </div>
-          </article>
-        `;
-      };
-
-      const render = (items) => {
-        ALL = Array.isArray(items) ? items : [];
-        const query = String(q?.value || "").trim().toLowerCase();
-
-        const filtered = query
-          ? ALL.filter(p =>
-              String(p?.name || "").toLowerCase().includes(query) ||
-              String(p?.description || "").toLowerCase().includes(query)
-            )
-          : ALL;
-
-        grid.innerHTML = "";
-
-        if (!filtered.length) {
-          if (empty) empty.hidden = false;
-          return;
+      // Optional: fallback to "first product image" if category image is missing
+      try {
+        const res = await fetch(endpoint, { headers: { Accept: "application/json" }, cache: "no-store" });
+        const text = await res.text();
+        if (res.ok && !text.trim().startsWith("<")) {
+          const data = JSON.parse(text);
+          const first = Array.isArray(data?.items) ? data.items[0] : null;
+          const img = String(first?.image_url || "").trim();
+          if (img) {
+            hero.style.setProperty("--hero", `url('${img}')`);
+            return;
+          }
         }
-        if (empty) empty.hidden = true;
+      } catch {}
 
-        grid.innerHTML = filtered.map(cardHtml).join("");
+      // Last resort fallback (already set in CSS var)
+      hero.style.setProperty("--hero", `url('${baseLocal}images/product-fallback.jpg')`);
+    }
 
-        // Wire buttons
-        grid.querySelectorAll(".card").forEach((card) => {
-          const id = card.getAttribute("data-id");
-          const btn = card.querySelector("button.add");
-          const p = filtered.find(x => String(x?.id || "") === String(id || ""));
-          if (!btn || !p) return;
-          btn.addEventListener("click", (e) => {
-            e.preventDefault();
-            addToCart(p, 1);
+    let ALL = [];
+
+    const cardHtml = (it) => {
+      const id = String(it?.id || "");
+      const title = escapeHtml(it?.name || "Product");
+      const descRaw = String(it?.description || "");
+      const desc = escapeHtml(descRaw.length > 120 ? (descRaw.slice(0, 117) + "…") : descRaw);
+      const img = (it?.image_url && String(it.image_url).trim()) ? it.image_url : fallback;
+      const price = it?.has_price ? money(it?.price_money) : "";
+
+      return `
+        <article class="card" data-id="${escapeHtml(id)}">
+          <a class="card-link" href="${productBase}${encodeURIComponent(id)}" aria-label="View ${title}">
+            <div class="media">
+              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy"
+                   onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';" />
+              <div class="shine" aria-hidden="true"></div>
+            </div>
+            <div class="body">
+              <div class="row">
+                <h3 class="title">${title}</h3>
+                <div class="price">${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}</div>
+              </div>
+              <p class="desc">${desc || "Tap to view details."}</p>
+            </div>
+          </a>
+          <div class="actions">
+            <button class="btn btn-primary add" type="button">Add to cart</button>
+            <a class="btn btn-ghost" href="${productBase}${encodeURIComponent(id)}">View</a>
+          </div>
+        </article>
+      `;
+    };
+
+    const render = (items) => {
+      ALL = Array.isArray(items) ? items : [];
+      const query = String(q?.value || "").trim().toLowerCase();
+
+      const filtered = query
+        ? ALL.filter(p =>
+            String(p?.name || "").toLowerCase().includes(query) ||
+            String(p?.description || "").toLowerCase().includes(query)
+          )
+        : ALL;
+
+      grid.innerHTML = "";
+
+      if (!filtered.length) {
+        if (empty) empty.hidden = false;
+        return;
+      }
+      if (empty) empty.hidden = true;
+
+      grid.innerHTML = filtered.map(cardHtml).join("");
+
+      grid.querySelectorAll(".card").forEach((card) => {
+        const id = card.getAttribute("data-id");
+        const btn = card.querySelector("button.add");
+        const p = filtered.find(x => String(x?.id || "") === String(id || ""));
+        if (!btn || !p) return;
+
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          try {
+            Cart.add({
+              id: String(p.id),
+              variation_id: String(p.variation_id || ""),
+              name: p.name,
+              image_url: p.image_url || "",
+              price_money: p.price_money || null,
+              has_price: !!p.has_price,
+              qty: 1,
+            });
+            syncCartCount();
             btn.textContent = "Added ✓";
             setTimeout(() => (btn.textContent = "Add to cart"), 900);
-          });
+          } catch {
+            btn.textContent = "Error";
+            setTimeout(() => (btn.textContent = "Add to cart"), 900);
+          }
         });
-      };
+      });
+    };
 
-      const load = async () => {
-        try {
-          const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
-          const text = await res.text();
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
-          const data = JSON.parse(text);
+    async function load() {
+      try {
+        if (!endpoint) throw new Error("Missing endpoint");
+        const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+        const text = await res.text();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+        const data = JSON.parse(text);
 
-          if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
-          render(data.items || []);
-        } catch (e) {
-          console.error("[category] load failed:", e);
-          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
-            <div class="kicker">Error</div>
-            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
-            <p class="p">Check API base/app slug and your category mapping (Square category IDs).</p>
-          </div>`;
-        }
-      };
+        if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
+        render(data.items || []);
+      } catch (e) {
+        console.error("[category] load failed:", e);
+        grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
+          <div class="kicker">Error</div>
+          <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
+          <p class="p">Check API base/app slug and your category mapping (Square category IDs).</p>
+        </div>`;
+      }
+    }
 
-      if (q) q.addEventListener("input", () => render(ALL));
-      syncCartCount();
-      window.addEventListener("storage", syncCartCount);
-      load();
-    })();
+    if (q) q.addEventListener("input", () => render(ALL));
+
+    syncCartCount();
+    window.addEventListener("storage", syncCartCount);
+    window.addEventListener("dts:cart", syncCartCount);
+
+    // ✅ Set hero first (fast), then load products
+    syncHeroFromSquareCategory();
+    load();
   </script>
 
   <style>
@@ -461,7 +523,6 @@ const ROUTES = {
       background: rgba(0,0,0,.14);
     }
 
-    /* skeletons */
     .skel-card{ pointer-events:none; }
     .skel{
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));

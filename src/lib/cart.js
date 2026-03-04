@@ -1,77 +1,104 @@
-// src/lib/cart.js
-const KEY = "dts_cart_v1";
+// /src/lib/cart.js
+// Deeper Than Skin — Cart v1 (single source of truth)
+// Storage shape is ALWAYS: { v: 1, items: [...] }
+
+const CART_KEY = "dts_cart_v1";
+
+function normalize(raw) {
+  // Accept legacy shapes:
+  // - [] (array of items)
+  // - { items: [] }
+  // - null/undefined
+  if (Array.isArray(raw)) return { v: 1, items: raw };
+  if (raw && Array.isArray(raw.items)) return { v: 1, items: raw.items };
+  return { v: 1, items: [] };
+}
 
 function read() {
   try {
-    const raw = localStorage.getItem(KEY);
-    const data = raw ? JSON.parse(raw) : { items: [] };
-    if (!data || !Array.isArray(data.items)) return { items: [] };
-    return data;
+    const raw = JSON.parse(localStorage.getItem(CART_KEY) || "null");
+    return normalize(raw);
   } catch {
-    return { items: [] };
+    return { v: 1, items: [] };
   }
 }
 
-function write(data) {
-  localStorage.setItem(KEY, JSON.stringify(data));
-  window.dispatchEvent(new CustomEvent("dts:cart", { detail: data }));
+function write(state) {
+  const next = normalize(state);
+  localStorage.setItem(CART_KEY, JSON.stringify(next));
+  // Notify pages (category/product/cart) to refresh UI
+  window.dispatchEvent(new CustomEvent("dts:cart"));
 }
 
-function normItem(it) {
-  // minimum needed for checkout + UI
-  return {
-    id: String(it.id || ""),
-    variation_id: it.variation_id ? String(it.variation_id) : null,
-    name: String(it.name || "Item"),
-    image_url: it.image_url || null,
-    price_money: it.price_money || null,
-    qty: Math.max(1, Number(it.qty || 1)),
-  };
+function keyOf(id, variation_id) {
+  return `${String(id || "")}::${String(variation_id || "")}`;
 }
 
 export const Cart = {
+  key: CART_KEY,
+
   get() {
     return read();
   },
+
+  set(items) {
+    write({ v: 1, items: Array.isArray(items) ? items : [] });
+  },
+
+  clear() {
+    write({ v: 1, items: [] });
+  },
+
   count() {
     const { items } = read();
-    return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+    return items.reduce((sum, it) => sum + Math.max(0, Number(it?.qty || 0)), 0);
   },
-  add(item, qty = 1) {
-    const data = read();
-    const incoming = normItem({ ...item, qty });
-    if (!incoming.id) return;
 
-    const idx = data.items.findIndex(
-      (x) => x.id === incoming.id && String(x.variation_id || "") === String(incoming.variation_id || "")
-    );
+  add(item) {
+    const state = read();
+    const items = state.items;
 
-    if (idx >= 0) data.items[idx].qty += incoming.qty;
-    else data.items.push(incoming);
+    const id = String(item?.id || "").trim();
+    if (!id) throw new Error("Missing product id");
 
-    write(data);
+    const variation_id = String(item?.variation_id || "").trim(); // can be empty (we allow but warn elsewhere)
+    const k = keyOf(id, variation_id);
+
+    const found = items.find((x) => keyOf(x?.id, x?.variation_id) === k);
+    const qtyAdd = Math.max(1, Number(item?.qty || 1));
+
+    if (found) found.qty = Math.max(1, Number(found.qty || 1)) + qtyAdd;
+    else {
+      items.push({
+        id,
+        variation_id,
+        name: item?.name || "Item",
+        image_url: item?.image_url || "",
+        price_money: item?.price_money || null,
+        has_price: !!item?.has_price,
+        qty: qtyAdd,
+      });
+    }
+
+    write({ v: 1, items });
   },
-  setQty(id, variation_id, qty) {
-    const data = read();
-    const q = Math.max(0, Number(qty || 0));
-    data.items = data.items
-      .map((it) => {
-        if (it.id === id && String(it.variation_id || "") === String(variation_id || "")) {
-          return { ...it, qty: q };
-        }
-        return it;
-      })
-      .filter((it) => it.qty > 0);
-    write(data);
+
+  remove(id, variation_id = "") {
+    const state = read();
+    const k = keyOf(id, variation_id);
+    const items = state.items.filter((x) => keyOf(x?.id, x?.variation_id) !== k);
+    write({ v: 1, items });
   },
-  remove(id, variation_id) {
-    const data = read();
-    data.items = data.items.filter(
-      (it) => !(it.id === id && String(it.variation_id || "") === String(variation_id || ""))
-    );
-    write(data);
-  },
-  clear() {
-    write({ items: [] });
+
+  setQty(id, variation_id = "", qty = 1) {
+    const state = read();
+    const k = keyOf(id, variation_id);
+    const q = Math.min(20, Math.max(1, Number(qty || 1)));
+
+    const it = state.items.find((x) => keyOf(x?.id, x?.variation_id) === k);
+    if (!it) return;
+
+    it.qty = q;
+    write({ v: 1, items: state.items });
   },
 };

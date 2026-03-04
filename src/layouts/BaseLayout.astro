@@ -191,47 +191,68 @@ const canonical = (() => {
       </div>
     </footer>
 
-    <script is:inline>
-      (() => {
-        const burger = document.querySelector("[data-burger]");
-        const drawer = document.querySelector("[data-drawer]");
-        const closeBtn = document.querySelector("[data-drawer-close]");
-        const backdrop = document.querySelector("[data-drawer-backdrop]");
-        if (!burger || !drawer || !backdrop) return;
+    <script is:inline data-astro-rerun>
+  (() => {
+    const init = () => {
+      // Scope everything to the current header so we don't bind to stale nodes
+      const nav = document.querySelector("[data-nav]");
+      if (!nav) return;
 
-        const open = () => {
-          drawer.classList.add("is-open");
-          backdrop.classList.add("is-open");
-          drawer.setAttribute("aria-hidden", "false");
-          backdrop.setAttribute("aria-hidden", "false");
-          burger.setAttribute("aria-expanded", "true");
-          document.documentElement.classList.add("no-scroll");
-        };
+      // Prevent double-binding (very common with reruns)
+      if (nav.dataset.drawerBound === "1") return;
+      nav.dataset.drawerBound = "1";
 
-        const close = () => {
-          drawer.classList.remove("is-open");
-          backdrop.classList.remove("is-open");
-          drawer.setAttribute("aria-hidden", "true");
-          backdrop.setAttribute("aria-hidden", "true");
-          burger.setAttribute("aria-expanded", "false");
-          document.documentElement.classList.remove("no-scroll");
-        };
+      const burger = nav.querySelector("[data-burger]");
+      const drawer = nav.querySelector("[data-drawer]");
+      const closeBtn = nav.querySelector("[data-drawer-close]");
+      const backdrop = nav.querySelector("[data-drawer-backdrop]");
 
-        burger.addEventListener("click", () => {
-          const isOpen = drawer.classList.contains("is-open");
-          isOpen ? close() : open();
-        });
+      if (!burger || !drawer || !backdrop) return;
 
-        closeBtn && closeBtn.addEventListener("click", close);
-        backdrop.addEventListener("click", close);
+      const open = () => {
+        drawer.classList.add("is-open");
+        backdrop.classList.add("is-open");
+        drawer.setAttribute("aria-hidden", "false");
+        backdrop.setAttribute("aria-hidden", "false");
+        burger.setAttribute("aria-expanded", "true");
+        document.documentElement.classList.add("no-scroll");
+      };
 
-        window.addEventListener("keydown", (e) => {
-          if (e.key === "Escape") close();
-        });
+      const close = () => {
+        drawer.classList.remove("is-open");
+        backdrop.classList.remove("is-open");
+        drawer.setAttribute("aria-hidden", "true");
+        backdrop.setAttribute("aria-hidden", "true");
+        burger.setAttribute("aria-expanded", "false");
+        document.documentElement.classList.remove("no-scroll");
+      };
 
-        drawer.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
-      })();
-    </script>
+      burger.addEventListener("click", (e) => {
+        e.preventDefault();
+        const isOpen = drawer.classList.contains("is-open");
+        isOpen ? close() : open();
+      });
+
+      if (closeBtn) closeBtn.addEventListener("click", close);
+      backdrop.addEventListener("click", close);
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") close();
+      });
+
+      drawer.querySelectorAll("a").forEach((a) =>
+        a.addEventListener("click", close)
+      );
+    };
+
+    // Run on initial load
+    init();
+
+    // Run after Astro swaps pages (client navigation)
+    document.addEventListener("astro:page-load", init);
+    document.addEventListener("astro:after-swap", init);
+  })();
+</script>
 
     <!-- Category DB sync (best-effort, non-blocking) -->
     <script is:inline>

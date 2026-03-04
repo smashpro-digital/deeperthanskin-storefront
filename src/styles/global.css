@@ -55,7 +55,20 @@
 @media (max-width: 860px){
   :root{ --nav-h: 68px; }
 }
+/* ---------- Link baseline (prevents “everything underlined”) ---------- */
+a{
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 3px; /* safe if you later re-enable underlines */
+}
+a:hover{ text-decoration: none; }
 
+/* If you ever want underlined text links on purpose */
+.text-link{
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.text-link:hover{ opacity: .9; }
 /* ---------- Base ---------- */
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
@@ -922,4 +935,255 @@ body[data-menu="open"] .nav-drawer{ display:block; }
 /* ---------- Reduced motion respect ---------- */
 @media (prefers-reduced-motion: reduce){
   *{ transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+/* =========================================================
+   PRODUCT CAROUSEL — MATCH "SHOP HIGHLIGHTS" LUX STYLING
+   Drop-in patch (place at END of global stylesheet)
+   ========================================================= */
+
+/* keep your carousel section rhythm */
+.carousel{
+  padding: 14px 0 22px;
+}
+
+/* header stays as-is, but align with lux section spacing */
+.carousel-head{
+  margin-bottom: 10px;
+}
+.carousel-title{
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: -.01em;
+}
+.carousel-sub{
+  color: var(--muted);
+}
+
+/* rail becomes a horizontal “grid strip” */
+.carousel-rail{
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(300px, 360px);
+  gap: clamp(12px, 2vw, 18px);
+
+  overflow-x: auto;
+  padding: 12px 2px 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+
+  /* optional: aligns first/last card nicely */
+  scroll-padding-left: 2px;
+  scroll-padding-right: 2px;
+}
+
+/* scrollbar polish (keeps your vibe) */
+.carousel-rail::-webkit-scrollbar { height: 8px; }
+.carousel-rail::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.18);
+  border-radius: 999px;
+}
+
+/* =========================================================
+   Make carousel cards LOOK like Shop Highlights cards
+   Map .pcard markup -> .product-card styling
+   ========================================================= */
+
+.pcard{
+  /* behave like a card, not a link list */
+  scroll-snap-align: start;
+  min-width: 0;
+
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+  border: 1px solid rgba(255,255,255,.12);
+  overflow: hidden;
+  position: relative;
+
+  display:flex;
+  flex-direction:column;
+  text-decoration:none;
+  color: inherit;
+
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.pcard:hover{
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: rgba(200,162,74,.30);
+}
+
+.pcard:focus-visible{
+  outline: 2px solid rgba(200,162,74,.55);
+  outline-offset: 3px;
+}
+
+/* Media area matches .product-media */
+.pcard-media{
+  aspect-ratio: 4 / 3;
+  background: rgba(0,0,0,.22);
+  position: relative;
+  overflow: hidden;
+}
+
+.pcard-media img{
+  width:100%;
+  height:100%;
+  object-fit: cover;
+  display:block;
+
+  transform: scale(1.01);
+  transition: transform .45s ease;
+}
+
+.pcard:hover .pcard-media img{
+  transform: scale(1.045);
+}
+
+/* remove the old vignette (your component adds ::after) by overriding */
+.pcard-media::after{
+  /* replace with Shop Highlights gradient */
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(200,162,74,.20) 0%, rgba(0,0,0,0) 55%),
+    linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,0) 55%);
+  pointer-events:none;
+}
+
+/* Body matches .product-body */
+.pcard-body{
+  padding: 16px 16px 16px;
+  display:flex;
+  flex-direction:column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Title matches .product-title */
+.pcard-title{
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.06;
+  margin: 0 0 8px;
+  letter-spacing: .01em;
+  color: rgba(255,255,255,.92);
+}
+
+/* price + title row: match Shop Highlights vibe */
+.pcard-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 10px;
+}
+
+/* price matches .product-price */
+.pcard-price{
+  color: rgba(255,255,255,.92);
+  font-weight: 700;
+  letter-spacing: .3px;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* description clamping like .product-desc */
+.pcard-desc{
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 14px;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+
+  overflow: hidden;
+}
+
+/* CTA aligns to bottom like Shop Highlights */
+.pcard-cta{
+  margin-top: auto;
+  display:flex;
+  justify-content:flex-end;
+}
+
+/* Map “View” pill -> “Shop” pill style (same as .btn-lux) */
+.pcard-pill{
+  border-radius: 999px;
+  padding: 10px 14px;
+  border: 1px solid rgba(200,162,74,.35);
+  background: rgba(200,162,74,.12);
+  color: rgba(255,255,255,.92);
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-transform: none; /* remove old uppercase look */
+}
+
+.pcard:hover .pcard-pill{
+  transform: translateY(-1px);
+  background: rgba(200,162,74,.18);
+  border-color: rgba(200,162,74,.55);
+  box-shadow: 0 14px 28px rgba(0,0,0,.18);
+}
+
+/* =========================================================
+   Skeletons + Empty state keep working
+   ========================================================= */
+
+.pcard--skeleton{
+  pointer-events:none;
+  border-color: rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+}
+
+.pcard--skeleton .pcard-media{
+  background: rgba(255,255,255,.04);
+}
+
+.pcard--skeleton .pcard-media::after{
+  display:none;
+}
+
+.pcard--skeleton .skel{
+  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 14px;
+}
+
+/* Empty card should look like a luxe callout */
+.pcard--empty{
+  grid-column: 1 / -1;
+  max-width: 560px;
+  border-radius: 22px;
+  padding: 14px;
+  border: 1px solid rgba(200,162,74,.22);
+  background: rgba(200,162,74,.10);
+}
+
+/* =========================================================
+   Responsive behavior for carousel strip
+   ========================================================= */
+
+@media (max-width: 780px){
+  .carousel-rail{
+    grid-auto-columns: minmax(78%, 420px);
+  }
+  .pcard-body{ padding: 14px; }
+  .pcard-title{ font-size: 20px; line-height: 1.1; }
+  .pcard-desc{
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+}
+
+/* If user has reduced motion, respect it (already in your sheet, but safe) */
+@media (prefers-reduced-motion: reduce){
+  .pcard, .pcard-media img, .pcard-pill{ transition: none !important; }
 }
