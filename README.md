@@ -10,7 +10,7 @@ The site is built as a **static, high‑performance frontend** and integrates wi
 ---
 
 ## 🌱 Live Site
-👉 https://smashpro-digital.github.io/deeperthanskin-storefront/
+👉 [https://shop.deeperthanskin.store/]
 
 ---
 
