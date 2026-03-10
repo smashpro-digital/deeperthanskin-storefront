@@ -1,0 +1,473 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const base = import.meta.env.BASE_URL || "/";
+
+/** Build internal URLs safe for GitHub Pages subpaths */
+const u = (path: string) => {
+  const b = base.endsWith("/") ? base.slice(0, -1) : base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
+};
+
+/* ================
+   CONFIG
+================ */
+const APP_SLUG = "deeper-than-skin";
+const API = "https://smashpro.app/api/v1/index.php";
+
+const apiUrl = (path: string, params: Record<string, any> = {}) => {
+  const url = new URL(API);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    url.searchParams.set(k, String(v));
+  });
+  return url.toString();
+};
+
+const ROUTES = {
+  home: u("/"),
+  shop: u("/shop"),
+  featured: u("/featured"),
+  skincare: u("/category/skincare"),
+  wellness: u("/category/wellness"),
+};
+
+const LINKS = {
+  community: "https://returntothegarden.co",
+};
+
+const EXT = { target: "_blank", rel: "noopener noreferrer" };
+
+/* ================
+   IMAGES
+================ */
+const HERO_IMAGE = `${base}images/hero-brand.png`;
+const IONIC_IMAGE = `${base}images/ionic-footbath.jpg`;
+const SERVICE_FALLBACK = `${base}images/product-fallback.jpg`;
+
+/* ================
+   DATA FETCH (SSR)
+================ */
+type ApiService = {
+  slug: string;
+  name: string;
+  subtitle?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  booking_url?: string | null;
+  is_featured?: boolean;
+  sort?: number;
+};
+
+type ServicesResponse = {
+  ok: boolean;
+  app_slug: string;
+  featured_service_slug?: string;
+  count?: number;
+  services?: ApiService[];
+  error?: string;
+};
+
+let servicesMode = "fallback";
+let servicesError = "";
+let services: ApiService[] = [];
+let featuredServiceSlug = "";
+
+try {
+  const res = await fetch(apiUrl("public/commerce/services"), {
+    headers: { Accept: "application/json" },
+  });
+
+  const json = (await res.json()) as ServicesResponse;
+
+  if (json?.ok && Array.isArray(json.services) && json.services.length) {
+    servicesMode = "api";
+    featuredServiceSlug = (json.featured_service_slug || "").trim();
+
+    services = json.services
+      .slice()
+      .sort((a, b) => {
+        const aFeatured = a.slug === featuredServiceSlug || a.is_featured;
+        const bFeatured = b.slug === featuredServiceSlug || b.is_featured;
+        if (aFeatured && !bFeatured) return -1;
+        if (!aFeatured && bFeatured) return 1;
+        return (a.sort ?? 999) - (b.sort ?? 999);
+      });
+  } else {
+    servicesError = json?.error || "Services unavailable";
+  }
+} catch (e: any) {
+  servicesError = e?.message || "Services unavailable";
+}
+
+/* ================
+   FALLBACKS
+================ */
+if (!services.length) {
+  services = [
+    {
+      slug: "ionic-footbath-therapy",
+      name: "Ionic Footbath Therapy",
+      subtitle: "Relax, Detox & Rebalance",
+      description:
+        "A restorative in-studio detox experience designed to support relaxation, reset, and energetic renewal.",
+      image_url: IONIC_IMAGE,
+      booking_url: "https://deeper-than-skin-llc.square.site/appointments",
+      is_featured: true,
+      sort: 1,
+    },
+  ];
+  if (!featuredServiceSlug) featuredServiceSlug = "ionic-footbath-therapy";
+}
+
+/* ================
+   HELPERS
+================ */
+function normalizeText(s?: string | null) {
+  return (s || "").trim().toLowerCase();
+}
+
+function serviceImage(service: ApiService) {
+  return service.image_url || IONIC_IMAGE || SERVICE_FALLBACK;
+}
+
+function serviceSubtitle(service: ApiService) {
+  return service.subtitle?.trim() || "Restorative wellness, guided with intention.";
+}
+
+function serviceDescription(service: ApiService) {
+  return (
+    service.description?.trim() ||
+    "A luxury wellness service designed to support restoration, calm, and a deeper return to balance."
+  );
+}
+
+const featuredService =
+  services.find((s) => s.slug === featuredServiceSlug) ||
+  services.find((s) => s.is_featured) ||
+  services[0] ||
+  null;
+
+const additionalServices = featuredService
+  ? services.filter((s) => s.slug !== featuredService.slug)
+  : services;
+---
+
+<BaseLayout title="Deeper Than Skin — Services">
+  <main>
+    {/* HERO */}
+    <section class="services-hero" style={`background-image:url('${HERO_IMAGE}');`}>
+      <div class="services-hero__overlay"></div>
+
+      <div class="container services-hero__inner" data-aos="fade-up">
+        <div class="kicker">Experience</div>
+        <h1 class="services-title">In-Studio Wellness Services</h1>
+        <p class="services-lead">
+          Book restorative experiences designed to help you relax, reset, and return to balance.
+        </p>
+
+        <div class="btns hero-ctas">
+          <a class="btn btn-primary" href={featuredService?.booking_url || "#services-list"} {...(featuredService?.booking_url ? EXT : {})}>
+            Book Now
+          </a>
+          <a class="btn btn-ghost" href={ROUTES.shop}>Shop Products</a>
+        </div>
+      </div>
+    </section>
+
+    {/* FEATURED SERVICE */}
+    {featuredService && (
+      <section class="section" id="services-list">
+        <div class="container">
+          <div class="service-spotlight" data-aos="fade-up">
+            <div class="service-spotlight__copy">
+              <div class="kicker">Featured service</div>
+              <h2 class="h2">{featuredService.name}</h2>
+              <p class="p service-sub">{serviceSubtitle(featuredService)}</p>
+              <p class="p">{serviceDescription(featuredService)}</p>
+
+              <div class="btns">
+                <a class="btn btn-primary" href={featuredService.booking_url || "#"} {...(featuredService.booking_url ? EXT : {})}>
+                  Book Your Session
+                </a>
+                <a class="btn btn-ghost" href={LINKS.community} {...EXT}>
+                  See Member Perks
+                </a>
+              </div>
+            </div>
+
+            <div class="service-spotlight__media">
+              <img src={serviceImage(featuredService)} alt={featuredService.name} loading="lazy" />
+            </div>
+          </div>
+        </div>
+      </section>
+    )}
+
+    {/* SERVICE GRID */}
+    <section class="section section--tight-top">
+      <div class="container" data-aos="fade-up">
+        <div class="kicker">Offerings</div>
+        <h2 class="h2">Choose Your Wellness Experience</h2>
+        <p class="p">
+          Square-managed services rendered in-house. Mode: <span class="featured-mode">{servicesMode}</span>.
+        </p>
+      </div>
+
+      <div class="container">
+        {servicesError ? (
+          <div class="callout callout--featured">
+            <div class="small callout__text">
+              Services are temporarily unavailable: <strong>{servicesError}</strong>
+            </div>
+            <div class="btns callout__btns">
+              <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
+              <a class="btn btn-ghost" href={LINKS.community} {...EXT}>Visit Community</a>
+            </div>
+          </div>
+        ) : (
+          <div class="services-grid" data-aos="fade-up">
+            {services.map((service, idx) => {
+              const isFeatured =
+                service.slug === featuredServiceSlug ||
+                service.is_featured ||
+                idx === 0;
+
+              return (
+                <article class={`service-card ${isFeatured ? "service-card--featured" : ""}`}>
+                  <div class="service-card__media">
+                    <img src={serviceImage(service)} alt={service.name} loading="lazy" />
+                  </div>
+
+                  <div class="service-card__body">
+                    {isFeatured && <div class="product-badge">Signature Experience</div>}
+                    <h3>{service.name}</h3>
+                    <p class="service-card__sub">{serviceSubtitle(service)}</p>
+                    <p class="service-card__desc">{serviceDescription(service)}</p>
+
+                    <div class="service-card__cta">
+                      <a
+                        class="btn btn-primary"
+                        href={service.booking_url || "#"}
+                        {...(service.booking_url ? EXT : {})}
+                      >
+                        Book Now
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+
+    {/* PHILOSOPHY */}
+    <section class="section">
+      <div class="container" data-aos="fade-up">
+        <div class="callout">
+          <div class="kicker">Philosophy</div>
+          <h2 class="h2">Wellness That Begins Within</h2>
+          <p class="p">
+            Our services are designed to complement your at-home rituals with in-studio care rooted in restoration,
+            intentional living, and a deeper return to self.
+          </p>
+
+          <div class="btns">
+            <a class="btn btn-primary" href={ROUTES.shop}>Shop Rituals</a>
+            <a class="btn btn-ghost" href={LINKS.community} {...EXT}>Visit ReturnToTheGarden.co</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  .services-hero {
+    position: relative;
+    min-height: 42vh;
+    display: flex;
+    align-items: center;
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+  }
+
+  .services-hero__overlay {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(8, 14, 12, 0.56) 0%, rgba(7, 14, 12, 0.72) 100%);
+  }
+
+  .services-hero__inner {
+    position: relative;
+    z-index: 1;
+    padding-top: clamp(72px, 10vw, 120px);
+    padding-bottom: clamp(72px, 10vw, 120px);
+    text-align: center;
+  }
+
+  .services-title {
+    margin: 0;
+    font-size: clamp(2.3rem, 5vw, 4.8rem);
+    line-height: 0.96;
+    letter-spacing: -0.03em;
+  }
+
+  .services-lead {
+    max-width: 760px;
+    margin: 18px auto 0;
+    font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+    line-height: 1.7;
+    color: rgba(245, 239, 227, 0.88);
+  }
+
+  .service-spotlight {
+    display: grid;
+    grid-template-columns: 1.02fr 0.98fr;
+    gap: 30px;
+    align-items: center;
+    padding: clamp(24px, 4vw, 36px);
+    border-radius: 34px;
+    border: 1px solid rgba(196, 158, 74, 0.16);
+    background:
+      radial-gradient(circle at top left, rgba(196, 158, 74, 0.10), transparent 34%),
+      linear-gradient(135deg, rgba(24, 42, 32, 0.98) 0%, rgba(13, 30, 24, 0.98) 100%);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.18);
+  }
+
+  .service-spotlight__media {
+    overflow: hidden;
+    border-radius: 26px;
+  }
+
+  .service-spotlight__media img {
+    width: 100%;
+    height: 100%;
+    min-height: 360px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .service-sub {
+    font-size: 1.14rem;
+    color: rgba(242, 232, 207, 0.92);
+  }
+
+  .services-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    margin-top: 26px;
+  }
+
+  .service-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 30px;
+    border: 1px solid rgba(196, 158, 74, 0.14);
+    background:
+      linear-gradient(180deg, rgba(18, 32, 26, 0.96) 0%, rgba(11, 24, 20, 0.98) 100%);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .service-card--featured {
+    box-shadow: 0 18px 40px rgba(196, 158, 74, 0.10);
+  }
+
+  .service-card__media {
+    aspect-ratio: 1.15 / 1;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .service-card__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .service-card__body {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .service-card__body h3 {
+    margin: 0;
+    font-size: clamp(1.35rem, 1.7vw, 1.95rem);
+    line-height: 1.05;
+  }
+
+  .service-card__sub {
+    margin: 10px 0 0;
+    font-size: 1rem;
+    line-height: 1.55;
+    color: rgba(242, 232, 207, 0.86);
+  }
+
+  .service-card__desc {
+    margin: 12px 0 0;
+    color: rgba(238, 234, 224, 0.78);
+    line-height: 1.7;
+    min-height: 4.8em;
+  }
+
+  .service-card__cta {
+    margin-top: 18px;
+  }
+
+  .product-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-bottom: 10px;
+    padding: 0.36rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(212, 178, 89, 0.10);
+    border: 1px solid rgba(212, 178, 89, 0.26);
+    color: #e3c06b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 1080px) {
+    .services-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .service-spotlight {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .services-grid {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .service-card,
+    .service-spotlight {
+      border-radius: 24px;
+    }
+
+    .service-card__body {
+      padding: 18px;
+    }
+
+    .service-spotlight__media img {
+      min-height: 260px;
+    }
+  }
+</style>
