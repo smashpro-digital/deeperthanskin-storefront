@@ -39,7 +39,6 @@ const ROUTES = {
 };
 
 const LINKS = {
-  // still used as a fallback if services API fails
   book: "https://deeper-than-skin-llc.square.site/appointments",
   community: "https://returntothegarden.co",
 };
@@ -55,7 +54,6 @@ const CAT_JUICES = `${base}images/cat-juices.jpg`;
 const CAT_SEAMOSS = `${base}images/cat-seamoss.jpg`;
 const CAT_KITS = `${base}images/cat-kits.jpg`;
 const CAT_HERBS = `${base}images/cat-herbs.jpg`;
-
 const PRODUCT_FALLBACK = `${base}images/product-fallback.jpg`;
 
 /* ================
@@ -105,14 +103,16 @@ try {
 
 /* ================
    CATEGORY FETCH (SSR)
-   Uses YOUR PHP response shape:
-   { ok, app_slug, categories: [{name,slug,square_category_id,parent_square_category_id}] }
 ================ */
 type DbCategory = {
+  id: string;
   name: string;
   slug: string;
-  square_category_id: string;
-  parent_square_category_id: string | null;
+  parent_id: string | null;
+  is_top_level: boolean;
+  description?: string | null;
+  image_ids?: string[];
+  image_url?: string | null;
 };
 
 type CategoriesResponse = {
@@ -123,37 +123,94 @@ type CategoriesResponse = {
   error?: string;
 };
 
-// Safety net (design-first)
-const FALLBACK_CATEGORIES = [
-  { title: "Cold-Pressed\nJuices", subtitle: "Event drops & limited releases", href: u("/category/juices"), img: CAT_JUICES },
-  { title: "Sea Moss Gel", subtitle: "Ocean-rooted daily support", href: u("/category/sea-moss"), img: CAT_SEAMOSS },
-  { title: "Detox Cleanse\nKits", subtitle: "Reset • restore • renew", href: u("/category/kits"), img: CAT_KITS },
-  { title: "Herbal Teas &\nOils", subtitle: "Calm, clarity, balance", href: u("/category/herbs"), img: CAT_HERBS },
-];
-
-// Keep the strip “curated” + stable
-const STRIP_ORDER = ["juices", "sea-moss", "kits", "herbs"];
-
-// Optional: luxe subtitles by slug (so it reads like your mock)
-const SUBTITLE_BY_SLUG: Record<string, string> = {
-  juices: "Event drops & limited releases",
-  "sea-moss": "Ocean-rooted daily support",
-  kits: "Reset • restore • renew",
-  herbs: "Calm, clarity, balance",
+type RitualCard = {
+  title: string;
+  subtitle: string;
+  href: string;
+  img: string;
+  slug: string;
 };
-
-type StripCategoryCard = { title: string; subtitle: string; href: string; img: string; slug: string };
 
 function imageFallbackForCategory(slugOrName: string): string {
   const s = (slugOrName || "").toLowerCase();
-  if (s.includes("juice")) return CAT_JUICES;
+  if (s.includes("juice") || s.includes("beverage")) return CAT_JUICES;
   if (s.includes("moss")) return CAT_SEAMOSS;
-  if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return CAT_KITS;
-  if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return CAT_HERBS;
+  if (s.includes("kit") || s.includes("cleanse") || s.includes("detox") || s.includes("bundle")) return CAT_KITS;
+  if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("gumm")) return CAT_HERBS;
   return PRODUCT_FALLBACK;
 }
 
-let shopCategories: StripCategoryCard[] = [];
+const RITUAL_BLUEPRINT = [
+  {
+    key: "sea-moss-gel",
+    title: "Ocean Mineral Renewal",
+    subtitle: "Deep nourishment from mineral-rich sea botanicals",
+    match: ["sea-moss-gel", "seamoss", "sea moss gel"],
+  },
+  {
+    key: "detox-cleanse-kits",
+    title: "Detox & Reset",
+    subtitle: "Cleanse the body and restore energetic balance",
+    match: ["detox-cleanse-kits", "detox cleanse kits", "kits"],
+  },
+  {
+    key: "body-butters",
+    title: "Botanical Body Rituals",
+    subtitle: "Plant oils and whipped botanical butters for radiant skin",
+    match: ["body-butters", "bath-body-oils", "bath-body-oils", "bath body oils"],
+  },
+  {
+    key: "herbal-teas",
+    title: "Sacred Tea Rituals",
+    subtitle: "Ancient herbal infusions for calm and balance",
+    match: ["herbal-teas", "herbal teas"],
+  },
+  {
+    key: "functional-gummies",
+    title: "Functional Wellness",
+    subtitle: "Targeted support for vitality and daily balance",
+    match: ["functional-gummies", "capsules"],
+  },
+  {
+    key: "beverages",
+    title: "Daily Hydration Elixirs",
+    subtitle: "Cold-pressed botanical beverages crafted for renewal",
+    match: ["beverages", "juices"],
+  },
+];
+
+const FALLBACK_RITUALS: RitualCard[] = [
+  {
+    title: "Ocean Mineral Renewal",
+    subtitle: "Deep nourishment from mineral-rich sea botanicals",
+    href: u("/category/sea-moss-gel"),
+    img: CAT_SEAMOSS,
+    slug: "sea-moss-gel",
+  },
+  {
+    title: "Detox & Reset",
+    subtitle: "Cleanse the body and restore energetic balance",
+    href: u("/category/detox-cleanse-kits"),
+    img: CAT_KITS,
+    slug: "detox-cleanse-kits",
+  },
+  {
+    title: "Botanical Body Rituals",
+    subtitle: "Plant oils and whipped botanical butters for radiant skin",
+    href: u("/category/body-butters"),
+    img: PRODUCT_FALLBACK,
+    slug: "body-butters",
+  },
+  {
+    title: "Sacred Tea Rituals",
+    subtitle: "Ancient herbal infusions for calm and balance",
+    href: u("/category/herbal-teas"),
+    img: CAT_HERBS,
+    slug: "herbal-teas",
+  },
+];
+
+let ritualCards: RitualCard[] = [];
 let categoriesMode = "fallback";
 let categoriesError = "";
 
@@ -167,39 +224,32 @@ try {
   if (json?.ok && Array.isArray(json.categories) && json.categories.length) {
     categoriesMode = "api";
 
-    // Prefer top-level categories for the strip (parent is null)
-    const top = json.categories.filter((c) => !c.parent_square_category_id);
+    const categories = json.categories;
 
-    const mapped: StripCategoryCard[] = top.map((c) => {
-      const slug = (c.slug || "").trim();
-      const href = u(`/category/${encodeURIComponent(slug)}`);
+    const findCategory = (terms: string[]) => {
+      const normalizedTerms = terms.map((t) => t.toLowerCase().trim());
 
-      // Title line breaks for “lux rhythm”
-      const title = (c.name || "Category")
-        .replace(/\s+\/\s+/g, "\n")
-        .replace(/\s+-\s+/g, "\n");
+      return (
+        categories.find((c) => normalizedTerms.includes((c.slug || "").toLowerCase())) ||
+        categories.find((c) => normalizedTerms.includes((c.name || "").toLowerCase())) ||
+        categories.find((c) => normalizedTerms.some((t) => (c.slug || "").toLowerCase().includes(t))) ||
+        categories.find((c) => normalizedTerms.some((t) => (c.name || "").toLowerCase().includes(t))) ||
+        null
+      );
+    };
 
-      const subtitle = SUBTITLE_BY_SLUG[slug] || "Curated essentials for your routine";
-      const img = imageFallbackForCategory(slug || c.name);
+    ritualCards = RITUAL_BLUEPRINT.map((r) => {
+      const found = findCategory(r.match);
+      const slug = found?.slug || r.key;
 
-      return { title, subtitle, href, img, slug };
-    });
-
-    // Order: match your desired strip order, then fill
-    const ordered: StripCategoryCard[] = [];
-
-    for (const s of STRIP_ORDER) {
-      const match = mapped.find((x) => x.slug === s);
-      if (match) ordered.push(match);
-    }
-
-    for (const x of mapped) {
-      if (ordered.length >= 4) break;
-      if (ordered.some((o) => o.slug === x.slug)) continue;
-      ordered.push(x);
-    }
-
-    shopCategories = ordered.slice(0, 4);
+      return {
+        title: r.title,
+        subtitle: r.subtitle,
+        href: u(`/category/${encodeURIComponent(slug)}`),
+        img: found?.image_url || imageFallbackForCategory(found?.slug || found?.name || r.key),
+        slug,
+      };
+    }).slice(0, 6);
   } else {
     categoriesError = json?.error || "Categories unavailable";
   }
@@ -207,22 +257,13 @@ try {
   categoriesError = e?.message || "Categories unavailable";
 }
 
-if (!shopCategories.length) {
+if (!ritualCards.length) {
   categoriesMode = "fallback";
-  shopCategories = FALLBACK_CATEGORIES.map((c) => ({
-    title: c.title,
-    subtitle: c.subtitle,
-    href: c.href,
-    img: c.img,
-    slug: c.href.split("/").pop() || "",
-  }));
+  ritualCards = FALLBACK_RITUALS;
 }
 
 /* ================
    SERVICES FETCH (SSR)
-   Uses YOUR services endpoint:
-   GET /public/commerce/services?app_slug=...
-   { ok, featured_service_slug, services:[{slug,name,subtitle,image_url,booking_url,is_featured,sort}] }
 ================ */
 type ApiService = {
   slug: string;
@@ -280,10 +321,10 @@ const serviceBookingUrl = featuredService?.booking_url || LINKS.book;
 ================ */
 function imageFallbackForProduct(name: string): string {
   const s = (name || "").toLowerCase();
-  if (s.includes("juice")) return CAT_JUICES;
+  if (s.includes("juice") || s.includes("beverage")) return CAT_JUICES;
   if (s.includes("moss")) return CAT_SEAMOSS;
   if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return CAT_KITS;
-  if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return CAT_HERBS;
+  if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("gumm")) return CAT_HERBS;
   return PRODUCT_FALLBACK;
 }
 
@@ -296,6 +337,31 @@ function formatMoney(pm?: Money | null) {
     return `$${dollars.toFixed(2)}`;
   }
 }
+
+function normalizeText(s?: string | null) {
+  return (s || "").trim().toLowerCase();
+}
+
+/* ================
+   SIGNATURE RITUAL + FEATURED DROPS
+================ */
+const SIGNATURE_MATCHES = [
+  "sea moss",
+  "detox",
+  "tea",
+  "body butter",
+  "oil",
+  "balm",
+  "gummies",
+  "capsules",
+];
+
+const signatureRitual = featured
+  .filter((p) => SIGNATURE_MATCHES.some((term) => normalizeText(p.name).includes(term)))
+  .slice(0, 4);
+
+const signatureCards = signatureRitual.length ? signatureRitual : featured.slice(0, 4);
+const featuredDrops = featured.slice(signatureCards.length, signatureCards.length + 8);
 ---
 
 <BaseLayout title="Deeper Than Skin — Storefront">
@@ -324,59 +390,48 @@ function formatMoney(pm?: Money | null) {
       <div class="hero-bottom-fade" aria-hidden="true"></div>
     </section>
 
-    {/* STRIP */}
-    <section class="strip-section" data-aos="fade-up" data-aos-delay="120">
-      <div class="container strip">
-        <div class="strip-grid">
-          <div class="strip-left">
-            <div class="cat-grid">
-              {shopCategories.map((c) => (
-                <a class="cat-card" href={c.href} aria-label={c.title.replace("\n", " ")}>
-                  <div class="cat-media">
-                    <img src={c.img} alt={c.title.replace("\n", " ")} loading="lazy" />
-                  </div>
-                  <div class="cat-body">
-                    <h3 set:html={c.title.replace("\n", "<br />")} />
-                    <p>{c.subtitle}</p>
-                  </div>
-                </a>
-              ))}
-            </div>
+    {/* BOTANICAL RITUALS */}
+    <section class="section section--light rituals-section" id="rituals">
+      <div class="container" data-aos="fade-up">
+        <div class="kicker kicker--dark">Discover</div>
+        <h2 class="h2 h2--dark">Botanical Rituals</h2>
+        <p class="p p--dark">
+          Curated wellness journeys for body, balance, and renewal.
+        </p>
+      </div>
 
-            <div class="shop-now-wrap">
-              <a class="shop-now" href={ROUTES.shop}>SHOP NOW</a>
-            </div>
+      <div class="container">
+        <div class="ritual-grid" data-aos="fade-up" data-aos-delay="80">
+          {ritualCards.map((c) => (
+            <a class="ritual-card" href={c.href} aria-label={`Explore ${c.title}`}>
+              <div class="ritual-media">
+                <img src={c.img} alt={c.title} loading="lazy" />
+              </div>
 
-            {/* Optional: dev-only sanity check */}
-            {/* <div class="small" style="margin-top:10px; opacity:.7;">strip: {categoriesMode}{categoriesError ? ` (${categoriesError})` : ""} • svc: {servicesMode}{servicesError ? ` (${servicesError})` : ""}</div> */}
-          </div>
-
-          {/* FEATURE SERVICE CARD (dynamic from /public/commerce/services) */}
-          <div class="feature-card feature-card--tight">
-            <h3 class="title">{serviceTitle}</h3>
-
-            <div class="media" aria-label={serviceTitle} role="img">
-              <img src={serviceImg} alt={serviceTitle} loading="lazy" />
-            </div>
-
-            <p class="desc">{serviceSubtitle}</p>
-
-            <div class="cta">
-              <a class="primary" href={serviceBookingUrl} {...EXT}>Book Your Session</a>
-            </div>
-          </div>
+              <div class="ritual-body">
+                <h3>{c.title}</h3>
+                <p>{c.subtitle}</p>
+                <span class="ritual-cta">Shop Now</span>
+              </div>
+            </a>
+          ))}
         </div>
+
+        <div class="btns" style="justify-content:center; margin-top: 22px;">
+          <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
+        </div>
+
+        {/* <div class="small" style="margin-top:10px; opacity:.7; text-align:center;">rituals: {categoriesMode}{categoriesError ? ` (${categoriesError})` : ""}</div> */}
       </div>
     </section>
 
-    {/* FEATURED GRID */}
-    <section class="section" id="featured">
+    {/* SIGNATURE RITUAL */}
+    <section class="section" id="signature-ritual">
       <div class="container featured-head" data-aos="fade-up">
-        <div class="kicker">Featured</div>
-        <h2 class="h2">Shop Highlights</h2>
+        <div class="kicker">Signature</div>
+        <h2 class="h2">The Signature Ritual</h2>
         <p class="p">
-          Curated pulls from Square, rendered in-house. Mode:{" "}
-          <span class="featured-mode">{featuredMode}</span>.
+          Our most loved essentials for daily wellness and restoration.
         </p>
       </div>
 
@@ -384,7 +439,7 @@ function formatMoney(pm?: Money | null) {
         {featuredError ? (
           <div class="callout callout--featured">
             <div class="small callout__text">
-              Featured is temporarily unavailable: <strong>{featuredError}</strong>
+              Signature products are temporarily unavailable: <strong>{featuredError}</strong>
             </div>
             <div class="btns callout__btns">
               <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
@@ -393,9 +448,16 @@ function formatMoney(pm?: Money | null) {
           </div>
         ) : (
           <div class="product-grid product-grid--featured" data-aos="fade-up">
-            {featured.map((p) => {
+            {signatureCards.map((p, idx) => {
               const img = p.image_url || imageFallbackForProduct(p.name);
               const price = formatMoney(p.price_money || null);
+
+              const badge =
+                idx === 0 ? "Community Favorite" :
+                normalizeText(p.name).includes("detox") ? "Detox Essential" :
+                normalizeText(p.name).includes("moss") ? "Mineral Ritual" :
+                normalizeText(p.name).includes("butter") ? "Skin Ritual" :
+                "Signature Pick";
 
               return (
                 <a class="product-card product-card--lux" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
@@ -404,6 +466,7 @@ function formatMoney(pm?: Money | null) {
                   </div>
 
                   <div class="product-body">
+                    <div class="product-badge">{badge}</div>
                     <h3 class="product-title">{p.name}</h3>
                     <p class="product-desc">
                       {p.description && p.description.trim() !== ""
@@ -424,55 +487,304 @@ function formatMoney(pm?: Money | null) {
           </div>
         )}
       </div>
+    </section>
 
-      {/* Carousel */}
-      <div class="section section--tight-top" style="padding-bottom: 0">
-        <div class="container" data-aos="fade-up">
-          <div class="kicker">Browse</div>
-          <h2 class="h2">More to Explore</h2>
-          <p class="p">Smooth scrolling, mobile-first cards. Checkout later. Browsing stays here.</p>
-        </div>
-        <ProductCarousel />
+    {/* FEATURED DROPS */}
+    <section class="section section--tight-top" id="featured">
+      <div class="container featured-head" data-aos="fade-up">
+        <div class="kicker">Featured</div>
+        <h2 class="h2">Featured Drops</h2>
+        <p class="p">
+          Event drops, curated launches, and community favorites. Mode:{" "}
+          <span class="featured-mode">{featuredMode}</span>.
+        </p>
       </div>
 
-      <div class="container" style="padding-top:18px">
-        <div class="btns" style="justify-content:center">
-          <a class="btn btn-primary" href={ROUTES.skincare}>Shop Skincare</a>
-          <a class="btn btn-ghost" href={ROUTES.wellness}>Shop Wellness</a>
-        </div>
+      <div class="container featured-wrap">
+        {featuredError ? (
+          <div class="callout callout--featured">
+            <div class="small callout__text">
+              Featured drops are temporarily unavailable: <strong>{featuredError}</strong>
+            </div>
+            <div class="btns callout__btns">
+              <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
+              <a class="btn btn-ghost" href={serviceBookingUrl} {...EXT}>Book Service</a>
+            </div>
+          </div>
+        ) : (
+          <div class="product-grid product-grid--featured" data-aos="fade-up">
+            {(featuredDrops.length ? featuredDrops : featured.slice(0, 4)).map((p) => {
+              const img = p.image_url || imageFallbackForProduct(p.name);
+              const price = formatMoney(p.price_money || null);
+
+              return (
+                <a class="product-card product-card--lux" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
+                  <div class="product-media">
+                    <img src={img} alt={p.name} loading="lazy" />
+                  </div>
+
+                  <div class="product-body">
+                    <h3 class="product-title">{p.name}</h3>
+                    <p class="product-desc">
+                      {p.description && p.description.trim() !== ""
+                        ? p.description
+                        : "Curated for discovery, gifting, and elevated daily ritual."}
+                    </p>
+
+                    <div class="product-row">
+                      <div class="product-price">
+                        {p.has_price && price ? price : <span class="product-price--muted">View details</span>}
+                      </div>
+                      <span class="btn-lux" aria-hidden="true">Shop</span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
+
+    {/* MORE TO EXPLORE / CAROUSEL */}
+    <section class="section section--tight-top" style="padding-bottom: 0">
+      <div class="container" data-aos="fade-up">
+        <div class="kicker">Browse</div>
+        <h2 class="h2">More to Explore</h2>
+        <p class="p">Smooth scrolling, mobile-first cards. Checkout later. Browsing stays here.</p>
+      </div>
+      <ProductCarousel />
+    </section>
+
+    <div class="container" style="padding-top:18px">
+      <div class="btns" style="justify-content:center">
+        <a class="btn btn-primary" href={ROUTES.skincare}>Shop Skincare</a>
+        <a class="btn btn-ghost" href={ROUTES.wellness}>Shop Wellness</a>
+      </div>
+    </div>
 
     {/* SERVICES */}
     <section class="section" id="services">
-      <div class="container" data-aos="fade-up">
-        <div class="callout">
-          <div class="kicker">Service</div>
-          <h2 class="h2">{serviceTitle.replace(" Therapy", "")}</h2>
-          <p class="p">{serviceSubtitle} Public booking now, community perks later.</p>
+      <div class="container">
+        <div class="service-feature" data-aos="fade-up">
+          <div class="service-copy">
+            <div class="kicker">Experience</div>
+            <h2 class="h2">In-Studio Detox Experience</h2>
+            <p class="p">
+              {serviceSubtitle} Book your session and step into a restorative wellness moment that goes deeper than products alone.
+            </p>
 
-          <div class="btns">
-            <a class="btn btn-primary" href={serviceBookingUrl} {...EXT}>Book Now</a>
-            <a class="btn btn-ghost" href={LINKS.community} {...EXT}>See Member Perks</a>
+            <div class="btns">
+              <a class="btn btn-primary" href={serviceBookingUrl} {...EXT}>Book Now</a>
+              <a class="btn btn-ghost" href={LINKS.community} {...EXT}>See Member Perks</a>
+            </div>
+          </div>
+
+          <div class="service-media">
+            <img src={serviceImg} alt={serviceTitle} loading="lazy" />
           </div>
         </div>
+
+        {/* <div class="small" style="margin-top:10px; opacity:.7;">svc: {servicesMode}{servicesError ? ` (${servicesError})` : ""}</div> */}
       </div>
     </section>
 
-    {/* COMMUNITY */}
+    {/* PHILOSOPHY / COMMUNITY */}
     <section class="section">
       <div class="container" data-aos="fade-up">
-        <div class="kicker">Next layer</div>
-        <h2 class="h2">Return to the Garden</h2>
-        <p class="p">
-          Your community home for the Seed Bearer pledge, education, and governance pages (terms &amp; privacy),
-          with the mobile app coming later.
-        </p>
+        <div class="callout">
+          <div class="kicker">Philosophy</div>
+          <h2 class="h2">The Deeper Than Skin Philosophy</h2>
+          <p class="p">
+            True wellness begins beneath the surface. Explore the community home for the Seed Bearer pledge,
+            education, governance pages, and the next layer of your journey.
+          </p>
 
-        <div class="btns">
-          <a class="btn btn-primary" href={LINKS.community} {...EXT}>Visit ReturnToTheGarden.co</a>
+          <div class="btns">
+            <a class="btn btn-primary" href={LINKS.community} {...EXT}>Visit ReturnToTheGarden.co</a>
+          </div>
         </div>
       </div>
     </section>
   </main>
 </BaseLayout>
+
+<style>
+  .section--light {
+    background:
+      radial-gradient(circle at top right, rgba(202, 170, 84, 0.07), transparent 28%),
+      linear-gradient(180deg, #f6f0e6 0%, #efe5d8 100%);
+  }
+
+  .kicker--dark {
+    color: #6e5530;
+  }
+
+  .h2--dark,
+  .p--dark {
+    color: #1f1e1b;
+  }
+
+  .rituals-section {
+    padding-top: clamp(54px, 7vw, 84px);
+    padding-bottom: clamp(54px, 7vw, 84px);
+  }
+
+  .ritual-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 22px;
+    margin-top: 26px;
+  }
+
+  .ritual-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    overflow: hidden;
+    border-radius: 28px;
+    background: rgba(255, 252, 247, 0.9);
+    border: 1px solid rgba(80, 61, 24, 0.12);
+    box-shadow: 0 18px 40px rgba(31, 24, 12, 0.08);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+  }
+
+  .ritual-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 50px rgba(31, 24, 12, 0.12);
+  }
+
+  .ritual-media {
+    aspect-ratio: 1 / 1;
+    background: #ede1d1;
+    overflow: hidden;
+  }
+
+  .ritual-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .ritual-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 20px 22px;
+  }
+
+  .ritual-body h3 {
+    margin: 0;
+    font-size: clamp(1.35rem, 1.7vw, 1.9rem);
+    line-height: 1.02;
+    color: #1f1e1b;
+  }
+
+  .ritual-body p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.55;
+    color: rgba(31, 30, 27, 0.78);
+    min-height: 3.2em;
+  }
+
+  .ritual-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 0.9rem 1.15rem;
+    width: 100%;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #564621 0%, #153a2d 100%);
+    color: #fff6e6;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .product-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-bottom: 10px;
+    padding: 0.36rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(212, 178, 89, 0.1);
+    border: 1px solid rgba(212, 178, 89, 0.26);
+    color: #e3c06b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .service-feature {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 30px;
+    align-items: center;
+    padding: clamp(26px, 4vw, 36px);
+    border-radius: 34px;
+    border: 1px solid rgba(196, 158, 74, 0.18);
+    background:
+      radial-gradient(circle at top left, rgba(196, 158, 74, 0.11), transparent 34%),
+      linear-gradient(135deg, rgba(24, 42, 32, 0.98) 0%, rgba(13, 30, 24, 0.98) 100%);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.18);
+  }
+
+  .service-copy {
+    min-width: 0;
+  }
+
+  .service-media {
+    border-radius: 26px;
+    overflow: hidden;
+    background: #0c201a;
+    min-height: 100%;
+  }
+
+  .service-media img {
+    width: 100%;
+    height: 100%;
+    min-height: 340px;
+    object-fit: cover;
+    display: block;
+  }
+
+  @media (max-width: 1120px) {
+    .ritual-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .service-feature {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .ritual-grid {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .ritual-card {
+      border-radius: 22px;
+    }
+
+    .ritual-body {
+      padding: 18px;
+    }
+
+    .service-feature {
+      padding: 20px;
+      border-radius: 24px;
+    }
+
+    .service-media img {
+      min-height: 260px;
+    }
+  }
+</style>
