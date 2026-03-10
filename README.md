@@ -1,8 +1,8 @@
-# Deeper Than Skin — Storefront
 
-**Wellness that begins within.**
 <img width="1877" height="847" alt="image" src="https://github.com/user-attachments/assets/cc35796a-110c-4f39-b1db-6b166f92f223" />
 
+# Deeper Than Skin — Storefront
+**Wellness that begins within.**
 This repository contains the official storefront and brand landing experience for **Deeper Than Skin**, a holistic wellness brand centered on intentional healing, community, and original provision.
 
 The site is built as a **static, high‑performance frontend** and integrates with **Square** for secure checkout, service bookings, and subscriptions — allowing us to stay lean, flexible, and aligned with our event‑driven sales model.
