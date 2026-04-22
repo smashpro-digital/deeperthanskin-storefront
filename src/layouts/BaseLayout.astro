@@ -34,7 +34,7 @@ const ROUTES = {
   home: u("/"),
   shop: u("/shop"),
   featured: u("/featured"),
-  services: u("/services"),
+  // services: u("/services"),
   cart: u("/cart"),
   checkout: u("/checkout"),
   search: u("/search"),
@@ -99,7 +99,7 @@ const canonical = (() => {
           <a class={`nav-link ${isActive(ROUTES.featured) ? "nav-link--active" : ""}`} href={ROUTES.featured}>Featured</a>
           <a class={`nav-link ${isActive(ROUTES.category("skincare")) ? "nav-link--active" : ""}`} href={ROUTES.category("skincare")}>Skincare</a>
           <a class={`nav-link ${isActive(ROUTES.category("wellness")) ? "nav-link--active" : ""}`} href={ROUTES.category("wellness")}>Wellness</a>
-          <a class={`nav-link ${isActive(ROUTES.services) ? "nav-link--active" : ""}`} href={ROUTES.services}>Services</a>
+          <!-- <a class={`nav-link ${isActive(ROUTES.services) ? "nav-link--active" : ""}`} href={ROUTES.services}>Services</a> -->
         </nav>
 
         <a class="nav-center" href={ROUTES.home} aria-label="Deeper Than Skin">
@@ -161,7 +161,7 @@ const canonical = (() => {
               <a class={isActive(ROUTES.category("herbs")) ? "is-active" : ""} href={ROUTES.category("herbs")}>Herbal Teas & Oils</a>
             </div>
 
-            <a class={isActive(ROUTES.services) ? "is-active" : ""} href={ROUTES.services}>Services</a>
+            <!-- <a class={isActive(ROUTES.services) ? "is-active" : ""} href={ROUTES.services}>Services</a> -->
 
             <div class="nav-drawer-actions">
               <a class="btn btn-primary" href={LINKS.squareShop} {...EXT}>Shop on Square</a>

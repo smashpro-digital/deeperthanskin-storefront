@@ -1,6 +1,5 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import ProductCarousel from "../components/ProductCarousel.astro";
 
 const base = import.meta.env.BASE_URL || "/";
 
@@ -28,82 +27,57 @@ const apiUrl = (path: string, params: Record<string, any> = {}) => {
   return url.toString();
 };
 
+const WAITLIST_ENDPOINT = apiUrl("public/waitlist");
+
 const ROUTES = {
+  home: u("/"),
   shop: u("/shop"),
-  featured: u("/featured"),
-  categories: u("/categories"),
   skincare: u("/category/skincare"),
   wellness: u("/category/wellness"),
-  services: u("/#services"),
   product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
+  category: (slug: string) => u(`/category/${encodeURIComponent(slug)}`),
 };
 
 const LINKS = {
-  book: "https://deeper-than-skin-llc.square.site/appointments",
   community: "https://returntothegarden.co",
 };
 const EXT = { target: "_blank", rel: "noopener noreferrer" };
 
 /* ================
-   IMAGES (fallbacks)
+   IMAGES
 ================ */
 const HERO_IMAGE = `${base}images/hero-brand.png`;
-const IONIC_IMAGE = `${base}images/ionic-footbath.jpg`;
-
+const PRODUCT_FALLBACK = `${base}images/product-fallback.jpg`;
 const CAT_JUICES = `${base}images/cat-juices.jpg`;
 const CAT_SEAMOSS = `${base}images/cat-seamoss.jpg`;
 const CAT_KITS = `${base}images/cat-kits.jpg`;
 const CAT_HERBS = `${base}images/cat-herbs.jpg`;
-const PRODUCT_FALLBACK = `${base}images/product-fallback.jpg`;
 
 /* ================
-   DATA FETCH (SSR)
+   TYPES
 ================ */
 type Money = { amount: number; currency: string };
+
 type ApiItem = {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   image_url?: string | null;
   primary_image_id?: string | null;
   variation_id?: string | null;
   price_money?: Money | null;
   has_price?: boolean;
   image_ids?: string[];
+  category_id?: string | null;
+  category_ids?: string[];
+  category_slug?: string | null;
+  category_slugs?: string[];
+  categories?: Array<{ id?: string; slug?: string; name?: string }>;
+  is_active?: boolean;
+  active?: boolean;
+  status?: string | null;
 };
 
-type FeaturedResponse = {
-  ok: boolean;
-  app_slug: string;
-  mode: string;
-  count: number;
-  items: ApiItem[];
-  error?: string;
-};
-
-let featured: ApiItem[] = [];
-let featuredMode = "fallback";
-let featuredError = "";
-
-try {
-  const res = await fetch(apiUrl("public/commerce/featured", { limit: 12 }), {
-    headers: { Accept: "application/json" },
-  });
-  const json = (await res.json()) as FeaturedResponse;
-
-  if (json?.ok && Array.isArray(json.items)) {
-    featured = json.items;
-    featuredMode = json.mode || "fallback";
-  } else {
-    featuredError = json?.error || "Featured unavailable";
-  }
-} catch (e: any) {
-  featuredError = e?.message || "Featured unavailable";
-}
-
-/* ================
-   CATEGORY FETCH (SSR)
-================ */
 type DbCategory = {
   id: string;
   name: string;
@@ -119,20 +93,72 @@ type CategoriesResponse = {
   ok: boolean;
   app_slug: string;
   categories: DbCategory[];
-  sync_db?: any;
   error?: string;
 };
 
-type RitualCard = {
-  title: string;
+type ProductListResponse = {
+  ok: boolean;
+  app_slug: string;
+  mode?: string;
+  count?: number;
+  items?: ApiItem[];
+  products?: ApiItem[];
+  error?: string;
+};
+
+type CollectionCard = {
+  id: string;
+  slug: string;
+  name: string;
   subtitle: string;
   href: string;
   img: string;
-  slug: string;
+  productCount: number;
 };
 
+type ProductCard = {
+  id: string;
+  name: string;
+  description: string;
+  href: string;
+  img: string;
+  price: string;
+  badge: string;
+};
+
+/* ================
+   HELPERS
+================ */
+function normalizeText(s?: string | null) {
+  return (s || "").trim().toLowerCase();
+}
+
+function titleCase(input?: string | null) {
+  const s = (input || "").trim();
+  if (!s) return "";
+  return s
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatMoney(pm?: Money | null) {
+  if (!pm || typeof pm.amount !== "number") return "";
+  const dollars = pm.amount / 100;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: pm.currency || "USD",
+    }).format(dollars);
+  } catch {
+    return `$${dollars.toFixed(2)}`;
+  }
+}
+
 function imageFallbackForCategory(slugOrName: string): string {
-  const s = (slugOrName || "").toLowerCase();
+  const s = normalizeText(slugOrName);
   if (s.includes("juice") || s.includes("beverage")) return CAT_JUICES;
   if (s.includes("moss")) return CAT_SEAMOSS;
   if (s.includes("kit") || s.includes("cleanse") || s.includes("detox") || s.includes("bundle")) return CAT_KITS;
@@ -140,464 +166,447 @@ function imageFallbackForCategory(slugOrName: string): string {
   return PRODUCT_FALLBACK;
 }
 
-const RITUAL_BLUEPRINT = [
-  {
-    key: "sea-moss-gel",
-    title: "Ocean Mineral Renewal",
-    subtitle: "Deep nourishment from mineral-rich sea botanicals",
-    match: ["sea-moss-gel", "seamoss", "sea moss gel"],
-  },
-  {
-    key: "detox-cleanse-kits",
-    title: "Detox & Reset",
-    subtitle: "Cleanse the body and restore energetic balance",
-    match: ["detox-cleanse-kits", "detox cleanse kits", "kits"],
-  },
-  {
-    key: "body-butters",
-    title: "Botanical Body Rituals",
-    subtitle: "Plant oils and whipped botanical butters for radiant skin",
-    match: ["body-butters", "bath-body-oils", "bath-body-oils", "bath body oils"],
-  },
-  {
-    key: "herbal-teas",
-    title: "Sacred Tea Rituals",
-    subtitle: "Ancient herbal infusions for calm and balance",
-    match: ["herbal-teas", "herbal teas"],
-  },
-  {
-    key: "functional-gummies",
-    title: "Functional Wellness",
-    subtitle: "Targeted support for vitality and daily balance",
-    match: ["functional-gummies", "capsules"],
-  },
-  {
-    key: "beverages",
-    title: "Daily Hydration Elixirs",
-    subtitle: "Cold-pressed botanical beverages crafted for renewal",
-    match: ["beverages", "juices"],
-  },
-];
-
-const FALLBACK_RITUALS: RitualCard[] = [
-  {
-    title: "Ocean Mineral Renewal",
-    subtitle: "Deep nourishment from mineral-rich sea botanicals",
-    href: u("/category/sea-moss-gel"),
-    img: CAT_SEAMOSS,
-    slug: "sea-moss-gel",
-  },
-  {
-    title: "Detox & Reset",
-    subtitle: "Cleanse the body and restore energetic balance",
-    href: u("/category/detox-cleanse-kits"),
-    img: CAT_KITS,
-    slug: "detox-cleanse-kits",
-  },
-  {
-    title: "Botanical Body Rituals",
-    subtitle: "Plant oils and whipped botanical butters for radiant skin",
-    href: u("/category/body-butters"),
-    img: PRODUCT_FALLBACK,
-    slug: "body-butters",
-  },
-  {
-    title: "Sacred Tea Rituals",
-    subtitle: "Ancient herbal infusions for calm and balance",
-    href: u("/category/herbal-teas"),
-    img: CAT_HERBS,
-    slug: "herbal-teas",
-  },
-];
-
-let ritualCards: RitualCard[] = [];
-let categoriesMode = "fallback";
-let categoriesError = "";
-
-try {
-  const res = await fetch(apiUrl("public/commerce/categories"), {
-    headers: { Accept: "application/json" },
-  });
-
-  const json = (await res.json()) as CategoriesResponse;
-
-  if (json?.ok && Array.isArray(json.categories) && json.categories.length) {
-    categoriesMode = "api";
-
-    const categories = json.categories;
-
-    const findCategory = (terms: string[]) => {
-      const normalizedTerms = terms.map((t) => t.toLowerCase().trim());
-
-      return (
-        categories.find((c) => normalizedTerms.includes((c.slug || "").toLowerCase())) ||
-        categories.find((c) => normalizedTerms.includes((c.name || "").toLowerCase())) ||
-        categories.find((c) => normalizedTerms.some((t) => (c.slug || "").toLowerCase().includes(t))) ||
-        categories.find((c) => normalizedTerms.some((t) => (c.name || "").toLowerCase().includes(t))) ||
-        null
-      );
-    };
-
-    ritualCards = RITUAL_BLUEPRINT.map((r) => {
-      const found = findCategory(r.match);
-      const slug = found?.slug || r.key;
-
-      return {
-        title: r.title,
-        subtitle: r.subtitle,
-        href: u(`/category/${encodeURIComponent(slug)}`),
-        img: found?.image_url || imageFallbackForCategory(found?.slug || found?.name || r.key),
-        slug,
-      };
-    }).slice(0, 6);
-  } else {
-    categoriesError = json?.error || "Categories unavailable";
-  }
-} catch (e: any) {
-  categoriesError = e?.message || "Categories unavailable";
-}
-
-if (!ritualCards.length) {
-  categoriesMode = "fallback";
-  ritualCards = FALLBACK_RITUALS;
-}
-
-/* ================
-   SERVICES FETCH (SSR)
-================ */
-type ApiService = {
-  slug: string;
-  name: string;
-  subtitle?: string | null;
-  image_url?: string | null;
-  booking_url?: string | null;
-  is_featured?: boolean;
-  sort?: number;
-};
-
-type ServicesResponse = {
-  ok: boolean;
-  app_slug: string;
-  featured_service_slug?: string;
-  count?: number;
-  services?: ApiService[];
-  error?: string;
-};
-
-let servicesMode = "fallback";
-let servicesError = "";
-let featuredService: ApiService | null = null;
-
-try {
-  const res = await fetch(apiUrl("public/commerce/services"), {
-    headers: { Accept: "application/json" },
-  });
-
-  const json = (await res.json()) as ServicesResponse;
-
-  if (json?.ok && Array.isArray(json.services) && json.services.length) {
-    servicesMode = "api";
-    const wanted = (json.featured_service_slug || "").trim();
-
-    featuredService =
-      json.services.find((s) => s.slug === wanted) ||
-      json.services.find((s) => s.is_featured) ||
-      json.services.slice().sort((a, b) => (a.sort ?? 999) - (b.sort ?? 999))[0] ||
-      null;
-  } else {
-    servicesError = json?.error || "Services unavailable";
-  }
-} catch (e: any) {
-  servicesError = e?.message || "Services unavailable";
-}
-
-const serviceTitle = featuredService?.name || "Ionic Footbath Therapy";
-const serviceSubtitle = featuredService?.subtitle || "Relax, Detox & Rebalance";
-const serviceImg = featuredService?.image_url || IONIC_IMAGE;
-const serviceBookingUrl = featuredService?.booking_url || LINKS.book;
-
-/* ================
-   Helpers
-================ */
 function imageFallbackForProduct(name: string): string {
-  const s = (name || "").toLowerCase();
-  if (s.includes("juice") || s.includes("beverage")) return CAT_JUICES;
-  if (s.includes("moss")) return CAT_SEAMOSS;
-  if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return CAT_KITS;
-  if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("gumm")) return CAT_HERBS;
-  return PRODUCT_FALLBACK;
+  return imageFallbackForCategory(name);
 }
 
-function formatMoney(pm?: Money | null) {
-  if (!pm || typeof pm.amount !== "number") return "";
-  const dollars = pm.amount / 100;
-  try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: pm.currency || "USD" }).format(dollars);
-  } catch {
-    return `$${dollars.toFixed(2)}`;
+function buildCollectionSubtitle(category: DbCategory, count: number) {
+  const desc = (category.description || "").trim();
+  if (desc) return desc;
+  if (count === 1) return "1 active product ready to shop now.";
+  return `${count} active products ready to shop now.`;
+}
+
+function productIsActive(p: ApiItem) {
+  const status = normalizeText(p.status);
+  if (typeof p.is_active === "boolean") return p.is_active;
+  if (typeof p.active === "boolean") return p.active;
+  if (!status) return true;
+  return ["active", "enabled", "published", "live"].includes(status);
+}
+
+function getProductCategoryKeys(p: ApiItem) {
+  const keys = new Set<string>();
+
+  if (p.category_id) keys.add(`id:${p.category_id}`);
+  (p.category_ids || []).forEach((id) => id && keys.add(`id:${id}`));
+
+  if (p.category_slug) keys.add(`slug:${normalizeText(p.category_slug)}`);
+  (p.category_slugs || []).forEach((slug) => slug && keys.add(`slug:${normalizeText(slug)}`));
+
+  (p.categories || []).forEach((c) => {
+    if (c?.id) keys.add(`id:${c.id}`);
+    if (c?.slug) keys.add(`slug:${normalizeText(c.slug)}`);
+  });
+
+  return [...keys];
+}
+
+async function fetchJson(path: string, params: Record<string, any> = {}) {
+  const res = await fetch(apiUrl(path, params), {
+    headers: { Accept: "application/json" },
+  });
+  return res.json();
+}
+
+async function fetchProducts(): Promise<{ items: ApiItem[]; mode: string; error: string }> {
+  const attempts: Array<{ path: string; params?: Record<string, any> }> = [
+    { path: "public/commerce/products", params: { limit: 100, status: "active" } },
+    { path: "public/commerce/products", params: { limit: 100 } },
+    { path: "public/commerce/catalog", params: { limit: 100, status: "active" } },
+    { path: "public/commerce/shop", params: { limit: 100, status: "active" } },
+  ];
+
+  let lastError = "";
+
+  for (const attempt of attempts) {
+    try {
+      const json = (await fetchJson(attempt.path, attempt.params || {})) as ProductListResponse;
+      const raw = Array.isArray(json?.items) ? json.items : Array.isArray(json?.products) ? json.products : [];
+      const active = raw.filter(productIsActive);
+
+      if (json?.ok && active.length) {
+        return {
+          items: active,
+          mode: attempt.path,
+          error: "",
+        };
+      }
+
+      if (json?.ok && raw.length) {
+        return {
+          items: raw,
+          mode: attempt.path,
+          error: "",
+        };
+      }
+
+      if (json?.error) lastError = json.error;
+    } catch (e: any) {
+      lastError = e?.message || "Catalog unavailable";
+    }
   }
-}
 
-function normalizeText(s?: string | null) {
-  return (s || "").trim().toLowerCase();
+  return { items: [], mode: "unavailable", error: lastError || "Catalog unavailable" };
 }
 
 /* ================
-   SIGNATURE RITUAL + FEATURED DROPS
+   FETCH SQUARE DATA
 ================ */
-const SIGNATURE_MATCHES = [
+let categories: DbCategory[] = [];
+let categoryError = "";
+
+try {
+  const json = (await fetchJson("public/commerce/categories")) as CategoriesResponse;
+  if (json?.ok && Array.isArray(json.categories)) {
+    categories = json.categories;
+  } else {
+    categoryError = json?.error || "Categories unavailable";
+  }
+} catch (e: any) {
+  categoryError = e?.message || "Categories unavailable";
+}
+
+const productsResult = await fetchProducts();
+const allProducts = productsResult.items;
+const activeProducts = allProducts.filter(productIsActive);
+
+/* ================
+   DERIVE LIVE COLLECTIONS
+================ */
+const categoryMap = new Map<string, DbCategory>();
+for (const category of categories) {
+  if (category.id) categoryMap.set(`id:${category.id}`, category);
+  if (category.slug) categoryMap.set(`slug:${normalizeText(category.slug)}`, category);
+}
+
+const collectionCounts = new Map<string, number>();
+const collectionCoverImage = new Map<string, string>();
+
+for (const product of activeProducts) {
+  const keys = getProductCategoryKeys(product);
+  const cover = product.image_url || imageFallbackForProduct(product.name);
+
+  for (const key of keys) {
+    const category = categoryMap.get(key);
+    if (!category) continue;
+
+    const canonicalKey = `id:${category.id}`;
+    collectionCounts.set(canonicalKey, (collectionCounts.get(canonicalKey) || 0) + 1);
+
+    if (!collectionCoverImage.has(canonicalKey)) {
+      collectionCoverImage.set(canonicalKey, category.image_url || cover);
+    }
+  }
+}
+
+const EXCLUDED_COLLECTION_SLUGS = new Set([
+  "services",
+  "service",
+  "mobile",
+  "in-home",
+  "in-home-services",
+]);
+
+const liveCollections: CollectionCard[] = categories
+  .filter((category) => {
+    const count = collectionCounts.get(`id:${category.id}`) || 0;
+    if (count <= 0) return false;
+
+    const slug = normalizeText(category.slug);
+    const name = normalizeText(category.name);
+
+    if (EXCLUDED_COLLECTION_SLUGS.has(slug) || EXCLUDED_COLLECTION_SLUGS.has(name)) {
+      return false;
+    }
+
+    if (category.is_top_level) {
+      return false;
+    }
+
+    return true;
+  })
+  .sort((a, b) => {
+    const aCount = collectionCounts.get(`id:${a.id}`) || 0;
+    const bCount = collectionCounts.get(`id:${b.id}`) || 0;
+    return bCount - aCount || a.name.localeCompare(b.name);
+  })
+  .map((category) => {
+    const count = collectionCounts.get(`id:${category.id}`) || 0;
+    return {
+      id: category.id,
+      slug: category.slug,
+      name: titleCase(category.name || category.slug),
+      subtitle: buildCollectionSubtitle(category, count),
+      href: ROUTES.category(category.slug),
+      img:
+        collectionCoverImage.get(`id:${category.id}`) ||
+        category.image_url ||
+        imageFallbackForCategory(category.slug || category.name),
+      productCount: count,
+    };
+  });
+
+/* ================
+   CURATED PRODUCT STRIP
+================ */
+const heroProductKeywords = [
   "sea moss",
   "detox",
   "tea",
   "body butter",
   "oil",
-  "balm",
   "gummies",
   "capsules",
+  "herbal",
+  "wellness",
+  "skincare",
 ];
 
-const signatureRitual = featured
-  .filter((p) => SIGNATURE_MATCHES.some((term) => normalizeText(p.name).includes(term)))
-  .slice(0, 4);
+const rankedProducts = [...activeProducts].sort((a, b) => {
+  const aScore = heroProductKeywords.reduce(
+    (score, term) => score + (normalizeText(a.name).includes(term) ? 2 : 0),
+    0
+  );
+  const bScore = heroProductKeywords.reduce(
+    (score, term) => score + (normalizeText(b.name).includes(term) ? 2 : 0),
+    0
+  );
+  return bScore - aScore || a.name.localeCompare(b.name);
+});
 
-const signatureCards = signatureRitual.length ? signatureRitual : featured.slice(0, 4);
-const featuredDrops = featured.slice(signatureCards.length, signatureCards.length + 8);
+const launchProducts: ProductCard[] = rankedProducts.slice(0, 4).map((p, idx) => {
+  const price = formatMoney(p.price_money || null);
+
+  return {
+    id: p.id,
+    name: p.name,
+    description:
+      (p.description || "").trim() || "A launch-ready ritual essential from the live catalog.",
+    href: ROUTES.product(p.id),
+    img: p.image_url || imageFallbackForProduct(p.name),
+    price: price || "View details",
+    badge:
+      idx === 0
+        ? "Launch Pick"
+        : normalizeText(p.name).includes("detox")
+        ? "Reset Ritual"
+        : normalizeText(p.name).includes("moss")
+        ? "Mineral Favorite"
+        : normalizeText(p.name).includes("tea")
+        ? "Calm Ritual"
+        : "Now Shopping",
+  };
+});
+
+const collectionCount = liveCollections.length;
+const productCount = activeProducts.length;
+const hasLiveCatalog = collectionCount > 0 && productCount > 0;
+const shopSummary =
+  hasLiveCatalog
+    ? `Live Square catalog with ${collectionCount} active collection${collectionCount === 1 ? "" : "s"} and ${productCount} active product${productCount === 1 ? "" : "s"}.`
+    : "Catalog is connected, but no live collection data was found yet.";
 ---
 
 <BaseLayout title="Deeper Than Skin — Storefront">
   <main>
     {/* HERO */}
     <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
-      <div class="hero-overlay"></div>
+  <div class="hero-overlay"></div>
 
-      <div class="hero-content hero-content--top" data-aos="fade-up">
-        <div class="hero-brand">
-          <span class="hero-wordmark">Deeper Than Skin</span>
-          <span class="hero-divider"></span>
-          <span class="hero-tagline">Wellness That Begins Within</span>
-        </div>
+  <div class="hero-content hero-content--top" data-aos="fade-up">
+    <div class="hero-brand">
+      <span class="hero-wordmark">Deeper Than Skin</span>
+      <span class="hero-divider"></span>
+      <span class="hero-tagline">Wellness Rooted in Ritual</span>
+    </div>
 
-        <p class="hero-lead">
-          Browse luxury skincare + wellness essentials right here, then checkout smoothly when you’re ready.
-        </p>
+    <h1 class="hero-title">Daily rituals for body, balance, and renewal.</h1>
 
-        <div class="btns hero-ctas">
-          <a class="btn btn-primary" href={ROUTES.shop}>Shop Now</a>
-          <a class="btn btn-ghost" href={ROUTES.featured}>Explore Featured</a>
-        </div>
-      </div>
+    <p class="hero-lead">
+      Explore botanical essentials crafted to support your everyday flow, from hydration and body care
+      to mineral-rich wellness staples designed to fit naturally into your routine.
+    </p>
 
-      <div class="hero-bottom-fade" aria-hidden="true"></div>
-    </section>
+    <div class="hero-meta">
+      <span class="hero-chip">Botanical wellness</span>
+      <span class="hero-chip">Curated collections</span>
+      <span class="hero-chip">Early access + key drops</span>
+    </div>
 
-    {/* BOTANICAL RITUALS */}
-    <section class="section section--light rituals-section" id="rituals">
-      <div class="container" data-aos="fade-up">
-        <div class="kicker kicker--dark">Discover</div>
-        <h2 class="h2 h2--dark">Botanical Rituals</h2>
-        <p class="p p--dark">
-          Curated wellness journeys for body, balance, and renewal.
-        </p>
-      </div>
+    <div class="btns hero-ctas">
+      <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
+      <a class="btn btn-ghost" href="#discover-live">Browse Collections</a>
+    </div>
+  </div>
 
-      <div class="container">
-        <div class="ritual-grid" data-aos="fade-up" data-aos-delay="80">
-          {ritualCards.map((c) => (
-            <a class="ritual-card" href={c.href} aria-label={`Explore ${c.title}`}>
-              <div class="ritual-media">
-                <img src={c.img} alt={c.title} loading="lazy" />
+  <div class="hero-bottom-fade" aria-hidden="true"></div>
+</section>
+
+    {/* LAUNCH STRIP */}
+    <section class="section section--tight launch-strip">
+  <div class="container launch-strip__inner" data-aos="fade-up">
+    
+    <div class="launch-stat">
+      <span class="launch-stat__label">Now Available</span>
+      <strong>Shop the current collection</strong>
+    </div>
+
+    <div class="launch-stat">
+      <span class="launch-stat__label">Curated Drops</span>
+      <strong>{collectionCount} collections to explore</strong>
+    </div>
+
+    <div class="launch-stat">
+      <span class="launch-stat__label">In Rotation</span>
+      <strong>{productCount} essentials ready now</strong>
+    </div>
+
+    <div class="launch-stat launch-stat--wide">
+      <span class="launch-stat__label">Stay Close</span>
+      <strong>
+        New rituals, restocks, and featured drops land here first.
+      </strong>
+    </div>
+
+  </div>
+</section>
+
+    {/* DISCOVER LIVE COLLECTIONS */}
+   <section class="section section--light discover-live" id="discover-live">
+  <div class="container" data-aos="fade-up">
+    <div class="kicker kicker--dark">Discover</div>
+    <h2 class="h2 h2--dark">Shop by Collection</h2>
+    <p class="p p--dark discover-copy">
+      Explore curated rituals for hydration, body care, and everyday wellness.
+      Start with the collection that fits your routine.
+    </p>
+  </div>
+
+  <div class="container">
+    {liveCollections.length ? (
+      <>
+        <div class="collection-grid" data-aos="fade-up" data-aos-delay="80">
+          {liveCollections.map((c) => (
+            <a class="collection-card" href={c.href} aria-label={`Explore ${c.name}`}>
+              <div class="collection-media">
+                <img src={c.img} alt={c.name} loading="lazy" />
+                <span class="collection-count">
+                  {c.productCount} {c.productCount === 1 ? "item" : "items"}
+                </span>
               </div>
 
-              <div class="ritual-body">
-                <h3>{c.title}</h3>
+              <div class="collection-body">
+                <h3>{c.name}</h3>
                 <p>{c.subtitle}</p>
-                <span class="ritual-cta">Shop Now</span>
+                <span class="collection-cta">Explore Collection</span>
               </div>
             </a>
           ))}
         </div>
 
-        <div class="btns" style="justify-content:center; margin-top: 22px;">
+        <div class="btns center-cta">
           <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
         </div>
-
-        {/* <div class="small" style="margin-top:10px; opacity:.7; text-align:center;">rituals: {categoriesMode}{categoriesError ? ` (${categoriesError})` : ""}</div> */}
-      </div>
-    </section>
-
-    {/* SIGNATURE RITUAL */}
-    <section class="section" id="signature-ritual">
-      <div class="container featured-head" data-aos="fade-up">
-        <div class="kicker">Signature</div>
-        <h2 class="h2">The Signature Ritual</h2>
-        <p class="p">
-          Our most loved essentials for daily wellness and restoration.
-        </p>
-      </div>
-
-      <div class="container featured-wrap">
-        {featuredError ? (
-          <div class="callout callout--featured">
-            <div class="small callout__text">
-              Signature products are temporarily unavailable: <strong>{featuredError}</strong>
-            </div>
-            <div class="btns callout__btns">
-              <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
-              <a class="btn btn-ghost" href={serviceBookingUrl} {...EXT}>Book Service</a>
-            </div>
-          </div>
-        ) : (
-          <div class="product-grid product-grid--featured" data-aos="fade-up">
-            {signatureCards.map((p, idx) => {
-              const img = p.image_url || imageFallbackForProduct(p.name);
-              const price = formatMoney(p.price_money || null);
-
-              const badge =
-                idx === 0 ? "Community Favorite" :
-                normalizeText(p.name).includes("detox") ? "Detox Essential" :
-                normalizeText(p.name).includes("moss") ? "Mineral Ritual" :
-                normalizeText(p.name).includes("butter") ? "Skin Ritual" :
-                "Signature Pick";
-
-              return (
-                <a class="product-card product-card--lux" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
-                  <div class="product-media">
-                    <img src={img} alt={p.name} loading="lazy" />
-                  </div>
-
-                  <div class="product-body">
-                    <div class="product-badge">{badge}</div>
-                    <h3 class="product-title">{p.name}</h3>
-                    <p class="product-desc">
-                      {p.description && p.description.trim() !== ""
-                        ? p.description
-                        : "A ritual-grade essential curated for your routine."}
-                    </p>
-
-                    <div class="product-row">
-                      <div class="product-price">
-                        {p.has_price && price ? price : <span class="product-price--muted">View details</span>}
-                      </div>
-                      <span class="btn-lux" aria-hidden="true">Shop</span>
-                    </div>
-                  </div>
-                </a>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
-
-    {/* FEATURED DROPS */}
-    <section class="section section--tight-top" id="featured">
-      <div class="container featured-head" data-aos="fade-up">
-        <div class="kicker">Featured</div>
-        <h2 class="h2">Featured Drops</h2>
-        <p class="p">
-          Event drops, curated launches, and community favorites. Mode:{" "}
-          <span class="featured-mode">{featuredMode}</span>.
-        </p>
-      </div>
-
-      <div class="container featured-wrap">
-        {featuredError ? (
-          <div class="callout callout--featured">
-            <div class="small callout__text">
-              Featured drops are temporarily unavailable: <strong>{featuredError}</strong>
-            </div>
-            <div class="btns callout__btns">
-              <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
-              <a class="btn btn-ghost" href={serviceBookingUrl} {...EXT}>Book Service</a>
-            </div>
-          </div>
-        ) : (
-          <div class="product-grid product-grid--featured" data-aos="fade-up">
-            {(featuredDrops.length ? featuredDrops : featured.slice(0, 4)).map((p) => {
-              const img = p.image_url || imageFallbackForProduct(p.name);
-              const price = formatMoney(p.price_money || null);
-
-              return (
-                <a class="product-card product-card--lux" href={ROUTES.product(p.id)} aria-label={`View ${p.name}`}>
-                  <div class="product-media">
-                    <img src={img} alt={p.name} loading="lazy" />
-                  </div>
-
-                  <div class="product-body">
-                    <h3 class="product-title">{p.name}</h3>
-                    <p class="product-desc">
-                      {p.description && p.description.trim() !== ""
-                        ? p.description
-                        : "Curated for discovery, gifting, and elevated daily ritual."}
-                    </p>
-
-                    <div class="product-row">
-                      <div class="product-price">
-                        {p.has_price && price ? price : <span class="product-price--muted">View details</span>}
-                      </div>
-                      <span class="btn-lux" aria-hidden="true">Shop</span>
-                    </div>
-                  </div>
-                </a>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
-
-    {/* MORE TO EXPLORE / CAROUSEL */}
-    <section class="section section--tight-top" style="padding-bottom: 0">
-      <div class="container" data-aos="fade-up">
-        <div class="kicker">Browse</div>
-        <h2 class="h2">More to Explore</h2>
-        <p class="p">Smooth scrolling, mobile-first cards. Checkout later. Browsing stays here.</p>
-      </div>
-      <ProductCarousel />
-    </section>
-
-    <div class="container" style="padding-top:18px">
-      <div class="btns" style="justify-content:center">
-        <a class="btn btn-primary" href={ROUTES.skincare}>Shop Skincare</a>
-        <a class="btn btn-ghost" href={ROUTES.wellness}>Shop Wellness</a>
-      </div>
-    </div>
-
-    {/* SERVICES */}
-    <section class="section" id="services">
-      <div class="container">
-        <div class="service-feature" data-aos="fade-up">
-          <div class="service-copy">
-            <div class="kicker">Experience</div>
-            <h2 class="h2">In-Studio Detox Experience</h2>
-            <p class="p">
-              {serviceSubtitle} Book your session and step into a restorative wellness moment that goes deeper than products alone.
-            </p>
-
-            <div class="btns">
-              <a class="btn btn-primary" href={serviceBookingUrl} {...EXT}>Book Now</a>
-              <a class="btn btn-ghost" href={LINKS.community} {...EXT}>See Member Perks</a>
-            </div>
-          </div>
-
-          <div class="service-media">
-            <img src={serviceImg} alt={serviceTitle} loading="lazy" />
-          </div>
+      </>
+    ) : (
+      <div class="callout callout--light">
+        <div>
+          <div class="kicker kicker--dark">Discover</div>
+          <h3 class="callout-title callout-title--dark">More collections are on the way</h3>
+          <p class="p p--dark">
+            We’re still building out the full storefront. Browse the shop to explore what’s available now.
+          </p>
         </div>
 
-        {/* <div class="small" style="margin-top:10px; opacity:.7;">svc: {servicesMode}{servicesError ? ` (${servicesError})` : ""}</div> */}
+        <div class="btns">
+          <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
+        </div>
       </div>
-    </section>
+    )}
+  </div>
+</section>
 
-    {/* PHILOSOPHY / COMMUNITY */}
-    <section class="section">
+    {/* NOW SHOPPING */}
+<section class="section" id="now-shopping">
+  <div class="container featured-head" data-aos="fade-up">
+    <div class="kicker">Featured</div>
+    <h2 class="h2">Shop the Current Ritual</h2>
+    <p class="p">
+      A curated selection of essentials available now, chosen to make discovery simple and shopping feel effortless.
+    </p>
+  </div>
+
+  <div class="container featured-wrap">
+    {launchProducts.length ? (
+      <div class="product-grid product-grid--featured" data-aos="fade-up">
+        {launchProducts.map((p) => (
+          <a class="product-card product-card--lux" href={p.href} aria-label={`View ${p.name}`}>
+            <div class="product-media">
+              <img src={p.img} alt={p.name} loading="lazy" />
+            </div>
+
+            <div class="product-body">
+              <div class="product-badge">{p.badge}</div>
+              <h3 class="product-title">{p.name}</h3>
+              <p class="product-desc">{p.description}</p>
+
+              <div class="product-row">
+                <div class="product-price">
+                  {p.price !== "View details" ? p.price : <span class="product-price--muted">View details</span>}
+                </div>
+                <span class="btn-lux" aria-hidden="true">Shop</span>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <div class="callout callout--featured">
+        <div>
+          <div class="kicker">Featured</div>
+          <h3 class="callout-title">Fresh selections are on the way</h3>
+          <p class="p">
+            Browse the full shop to explore what’s available now while new featured picks are being refreshed.
+          </p>
+        </div>
+
+        <div class="btns callout__btns">
+          <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
+        </div>
+      </div>
+    )}
+  </div>
+</section>
+
+    {/* SHOP PATHS */}
+   <section class="section section--tight-top">
+  <div class="container" data-aos="fade-up">
+    <div class="callout">
+      <div class="kicker">Explore</div>
+      <h2 class="h2">Find your rhythm</h2>
+      <p class="p">
+        Move through skincare, wellness, or the full collection and build a routine that fits your flow.
+      </p>
+
+      <div class="btns">
+        <a class="btn btn-primary" href={ROUTES.skincare}>Shop Skincare</a>
+        <a class="btn btn-ghost" href={ROUTES.wellness}>Shop Wellness</a>
+        <a class="btn btn-ghost" href={ROUTES.shop}>View All</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+    {/* PHILOSOPHY */}
+    <!-- <section class="section">
       <div class="container" data-aos="fade-up">
         <div class="callout">
           <div class="kicker">Philosophy</div>
           <h2 class="h2">The Deeper Than Skin Philosophy</h2>
           <p class="p">
             True wellness begins beneath the surface. Explore the community home for the Seed Bearer pledge,
-            education, governance pages, and the next layer of your journey.
+            education, governance pages, and the deeper layer of the brand story.
           </p>
 
           <div class="btns">
@@ -605,15 +614,155 @@ const featuredDrops = featured.slice(signatureCards.length, signatureCards.lengt
           </div>
         </div>
       </div>
+    </section> -->
+
+    {/* FOOTER WAITLIST */}
+    <section class="section footer-waitlist-section">
+      <div class="container" data-aos="fade-up">
+        <div class="footer-waitlist">
+          <div class="footer-waitlist__copy">
+            <div class="kicker">Stay Close</div>
+            <h2 class="h2">Stay close for relaunch access, restocks, and key drops</h2>
+            <p class="p">
+              Join the list for relaunch updates, early access, restocks, and the next drop in your ritual.
+            </p>
+          </div>
+
+          <form
+            class="footer-waitlist__form"
+            id="waitlist-form"
+            data-endpoint={WAITLIST_ENDPOINT}
+            novalidate
+          >
+            <label class="footer-waitlist__label" for="waitlist-email">Email</label>
+
+            <div class="footer-waitlist__row">
+              <input
+                id="waitlist-email"
+                name="email"
+                type="email"
+                class="footer-waitlist__input"
+                placeholder="you@domain.com"
+                autocomplete="email"
+                required
+              />
+              <button type="submit" class="footer-waitlist__btn">Notify me</button>
+            </div>
+
+            <input type="text" name="company" tabindex="-1" autocomplete="off" class="hp-field" aria-hidden="true" />
+            <input type="hidden" name="app_slug" value={APP_SLUG} />
+            <input type="hidden" name="source" value="storefront-footer" />
+            <input type="hidden" name="consent" value="1" />
+
+            <p class="footer-waitlist__note">
+              We’ll only email you about the relaunch, early access, restocks, and key drops.
+            </p>
+
+            <div class="footer-waitlist__status" id="waitlist-status" aria-live="polite"></div>
+
+            <div class="footer-waitlist__proof">
+              <span class="footer-waitlist__dot"></span>
+              <span>Join the Deeper Than Skin list</span>
+            </div>
+          </form>
+        </div>
+      </div>
     </section>
   </main>
 </BaseLayout>
+
+<script is:inline>
+  (() => {
+    const form = document.getElementById("waitlist-form");
+    const emailInput = document.getElementById("waitlist-email");
+    const statusEl = document.getElementById("waitlist-status");
+
+    if (!form || !emailInput || !statusEl) return;
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const endpoint = form.getAttribute("data-endpoint");
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const company = form.querySelector('input[name="company"]');
+      const source = form.querySelector('input[name="source"]');
+      const appSlug = form.querySelector('input[name="app_slug"]');
+      const consent = form.querySelector('input[name="consent"]');
+
+      const email = emailInput.value.trim();
+
+      if (!email) {
+        statusEl.textContent = "Enter your email to join the list.";
+        statusEl.dataset.state = "error";
+        emailInput.focus();
+        return;
+      }
+
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!emailOk) {
+        statusEl.textContent = "Enter a valid email address.";
+        statusEl.dataset.state = "error";
+        emailInput.focus();
+        return;
+      }
+
+      statusEl.textContent = "Joining the list…";
+      statusEl.dataset.state = "loading";
+      submitBtn?.setAttribute("disabled", "disabled");
+
+      try {
+        const payload = {
+          app_slug: appSlug?.value || "deeper-than-skin",
+          email,
+          source: source?.value || "storefront-footer",
+          consent: consent?.value || "1",
+          company: company?.value || "",
+        };
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain",
+            "Accept": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || "Unable to join the list right now.");
+        }
+
+        statusEl.textContent = json.created
+          ? "You’re on the list. We’ll keep you posted."
+          : "You’re already on the list. We’ll keep you posted.";
+        statusEl.dataset.state = "success";
+        form.reset();
+      } catch (error) {
+        statusEl.textContent = error?.message || "Something went wrong. Please try again.";
+        statusEl.dataset.state = "error";
+      } finally {
+        submitBtn?.removeAttribute("disabled");
+      }
+    });
+  })();
+</script>
 
 <style>
   .section--light {
     background:
       radial-gradient(circle at top right, rgba(202, 170, 84, 0.07), transparent 28%),
       linear-gradient(180deg, #f6f0e6 0%, #efe5d8 100%);
+  }
+
+  .section--tight {
+    padding-top: 22px;
+    padding-bottom: 22px;
+  }
+
+  .section--tight-top {
+    padding-top: 32px;
   }
 
   .kicker--dark {
@@ -625,25 +774,96 @@ const featuredDrops = featured.slice(signatureCards.length, signatureCards.lengt
     color: #1f1e1b;
   }
 
-  .rituals-section {
+  .hero-title {
+    margin: 0 0 14px;
+    max-width: 900px;
+    font-size: clamp(2.2rem, 5vw, 4.4rem);
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    color: #fff8ef;
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 18px 0 0;
+  }
+
+  .hero-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.58rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(224, 191, 105, 0.28);
+    background: rgba(10, 18, 14, 0.28);
+    color: #f8ebcf;
+    font-size: 0.88rem;
+    font-weight: 600;
+    backdrop-filter: blur(6px);
+  }
+
+  .launch-strip {
+    background:
+      linear-gradient(180deg, rgba(10, 23, 18, 0.98) 0%, rgba(9, 24, 18, 0.9) 100%);
+    border-top: 1px solid rgba(196, 158, 74, 0.12);
+    border-bottom: 1px solid rgba(196, 158, 74, 0.12);
+  }
+
+  .launch-strip__inner {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .launch-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(196, 158, 74, 0.12);
+    min-width: 0;
+  }
+
+  .launch-stat__label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(240, 225, 190, 0.62);
+  }
+
+  .launch-stat strong {
+    color: #fff8ef;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .discover-live {
     padding-top: clamp(54px, 7vw, 84px);
     padding-bottom: clamp(54px, 7vw, 84px);
   }
 
-  .ritual-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 22px;
-    margin-top: 26px;
+  .discover-copy {
+    max-width: 780px;
   }
 
-  .ritual-card {
+  .collection-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px;
+    margin-top: 28px;
+  }
+
+  .collection-card {
     display: flex;
     flex-direction: column;
     min-height: 100%;
     overflow: hidden;
     border-radius: 28px;
-    background: rgba(255, 252, 247, 0.9);
+    background: rgba(255, 252, 247, 0.92);
     border: 1px solid rgba(80, 61, 24, 0.12);
     box-shadow: 0 18px 40px rgba(31, 24, 12, 0.08);
     text-decoration: none;
@@ -651,39 +871,57 @@ const featuredDrops = featured.slice(signatureCards.length, signatureCards.lengt
     transition: transform 0.22s ease, box-shadow 0.22s ease;
   }
 
-  .ritual-card:hover {
+  .collection-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 24px 50px rgba(31, 24, 12, 0.12);
   }
 
-  .ritual-media {
-    aspect-ratio: 1 / 1;
+  .collection-media {
+    position: relative;
+    aspect-ratio: 1.14 / 1;
     background: #ede1d1;
     overflow: hidden;
   }
 
-  .ritual-media img {
+  .collection-media img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
   }
 
-  .ritual-body {
+  .collection-count {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.48rem 0.78rem;
+    border-radius: 999px;
+    background: rgba(18, 31, 24, 0.84);
+    color: #fff6e6;
+    border: 1px solid rgba(224, 191, 105, 0.22);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .collection-body {
     display: flex;
     flex-direction: column;
     gap: 10px;
     padding: 20px 20px 22px;
   }
 
-  .ritual-body h3 {
+  .collection-body h3 {
     margin: 0;
     font-size: clamp(1.35rem, 1.7vw, 1.9rem);
     line-height: 1.02;
     color: #1f1e1b;
   }
 
-  .ritual-body p {
+  .collection-body p {
     margin: 0;
     font-size: 1rem;
     line-height: 1.55;
@@ -691,18 +929,23 @@ const featuredDrops = featured.slice(signatureCards.length, signatureCards.lengt
     min-height: 3.2em;
   }
 
-  .ritual-cta {
+  .collection-cta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     margin-top: 8px;
-    padding: 0.9rem 1.15rem;
+    padding: 0.92rem 1.15rem;
     width: 100%;
     border-radius: 999px;
     background: linear-gradient(135deg, #564621 0%, #153a2d 100%);
     color: #fff6e6;
     font-weight: 700;
     letter-spacing: 0.02em;
+  }
+
+  .center-cta {
+    justify-content: center;
+    margin-top: 24px;
   }
 
   .product-badge {
@@ -721,70 +964,231 @@ const featuredDrops = featured.slice(signatureCards.length, signatureCards.lengt
     text-transform: uppercase;
   }
 
-  .service-feature {
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 30px;
+  .callout--light {
+    display: flex;
     align-items: center;
-    padding: clamp(26px, 4vw, 36px);
+    justify-content: space-between;
+    gap: 22px;
+    padding: clamp(24px, 4vw, 34px);
+    border-radius: 28px;
+    background: rgba(255, 252, 247, 0.88);
+    border: 1px solid rgba(80, 61, 24, 0.12);
+    box-shadow: 0 18px 40px rgba(31, 24, 12, 0.08);
+  }
+
+  .callout-title {
+    margin: 8px 0 12px;
+    font-size: clamp(1.5rem, 2.2vw, 2rem);
+    line-height: 1.02;
+  }
+
+  .callout-title--dark {
+    color: #1f1e1b;
+  }
+
+  .footer-waitlist-section {
+    padding-top: 20px;
+    padding-bottom: 14px;
+  }
+
+  .footer-waitlist {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: clamp(24px, 4vw, 36px);
     border-radius: 34px;
-    border: 1px solid rgba(196, 158, 74, 0.18);
+    border: 1px solid rgba(80, 61, 24, 0.12);
     background:
-      radial-gradient(circle at top left, rgba(196, 158, 74, 0.11), transparent 34%),
-      linear-gradient(135deg, rgba(24, 42, 32, 0.98) 0%, rgba(13, 30, 24, 0.98) 100%);
-    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.18);
+      radial-gradient(circle at top right, rgba(202, 170, 84, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(255, 252, 247, 0.96) 0%, rgba(245, 237, 225, 0.96) 100%);
+    box-shadow: 0 18px 40px rgba(31, 24, 12, 0.08);
   }
 
-  .service-copy {
-    min-width: 0;
+  .footer-waitlist .kicker {
+    color: #6e5530;
   }
 
-  .service-media {
-    border-radius: 26px;
-    overflow: hidden;
-    background: #0c201a;
-    min-height: 100%;
+  .footer-waitlist .h2 {
+    margin-bottom: 12px;
+    color: #1f1e1b;
   }
 
-  .service-media img {
+  .footer-waitlist .p {
+    color: rgba(31, 30, 27, 0.82);
+    max-width: 760px;
+  }
+
+  .footer-waitlist__form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .footer-waitlist__label {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #1f1e1b;
+  }
+
+  .footer-waitlist__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .footer-waitlist__input {
     width: 100%;
-    height: 100%;
-    min-height: 340px;
-    object-fit: cover;
-    display: block;
+    min-height: 76px;
+    padding: 0 24px;
+    border-radius: 24px;
+    border: 1px solid rgba(80, 61, 24, 0.14);
+    background: rgba(255, 252, 247, 0.9);
+    color: #1f1e1b;
+    font-size: clamp(1.05rem, 1.7vw, 1.25rem);
+    outline: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .footer-waitlist__input::placeholder {
+    color: rgba(31, 30, 27, 0.42);
+  }
+
+  .footer-waitlist__input:focus {
+    border-color: rgba(86, 70, 33, 0.38);
+    box-shadow: 0 0 0 4px rgba(196, 158, 74, 0.12);
+  }
+
+  .footer-waitlist__btn {
+    min-width: 168px;
+    min-height: 76px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: 24px;
+    font-size: 1.08rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fff6e6;
+    cursor: pointer;
+    background: linear-gradient(135deg, #564621 0%, #153a2d 100%);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    box-shadow: 0 14px 28px rgba(31, 24, 12, 0.14);
+  }
+
+  .footer-waitlist__btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .footer-waitlist__btn[disabled] {
+    opacity: 0.72;
+    cursor: wait;
+  }
+
+  .footer-waitlist__note {
+    margin: 0;
+    color: rgba(31, 30, 27, 0.64);
+    font-size: 0.96rem;
+    line-height: 1.5;
+  }
+
+  .footer-waitlist__status {
+    min-height: 1.5em;
+    font-size: 0.98rem;
+    font-weight: 600;
+  }
+
+  .footer-waitlist__status[data-state="success"] {
+    color: #21553e;
+  }
+
+  .footer-waitlist__status[data-state="error"] {
+    color: #9a3f3f;
+  }
+
+  .footer-waitlist__status[data-state="loading"] {
+    color: #6e5530;
+  }
+
+  .footer-waitlist__proof {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(31,255,255,0.82);
+    font-size: 0.98rem;
+    font-weight: 600;
+  }
+
+  .footer-waitlist__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #d4b259;
+    box-shadow: 0 0 0 6px rgba(212, 178, 89, 0.08);
+  }
+
+  .hp-field {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+    pointer-events: none;
   }
 
   @media (max-width: 1120px) {
-    .ritual-grid {
+    .launch-strip__inner {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .service-feature {
-      grid-template-columns: 1fr;
+    .collection-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 720px) {
-    .ritual-grid {
+    .hero-title {
+      font-size: clamp(1.95rem, 10vw, 3rem);
+    }
+
+    .launch-strip__inner {
+      grid-template-columns: 1fr;
+    }
+
+    .collection-grid {
       grid-template-columns: 1fr;
       gap: 18px;
     }
 
-    .ritual-card {
+    .collection-card {
       border-radius: 22px;
     }
 
-    .ritual-body {
+    .collection-body {
       padding: 18px;
     }
 
-    .service-feature {
-      padding: 20px;
-      border-radius: 24px;
+    .callout--light {
+      flex-direction: column;
+      align-items: flex-start;
+      border-radius: 22px;
     }
 
-    .service-media img {
-      min-height: 260px;
+    .footer-waitlist {
+      border-radius: 24px;
+      padding: 20px;
+    }
+
+    .footer-waitlist__row {
+      grid-template-columns: 1fr;
+    }
+
+    .footer-waitlist__input,
+    .footer-waitlist__btn {
+      min-height: 68px;
+      border-radius: 20px;
+    }
+
+    .footer-waitlist__btn {
+      width: 100%;
     }
   }
 </style>

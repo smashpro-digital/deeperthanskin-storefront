@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import BeverageQuestionnaire from "../../components/BeverageQuestionnaire.astro";
 
 export const prerender = true;
 
@@ -7,43 +8,36 @@ const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
 const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
+  "https://smashpro.app/api/v1/routes";
 
 const APP_SLUG =
-  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+  (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+  "deeper-than-skin";
 
 const { slug: slugParam } = Astro.params;
 
 const rawSlug = String(slugParam || "").trim().toLowerCase();
 
-/**
- * Normalize legacy / typo / alternate storefront slugs to canonical API slugs.
- * Keep this generous so old links do not die.
- */
 const SLUG_ALIASES: Record<string, string> = {
   seamoss: "sea-moss-gel",
   "sea-moss": "sea-moss-gel",
   "sea-moss-gel": "sea-moss-gel",
-
-  "detox-cleanse-kits": "detox-cleanse-kits",
   "detox-cleanse-kits": "detox-cleanse-kits",
   kits: "detox-cleanse-kits",
-
   herbs: "herbal-teas",
   "herbal-teas": "herbal-teas",
-
   beverages: "beverages",
   juices: "beverages",
-
   "bath-body-oils": "bath-body-oils",
   "body-butters": "body-butters",
-
   skincare: "skincare",
   wellness: "wellness",
 };
 
 const apiSlug = SLUG_ALIASES[rawSlug] || rawSlug;
 const pageSlug = apiSlug;
+const isBeveragesPage = pageSlug === "beverages";
 
 const prettyTitleFromSlug = (s: string) =>
   String(s || "")
@@ -52,7 +46,6 @@ const prettyTitleFromSlug = (s: string) =>
     .replace(/\b\w/g, (m) => m.toUpperCase());
 
 export async function getStaticPaths() {
-  // Keep stable for local/static builds
   const slugs = [
     "skincare",
     "wellness",
@@ -66,7 +59,6 @@ export async function getStaticPaths() {
     "sea-moss",
     "seamoss",
     "detox-cleanse-kits",
-    "detox-cleanse-kits",
     "functional-gummies",
     "capsules",
     "therapeutic-oils",
@@ -77,20 +69,11 @@ export async function getStaticPaths() {
   return Array.from(new Set(slugs)).map((slug) => ({ params: { slug } }));
 }
 
-/**
- * DB-first endpoints
- */
 const productsEndpoint =
   `${API_BASE}/public.commerce.products.get.php` +
   `?app_slug=${encodeURIComponent(APP_SLUG)}` +
   `&limit=120` +
   `&category=${encodeURIComponent(apiSlug)}`;
-
-const categoriesEndpointCandidates = [
-  `${API_BASE}/public.commerce.categories.get.php?app_slug=${encodeURIComponent(APP_SLUG)}`,
-  `${API_BASE}/public.commerce.categories.php?app_slug=${encodeURIComponent(APP_SLUG)}`,
-  `https://smashpro.app/api/v1/index.php?path=public/commerce/categories&app_slug=${encodeURIComponent(APP_SLUG)}`,
-];
 
 const TITLE_MAP: Record<string, string> = {
   skincare: "Skincare",
@@ -128,7 +111,6 @@ const pageTitle = TITLE_MAP[pageSlug] || prettyTitleFromSlug(pageSlug) || "Categ
 const pageSubtitle =
   SUBTITLE_MAP[pageSlug] || "Browse curated essentials. Add to cart, then checkout when ready.";
 
-// Safe default hero so the page never feels broken
 const heroImg = `${base}images/product-fallback.jpg`;
 const fallbackImg = `${base}images/product-fallback.jpg`;
 
@@ -173,6 +155,13 @@ const ROUTES = {
           </div>
         </div>
       </section>
+
+      {isBeveragesPage && (
+        <BeverageQuestionnaire
+          title="Build Your Custom Juice Plan"
+          categorySlug={pageSlug}
+        />
+      )}
 
       <section class="panel" style="margin-top:18px">
         <div class="panel-head">
@@ -224,6 +213,18 @@ const ROUTES = {
   <script type="module" is:inline>
     import { Cart } from "/src/lib/cart.js";
 
+    /**
+     * @typedef {{
+     *   id?: string;
+     *   name?: string;
+     *   description?: string;
+     *   image_url?: string;
+     *   has_price?: boolean;
+     *   price_money?: { amount?: number; currency?: string } | null;
+     *   variation_id?: string;
+     * }} ProductItem
+     */
+
     const grid = document.getElementById("cat-grid");
     const empty = document.getElementById("empty");
     const q = document.getElementById("q");
@@ -237,10 +238,6 @@ const ROUTES = {
     const base = grid.getAttribute("data-base") || "/";
     const productBase = grid.getAttribute("data-product-base") || (base + "product/");
 
-    const categoryEndpointCandidates = [
-      ...JSON.parse(document.querySelector("main")?.getAttribute("data-category-endpoints") || "[]")
-    ];
-
     const escapeHtml = (s) =>
       String(s || "")
         .replaceAll("&", "&amp;")
@@ -253,8 +250,11 @@ const ROUTES = {
       if (!pm || typeof pm.amount !== "number") return "";
       const amt = pm.amount / 100;
       const cur = pm.currency || "USD";
-      try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
-      catch { return `$${amt.toFixed(2)}`; }
+      try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+      } catch {
+        return `$${amt.toFixed(2)}`;
+      }
     };
 
     const syncCartCount = () => {
@@ -275,14 +275,16 @@ const ROUTES = {
     }
 
     async function fetchJson(url) {
-      const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
       return JSON.parse(text);
     }
 
-    // HERO: pull category image from DB-first categories endpoint
     async function syncHeroFromCategory() {
       const hero = document.querySelector(".hero");
       if (!hero) return;
@@ -328,12 +330,9 @@ const ROUTES = {
             hero.style.setProperty("--hero", `url('${img}')`);
             return;
           }
-        } catch {
-          // try next
-        }
+        } catch {}
       }
 
-      // optional fallback: use first product image
       try {
         const data = await fetchJson(endpoint);
         const first = Array.isArray(data?.items) ? data.items[0] : null;
@@ -347,14 +346,15 @@ const ROUTES = {
       hero.style.setProperty("--hero", `url('${baseLocal}images/product-fallback.jpg')`);
     }
 
+    /** @type {ProductItem[]} */
     let ALL = [];
 
     const cardHtml = (it) => {
       const id = String(it?.id || "");
       const title = escapeHtml(it?.name || "Product");
       const descRaw = String(it?.description || "");
-      const desc = escapeHtml(descRaw.length > 120 ? (descRaw.slice(0, 117) + "…") : descRaw);
-      const img = (it?.image_url && String(it.image_url).trim()) ? it.image_url : fallback;
+      const desc = escapeHtml(descRaw.length > 120 ? descRaw.slice(0, 117) + "…" : descRaw);
+      const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
       const price = it?.has_price ? money(it?.price_money) : "";
 
       return `
@@ -398,6 +398,7 @@ const ROUTES = {
         if (empty) empty.hidden = false;
         return;
       }
+
       if (empty) empty.hidden = true;
 
       grid.innerHTML = filtered.map(cardHtml).join("");
@@ -412,9 +413,9 @@ const ROUTES = {
           e.preventDefault();
           try {
             Cart.add({
-              id: String(p.id),
+              id: String(p.id || ""),
               variation_id: String(p.variation_id || ""),
-              name: p.name,
+              name: p.name || "",
               image_url: p.image_url || "",
               price_money: p.price_money || null,
               has_price: !!p.has_price,

@@ -1,29 +1,67 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-const base = import.meta.env.BASE_URL || "/";
+const baseRaw = import.meta.env.BASE_URL || "/";
+const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
-/** Build internal URLs safe for GitHub Pages subpaths */
-const u = (path: string) => {
+type ServiceType = "in-studio" | "mobile" | "in-home" | "pop-up" | "other";
+
+type ApiService = {
+  square_service_id?: string | null;
+  slug: string;
+  name: string;
+  subtitle?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  booking_url?: string | null;
+  is_featured?: boolean;
+  sort?: number;
+  price_amount?: number | null;
+  currency_code?: string | null;
+  categories?: string[] | null;
+  parent_category?: string | null;
+  service_type?: ServiceType | null;
+};
+
+type ServicesResponse = {
+  ok: boolean;
+  app_slug: string;
+  featured_service_slug?: string;
+  featured?: ApiService | null;
+  count?: number;
+  services?: ApiService[];
+  service_type_counts?: Partial<Record<ServiceType, number>>;
+  category_filter_applied?: boolean;
+  error?: string;
+};
+
+type ServiceGroup = {
+  type: ServiceType;
+  items: ApiService[];
+};
+
+const u = (path: string): string => {
   const b = base.endsWith("/") ? base.slice(0, -1) : base;
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${b}${p}`;
 };
 
-/* ================
-   CONFIG
-================ */
-const APP_SLUG = "deeper-than-skin";
-const API = "https://smashpro.app/api/v1/index.php";
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+const API =
+  import.meta.env.PUBLIC_COMMERCE_API_BASE_INDEX ||
+  "https://smashpro.app/api/v1/index.php";
 
-const apiUrl = (path: string, params: Record<string, any> = {}) => {
+const apiUrl = (path: string, params: Record<string, unknown> = {}): string => {
   const url = new URL(API);
   url.searchParams.set("path", path);
   url.searchParams.set("app_slug", APP_SLUG);
+
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null || v === "") return;
     url.searchParams.set(k, String(v));
   });
+
   return url.toString();
 };
 
@@ -41,40 +79,224 @@ const LINKS = {
 
 const EXT = { target: "_blank", rel: "noopener noreferrer" };
 
-/* ================
-   IMAGES
-================ */
 const HERO_IMAGE = `${base}images/hero-brand.png`;
 const IONIC_IMAGE = `${base}images/ionic-footbath.jpg`;
 const SERVICE_FALLBACK = `${base}images/product-fallback.jpg`;
 
-/* ================
-   DATA FETCH (SSR)
-================ */
-type ApiService = {
-  slug: string;
-  name: string;
-  subtitle?: string | null;
-  description?: string | null;
-  image_url?: string | null;
-  booking_url?: string | null;
-  is_featured?: boolean;
-  sort?: number;
-};
+/**
+ * Keep this as a safety net only.
+ * Real service rows should bring their own booking_url from API/DB.
+ */
+const DEFAULT_BOOKING_URL = "https://deeper-than-skin-llc.square.site";
 
-type ServicesResponse = {
-  ok: boolean;
-  app_slug: string;
-  featured_service_slug?: string;
-  count?: number;
-  services?: ApiService[];
-  error?: string;
-};
+function normalizeText(s?: string | null): string {
+  return (s || "").trim().toLowerCase();
+}
+
+function titleCase(s?: string | null): string {
+  const value = (s || "").trim();
+  if (!value) return "";
+  return value
+    .split(/[\s-_]+/)
+    .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function normalizeCategoryList(service?: ApiService | null): string[] {
+  if (!service || !Array.isArray(service.categories)) return [];
+  return service.categories
+    .map((c: string | null | undefined) => (c || "").trim())
+    .filter(Boolean);
+}
+
+function hasCategory(service: ApiService | null | undefined, category: string): boolean {
+  const target = normalizeText(category);
+  return normalizeCategoryList(service).some((c: string) => normalizeText(c) === target);
+}
+
+function isServicesCategoryMatch(service: ApiService): boolean {
+  const parent = normalizeText(service.parent_category);
+  if (parent === "services") return true;
+  return hasCategory(service, "services");
+}
+
+function deriveServiceType(service: ApiService | null | undefined): ServiceType {
+  const explicit = normalizeText(service?.service_type || "");
+
+  if (
+    explicit === "in-studio" ||
+    explicit === "mobile" ||
+    explicit === "in-home" ||
+    explicit === "pop-up" ||
+    explicit === "other"
+  ) {
+    return explicit;
+  }
+
+  if (hasCategory(service, "mobile")) return "mobile";
+  if (hasCategory(service, "in-home")) return "in-home";
+  if (hasCategory(service, "pop-up")) return "pop-up";
+  if (hasCategory(service, "in-studio")) return "in-studio";
+
+  return "other";
+}
+
+function serviceKey(service?: ApiService | null): string {
+  if (!service) return "";
+  return (
+    (service.square_service_id || "").trim() ||
+    (service.slug || "").trim() ||
+    (service.name || "").trim().toLowerCase()
+  );
+}
+
+function isSameService(a?: ApiService | null, b?: ApiService | null): boolean {
+  if (!a || !b) return false;
+  return serviceKey(a) !== "" && serviceKey(a) === serviceKey(b);
+}
+
+function isFeaturedService(
+  service: ApiService,
+  featuredSlug = "",
+  featuredRef: ApiService | null = null
+): boolean {
+  return Boolean(
+    isSameService(service, featuredRef) ||
+      normalizeText(service.slug) === normalizeText(featuredSlug) ||
+      service.is_featured ||
+      hasCategory(service, "featured")
+  );
+}
+
+function serviceImage(service: ApiService): string {
+  return service.image_url || IONIC_IMAGE || SERVICE_FALLBACK;
+}
+
+function serviceSubtitle(service: ApiService): string {
+  return service.subtitle?.trim() || "Restorative wellness, guided with intention.";
+}
+
+function serviceDescription(service: ApiService): string {
+  return (
+    service.description?.trim() ||
+    "A luxury wellness service designed to support restoration, calm, and a deeper return to balance."
+  );
+}
+
+function serviceTypeLabel(service: Partial<ApiService>): string {
+  switch (deriveServiceType(service as ApiService)) {
+    case "mobile":
+      return "Mobile Service";
+    case "in-home":
+      return "In-Home Service";
+    case "pop-up":
+      return "Pop-Up Service";
+    case "in-studio":
+      return "In-Studio Service";
+    default:
+      return "Wellness Service";
+  }
+}
+
+function serviceTypeKicker(service: ApiService): string {
+  switch (deriveServiceType(service)) {
+    case "mobile":
+      return "Mobile wellness experience";
+    case "in-home":
+      return "In-home wellness experience";
+    case "pop-up":
+      return "Pop-up wellness experience";
+    case "in-studio":
+      return "In-studio wellness experience";
+    default:
+      return "Wellness experience";
+  }
+}
+
+function typeSectionTitle(type: ServiceType): string {
+  switch (type) {
+    case "in-studio":
+      return "In-Studio Services";
+    case "mobile":
+      return "Mobile Services";
+    case "in-home":
+      return "In-Home Services";
+    case "pop-up":
+      return "Pop-Up Services";
+    default:
+      return "Additional Services";
+  }
+}
+
+function typeSectionLead(type: ServiceType): string {
+  switch (type) {
+    case "in-studio":
+      return "Book restorative care in our wellness space.";
+    case "mobile":
+      return "Bring the wellness experience to your location.";
+    case "in-home":
+      return "Personalized services offered in the comfort of home.";
+    case "pop-up":
+      return "Flexible event-based wellness experiences for special settings.";
+    default:
+      return "Explore more restorative service options.";
+  }
+}
+
+function compareServices(
+  a: ApiService,
+  b: ApiService,
+  featuredSlug = "",
+  featuredRef: ApiService | null = null
+): number {
+  const aFeatured = isFeaturedService(a, featuredSlug, featuredRef);
+  const bFeatured = isFeaturedService(b, featuredSlug, featuredRef);
+
+  if (aFeatured && !bFeatured) return -1;
+  if (!aFeatured && bFeatured) return 1;
+
+  return (a.sort ?? 999) - (b.sort ?? 999);
+}
+
+function priceLabel(service: ApiService): string {
+  if (typeof service.price_amount !== "number" || !service.currency_code) return "";
+  const dollars = service.price_amount / 100;
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: service.currency_code,
+      maximumFractionDigits: 2,
+    }).format(dollars);
+  } catch {
+    return `${dollars.toFixed(2)} ${service.currency_code}`;
+  }
+}
+
+function cleanBookingUrl(url?: string | null): string {
+  const value = (url || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  return "";
+}
+
+function resolvedBookingUrl(service: ApiService | null): string {
+  return cleanBookingUrl(service?.booking_url) || DEFAULT_BOOKING_URL;
+}
+
+function bookingHref(service: ApiService | null, fallback = "#services-list"): string {
+  return resolvedBookingUrl(service) || fallback;
+}
+
+function bookingAttrs(service: ApiService | null): Record<string, string> {
+  return cleanBookingUrl(resolvedBookingUrl(service)) ? EXT : {};
+}
 
 let servicesMode = "fallback";
 let servicesError = "";
 let services: ApiService[] = [];
 let featuredServiceSlug = "";
+let featuredServiceFromApi: ApiService | null = null;
 
 try {
   const res = await fetch(apiUrl("public/commerce/services"), {
@@ -83,94 +305,135 @@ try {
 
   const json = (await res.json()) as ServicesResponse;
 
-  if (json?.ok && Array.isArray(json.services) && json.services.length) {
-    servicesMode = "api";
+  if (json?.ok) {
     featuredServiceSlug = (json.featured_service_slug || "").trim();
+    featuredServiceFromApi = json.featured || null;
 
-    services = json.services
-      .slice()
-      .sort((a, b) => {
-        const aFeatured = a.slug === featuredServiceSlug || a.is_featured;
-        const bFeatured = b.slug === featuredServiceSlug || b.is_featured;
-        if (aFeatured && !bFeatured) return -1;
-        if (!aFeatured && bFeatured) return 1;
-        return (a.sort ?? 999) - (b.sort ?? 999);
-      });
+    const rawServices: ApiService[] = Array.isArray(json.services) ? json.services : [];
+    const merged: ApiService[] = [];
+
+    if (featuredServiceFromApi) merged.push(featuredServiceFromApi);
+
+    for (const service of rawServices) {
+      if (!merged.some((existing: ApiService) => isSameService(existing, service))) {
+        merged.push(service);
+      }
+    }
+
+    const normalized: ApiService[] = merged
+      .filter((service: ApiService) => {
+        if (service.parent_category || (service.categories && service.categories.length)) {
+          return isServicesCategoryMatch(service);
+        }
+        return true;
+      })
+      .map((service: ApiService) => ({
+        ...service,
+        categories: normalizeCategoryList(service),
+        service_type: deriveServiceType(service),
+      }))
+      .sort((a: ApiService, b: ApiService) =>
+        compareServices(a, b, featuredServiceSlug, featuredServiceFromApi)
+      );
+
+    if (normalized.length) {
+      services = normalized;
+      servicesMode = "api";
+    } else {
+      servicesError = "No services are currently assigned to the Services category.";
+    }
   } else {
     servicesError = json?.error || "Services unavailable";
   }
-} catch (e: any) {
-  servicesError = e?.message || "Services unavailable";
+} catch (e: unknown) {
+  servicesError = e instanceof Error ? e.message : "Services unavailable";
 }
 
-/* ================
-   FALLBACKS
-================ */
 if (!services.length) {
   services = [
     {
-      slug: "ionic-footbath-therapy",
-      name: "Ionic Footbath Therapy",
+      slug: "ionic-foot-detox",
+      name: "Ionic Foot Detox",
       subtitle: "Relax, Detox & Rebalance",
       description:
-        "A restorative in-studio detox experience designed to support relaxation, reset, and energetic renewal.",
+        "A restorative wellness session designed to support relaxation, reset, and energetic renewal.",
       image_url: IONIC_IMAGE,
-      booking_url: "https://deeper-than-skin-llc.square.site/appointments",
+      booking_url: DEFAULT_BOOKING_URL,
+      categories: ["Services", "Featured", "Mobile"],
+      parent_category: "Services",
+      service_type: "mobile",
       is_featured: true,
       sort: 1,
     },
   ];
-  if (!featuredServiceSlug) featuredServiceSlug = "ionic-footbath-therapy";
+
+  if (!featuredServiceSlug) featuredServiceSlug = "ionic-foot-detox";
+  if (!featuredServiceFromApi) featuredServiceFromApi = services[0];
 }
 
-/* ================
-   HELPERS
-================ */
-function normalizeText(s?: string | null) {
-  return (s || "").trim().toLowerCase();
-}
-
-function serviceImage(service: ApiService) {
-  return service.image_url || IONIC_IMAGE || SERVICE_FALLBACK;
-}
-
-function serviceSubtitle(service: ApiService) {
-  return service.subtitle?.trim() || "Restorative wellness, guided with intention.";
-}
-
-function serviceDescription(service: ApiService) {
-  return (
-    service.description?.trim() ||
-    "A luxury wellness service designed to support restoration, calm, and a deeper return to balance."
-  );
-}
-
-const featuredService =
-  services.find((s) => s.slug === featuredServiceSlug) ||
-  services.find((s) => s.is_featured) ||
+const featuredService: ApiService | null =
+  services.find((s: ApiService) => isFeaturedService(s, featuredServiceSlug, featuredServiceFromApi)) ||
+  featuredServiceFromApi ||
   services[0] ||
   null;
 
-const additionalServices = featuredService
-  ? services.filter((s) => s.slug !== featuredService.slug)
-  : services;
+const remainingServices: ApiService[] = featuredService
+  ? services.filter((s: ApiService) => !isSameService(s, featuredService))
+  : services.slice();
+
+const groupedServices: ServiceGroup[] = [
+  {
+    type: "in-studio" as ServiceType,
+    items: remainingServices.filter((s: ApiService) => deriveServiceType(s) === "in-studio"),
+  },
+  {
+    type: "mobile" as ServiceType,
+    items: remainingServices.filter((s: ApiService) => deriveServiceType(s) === "mobile"),
+  },
+  {
+    type: "in-home" as ServiceType,
+    items: remainingServices.filter((s: ApiService) => deriveServiceType(s) === "in-home"),
+  },
+  {
+    type: "pop-up" as ServiceType,
+    items: remainingServices.filter((s: ApiService) => deriveServiceType(s) === "pop-up"),
+  },
+  {
+    type: "other" as ServiceType,
+    items: remainingServices.filter((s: ApiService) => deriveServiceType(s) === "other"),
+  },
+].filter((group: ServiceGroup) => group.items.length > 0);
+
+const hasAdditionalServices = remainingServices.length > 0;
+
+const serviceTypesPresent: ServiceType[] = Array.from(
+  new Set(services.map((service: ApiService) => deriveServiceType(service)))
+) as ServiceType[];
+
+const heroLead =
+  serviceTypesPresent.length > 1
+    ? "Book restorative experiences available in-studio, mobile, in-home, and pop-up formats."
+    : featuredService
+      ? `Book ${serviceTypeKicker(featuredService).toLowerCase()}s designed to help you relax, reset, and return to balance.`
+      : "Book restorative experiences designed to help you relax, reset, and return to balance.";
 ---
 
 <BaseLayout title="Deeper Than Skin — Services">
   <main>
-    {/* HERO */}
     <section class="services-hero" style={`background-image:url('${HERO_IMAGE}');`}>
       <div class="services-hero__overlay"></div>
 
       <div class="container services-hero__inner" data-aos="fade-up">
         <div class="kicker">Experience</div>
-        <h1 class="services-title">In-Studio Wellness Services</h1>
-        <p class="services-lead">
-          Book restorative experiences designed to help you relax, reset, and return to balance.
-        </p>
+        <h1 class="services-title">Wellness Services</h1>
+        <p class="services-lead">{heroLead}</p>
 
         <div class="btns hero-ctas">
-          <a class="btn btn-primary" href={featuredService?.booking_url || "#services-list"} {...(featuredService?.booking_url ? EXT : {})}>
+          <a
+            class="btn btn-primary"
+            href={bookingHref(featuredService, "#services-list")}
+            {...bookingAttrs(featuredService)}
+          >
             Book Now
           </a>
           <a class="btn btn-ghost" href={ROUTES.shop}>Shop Products</a>
@@ -178,7 +441,6 @@ const additionalServices = featuredService
       </div>
     </section>
 
-    {/* FEATURED SERVICE */}
     {featuredService && (
       <section class="section" id="services-list">
         <div class="container">
@@ -186,11 +448,36 @@ const additionalServices = featuredService
             <div class="service-spotlight__copy">
               <div class="kicker">Featured service</div>
               <h2 class="h2">{featuredService.name}</h2>
+
+              <div class="service-spotlight__meta">
+                <span class="service-type-badge service-type-badge--spotlight">
+                  {serviceTypeLabel(featuredService)}
+                </span>
+
+                {priceLabel(featuredService) && (
+                  <span class="service-chip">{priceLabel(featuredService)}</span>
+                )}
+
+                {normalizeCategoryList(featuredService)
+                  .filter(
+                    (category: string) =>
+                      !["services", "featured", "mobile", "in-home", "pop-up", "in-studio"].includes(
+                        normalizeText(category)
+                      )
+                  )
+                  .slice(0, 2)
+                  .map((category: string) => <span class="service-chip">{titleCase(category)}</span>)}
+              </div>
+
               <p class="p service-sub">{serviceSubtitle(featuredService)}</p>
               <p class="p">{serviceDescription(featuredService)}</p>
 
               <div class="btns">
-                <a class="btn btn-primary" href={featuredService.booking_url || "#"} {...(featuredService.booking_url ? EXT : {})}>
+                <a
+                  class="btn btn-primary"
+                  href={bookingHref(featuredService, "#services-list")}
+                  {...bookingAttrs(featuredService)}
+                >
                   Book Your Session
                 </a>
                 <a class="btn btn-ghost" href={LINKS.community} {...EXT}>
@@ -207,79 +494,114 @@ const additionalServices = featuredService
       </section>
     )}
 
-    {/* SERVICE GRID */}
-    <section class="section section--tight-top">
-      <div class="container" data-aos="fade-up">
-        <div class="kicker">Offerings</div>
-        <h2 class="h2">Choose Your Wellness Experience</h2>
-        <p class="p">
-          Square-managed services rendered in-house. Mode: <span class="featured-mode">{servicesMode}</span>.
-        </p>
-      </div>
-
-      <div class="container">
-        {servicesError ? (
+    {servicesError && !featuredService && (
+      <section class="section section--tight-top">
+        <div class="container">
           <div class="callout callout--featured">
             <div class="small callout__text">
               Services are temporarily unavailable: <strong>{servicesError}</strong>
             </div>
+
             <div class="btns callout__btns">
               <a class="btn btn-primary" href={ROUTES.shop}>Browse Shop</a>
               <a class="btn btn-ghost" href={LINKS.community} {...EXT}>Visit Community</a>
             </div>
           </div>
-        ) : (
-          <div class="services-grid" data-aos="fade-up">
-            {services.map((service, idx) => {
-              const isFeatured =
-                service.slug === featuredServiceSlug ||
-                service.is_featured ||
-                idx === 0;
+        </div>
+      </section>
+    )}
 
-              return (
-                <article class={`service-card ${isFeatured ? "service-card--featured" : ""}`}>
-                  <div class="service-card__media">
-                    <img src={serviceImage(service)} alt={service.name} loading="lazy" />
+    {hasAdditionalServices && (
+      <section class="section section--tight-top">
+        <div class="container" data-aos="fade-up">
+          <div class="kicker">Offerings</div>
+          <h2 class="h2">Choose Your Wellness Experience</h2>
+          <p class="p">
+            Services are managed in Square and rendered here by category. Mode:
+            <span class="featured-mode"> {servicesMode}</span>.
+          </p>
+        </div>
+
+        <div class="container">
+          {groupedServices.length ? (
+            groupedServices.map((group: ServiceGroup) => (
+              <div class="service-group" data-aos="fade-up">
+                <div class="service-group__header">
+                  <div>
+                    <div class="kicker">{serviceTypeLabel({ service_type: group.type })}</div>
+                    <h3 class="h3 service-group__title">{typeSectionTitle(group.type)}</h3>
                   </div>
+                  <p class="p service-group__lead">{typeSectionLead(group.type)}</p>
+                </div>
 
-                  <div class="service-card__body">
-                    {isFeatured && <div class="product-badge">Signature Experience</div>}
-                    <h3>{service.name}</h3>
-                    <p class="service-card__sub">{serviceSubtitle(service)}</p>
-                    <p class="service-card__desc">{serviceDescription(service)}</p>
+                <div class="services-grid">
+                  {group.items.map((service: ApiService) => {
+                    const featured = isFeaturedService(service, featuredServiceSlug, featuredServiceFromApi);
 
-                    <div class="service-card__cta">
-                      <a
-                        class="btn btn-primary"
-                        href={service.booking_url || "#"}
-                        {...(service.booking_url ? EXT : {})}
-                      >
-                        Book Now
-                      </a>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </section>
+                    return (
+                      <article class={`service-card ${featured ? "service-card--featured" : ""}`}>
+                        <div class="service-card__media">
+                          <img src={serviceImage(service)} alt={service.name} loading="lazy" />
+                        </div>
 
-    {/* PHILOSOPHY */}
+                        <div class="service-card__body">
+                          <div class="service-meta">
+                            {featured && <div class="product-badge">Featured</div>}
+                            <div class="service-type-badge">{serviceTypeLabel(service)}</div>
+
+                            {priceLabel(service) && <div class="service-chip">{priceLabel(service)}</div>}
+
+                            {normalizeCategoryList(service)
+                              .filter(
+                                (category: string) =>
+                                  !["services", "featured", "mobile", "in-home", "pop-up", "in-studio"].includes(
+                                    normalizeText(category)
+                                  )
+                              )
+                              .slice(0, 2)
+                              .map((category: string) => <div class="service-chip">{titleCase(category)}</div>)}
+                          </div>
+
+                          <h3>{service.name}</h3>
+                          <p class="service-card__sub">{serviceSubtitle(service)}</p>
+                          <p class="service-card__desc">{serviceDescription(service)}</p>
+
+                          <div class="service-card__cta">
+                            <a
+                              class="btn btn-primary"
+                              href={bookingHref(service, "#services-list")}
+                              {...bookingAttrs(service)}
+                            >
+                              Book Now
+                            </a>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          ) : null}
+        </div>
+      </section>
+    )}
+
     <section class="section">
       <div class="container" data-aos="fade-up">
         <div class="callout">
           <div class="kicker">Philosophy</div>
           <h2 class="h2">Wellness That Begins Within</h2>
           <p class="p">
-            Our services are designed to complement your at-home rituals with in-studio care rooted in restoration,
+            Our services are designed to complement your at-home rituals with care rooted in restoration,
             intentional living, and a deeper return to self.
           </p>
 
           <div class="btns">
             <a class="btn btn-primary" href={ROUTES.shop}>Shop Rituals</a>
-            <a class="btn btn-ghost" href={LINKS.community} {...EXT}>Visit ReturnToTheGarden.co</a>
+            <a class="btn btn-ghost" href={LINKS.community} {...EXT}>
+              Visit ReturnToTheGarden.co
+            </a>
           </div>
         </div>
       </div>
@@ -342,6 +664,18 @@ const additionalServices = featuredService
     box-shadow: 0 22px 48px rgba(0, 0, 0, 0.18);
   }
 
+  .service-spotlight__copy {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .service-spotlight__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0 4px;
+  }
+
   .service-spotlight__media {
     overflow: hidden;
     border-radius: 26px;
@@ -360,11 +694,37 @@ const additionalServices = featuredService
     color: rgba(242, 232, 207, 0.92);
   }
 
+  .service-group {
+    margin-top: 34px;
+  }
+
+  .service-group:first-of-type {
+    margin-top: 24px;
+  }
+
+  .service-group__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: end;
+    margin-bottom: 18px;
+  }
+
+  .service-group__title {
+    margin: 6px 0 0;
+  }
+
+  .service-group__lead {
+    max-width: 520px;
+    margin: 0;
+    text-align: right;
+  }
+
   .services-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 24px;
-    margin-top: 26px;
+    margin-top: 12px;
   }
 
   .service-card {
@@ -425,20 +785,51 @@ const additionalServices = featuredService
     margin-top: 18px;
   }
 
-  .product-badge {
+  .service-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .product-badge,
+  .service-type-badge,
+  .service-chip {
     display: inline-flex;
     align-items: center;
     width: fit-content;
-    margin-bottom: 10px;
     padding: 0.36rem 0.7rem;
     border-radius: 999px;
-    background: rgba(212, 178, 89, 0.10);
-    border: 1px solid rgba(212, 178, 89, 0.26);
-    color: #e3c06b;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+
+  .product-badge {
+    background: rgba(212, 178, 89, 0.10);
+    border: 1px solid rgba(212, 178, 89, 0.26);
+    color: #e3c06b;
+  }
+
+  .service-type-badge {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(245, 239, 227, 0.88);
+  }
+
+  .service-type-badge--spotlight {
+    background: rgba(227, 192, 107, 0.08);
+    border-color: rgba(227, 192, 107, 0.2);
+  }
+
+  .service-chip {
+    background: rgba(115, 145, 122, 0.12);
+    border: 1px solid rgba(115, 145, 122, 0.22);
+    color: rgba(226, 236, 224, 0.82);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
   }
 
   @media (max-width: 1080px) {
@@ -446,8 +837,18 @@ const additionalServices = featuredService
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .service-spotlight,
+    .service-group__header {
+      grid-template-columns: 1fr;
+    }
+
     .service-spotlight {
       grid-template-columns: 1fr;
+    }
+
+    .service-group__lead {
+      text-align: left;
+      max-width: none;
     }
   }
 
@@ -468,6 +869,10 @@ const additionalServices = featuredService
 
     .service-spotlight__media img {
       min-height: 260px;
+    }
+
+    .service-group {
+      margin-top: 28px;
     }
   }
 </style>

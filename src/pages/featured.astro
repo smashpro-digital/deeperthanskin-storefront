@@ -1,12 +1,11 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-export const prerender = true;
+export const prerender = false;
 
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
-/** GH Pages safe internal URLs */
 const u = (path: string) => {
   const b = base.endsWith("/") ? base.slice(0, -1) : base;
   const p = path.startsWith("/") ? path : `/${path}`;
@@ -21,17 +20,16 @@ const APP_SLUG =
 const endpoint =
   `${API_BASE}/public.commerce.featured.get.php` +
   `?app_slug=${encodeURIComponent(APP_SLUG)}` +
-  `&limit=60` +
-  `&_ts=${Date.now()}`;
+  `&section=${encodeURIComponent("homepage_signature_ritual")}` +
+  `&limit=60`;
 
-// Fallback images (base-safe)
 const FALLBACKS = {
-  juices: `${base}images/cat-juices.jpg`,
-  seamoss: `${base}images/cat-seamoss.jpg`,
-  kits: `${base}images/cat-kits.jpg`,
-  herbs: `${base}images/cat-herbs.jpg`,
-  product: `${base}images/product-fallback.jpg`,
-  hero: `${base}images/hero-brand.png`, // fallback ONLY (Square will override)
+  juices: u("/images/cat-juices.jpg"),
+  seamoss: u("/images/cat-seamoss.jpg"),
+  kits: u("/images/cat-kits.jpg"),
+  herbs: u("/images/cat-herbs.jpg"),
+  product: u("/images/product-fallback.jpg"),
+  hero: u("/images/hero-brand.png"),
 };
 
 const ROUTES = {
@@ -39,30 +37,12 @@ const ROUTES = {
   cart: u("/cart"),
   product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
 };
-
-type Money = { amount: number; currency: string };
-type ApiItem = {
-  id: string;
-  name: string;
-  description?: string | null;
-  image_url?: string | null;
-
-  // IMPORTANT: enables add-to-cart from Featured
-  variation_id?: string | null;
-
-  has_price?: boolean;
-  price_money?: Money | null;
-
-  // Optional fields you may add later
-  category?: string | null;
-};
 ---
 
 <BaseLayout title="Featured | Deeper Than Skin">
   <main class="page">
     <div class="container">
-      {/* ✅ hero starts with local fallback, then JS swaps to Square image */}
-      <div
+      <section
         id="featHero"
         class="hero"
         data-fallback-hero={FALLBACKS.hero}
@@ -73,7 +53,7 @@ type ApiItem = {
           <div class="kicker">Featured</div>
           <h1 class="h1">Featured Drops</h1>
           <p class="lead">
-            Curated pulls, rendered in-house. Add to cart and keep browsing here. Checkout when you’re ready.
+            Curated picks, loaded right into your storefront without trapdoors, blank shelves, or runaway scripts.
           </p>
 
           <div class="hero-actions">
@@ -83,9 +63,9 @@ type ApiItem = {
             </a>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="toolbar" aria-label="Featured controls">
+      <section class="toolbar" aria-label="Featured controls">
         <div class="chips" role="tablist" aria-label="Filter featured">
           <button class="chip is-on" data-filter="all" type="button">All</button>
           <button class="chip" data-filter="juices" type="button">Juices</button>
@@ -96,12 +76,12 @@ type ApiItem = {
 
         <div class="tools">
           <label class="search">
-            <span class="sr">Search</span>
-            <input id="q" placeholder="Search featured…" autocomplete="off" />
+            <span class="sr-only">Search featured</span>
+            <input id="q" type="text" placeholder="Search featured…" autocomplete="off" />
           </label>
 
           <label class="select">
-            <span class="sr">Sort</span>
+            <span class="sr-only">Sort featured</span>
             <select id="sort">
               <option value="featured">Curated</option>
               <option value="price_asc">Price: Low → High</option>
@@ -111,9 +91,22 @@ type ApiItem = {
             </select>
           </label>
         </div>
-      </div>
+      </section>
 
-      <div class="grid" id="featGrid" data-endpoint={endpoint} data-base={base}>
+      <section
+        id="featGrid"
+        class="grid"
+        data-endpoint={endpoint}
+        data-base={base}
+        data-shop={ROUTES.shop}
+        data-cart={ROUTES.cart}
+        data-product-base={u("/product")}
+        data-fallback-product={FALLBACKS.product}
+        data-fallback-juices={FALLBACKS.juices}
+        data-fallback-seamoss={FALLBACKS.seamoss}
+        data-fallback-kits={FALLBACKS.kits}
+        data-fallback-herbs={FALLBACKS.herbs}
+      >
         {Array.from({ length: 9 }).map(() => (
           <div class="card skel-card" aria-hidden="true">
             <div class="media skel"></div>
@@ -124,7 +117,7 @@ type ApiItem = {
             </div>
           </div>
         ))}
-      </div>
+      </section>
 
       <div class="foot">
         <a class="btn btn-ghost" href={ROUTES.shop}>Back to Shop</a>
@@ -133,258 +126,439 @@ type ApiItem = {
     </div>
   </main>
 
-  <script type="module" is:inline>
-    import { Cart } from "/src/lib/cart.js";
+  <script is:inline>
+    (() => {
+      const CART_KEY = "dts_cart_v1";
 
-    const grid = document.getElementById("featGrid");
-    const hero = document.getElementById("featHero");
-    if (!grid) return;
+      const normalizeCart = (raw) => {
+        if (Array.isArray(raw)) return { v: 1, items: raw };
+        if (raw && Array.isArray(raw.items)) return { v: 1, items: raw.items };
+        return { v: 1, items: [] };
+      };
 
-    const endpoint = grid.getAttribute("data-endpoint") || "";
-    const base = grid.getAttribute("data-base") || "/";
-    const q = document.getElementById("q");
-    const sort = document.getElementById("sort");
-    const countEl = document.getElementById("cartCount");
+      const readCart = () => {
+        try {
+          const raw = JSON.parse(localStorage.getItem(CART_KEY) || "null");
+          return normalizeCart(raw);
+        } catch {
+          return { v: 1, items: [] };
+        }
+      };
 
-    let all = [];
-    let filter = "all";
+      const writeCart = (state) => {
+        const next = normalizeCart(state);
+        localStorage.setItem(CART_KEY, JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent("dts:cart"));
+      };
 
-    const escapeHtml = (s) =>
-      String(s ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+      const keyOf = (id, variation_id) =>
+        `${String(id || "")}::${String(variation_id || "")}`;
 
-    const money = (pm) => {
-      if (!pm || typeof pm.amount !== "number") return "";
-      const amt = pm.amount / 100;
-      const cur = pm.currency || "USD";
-      try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
-      catch { return `$${amt.toFixed(2)}`; }
-    };
+      const Cart = {
+        get() {
+          return readCart();
+        },
+        count() {
+          const { items } = readCart();
+          return items.reduce((sum, it) => sum + Math.max(0, Number(it?.qty || 0)), 0);
+        },
+        add(item) {
+          const state = readCart();
+          const items = state.items.slice();
 
-    const pickFallback = (name) => {
-      const s = String(name || "").toLowerCase();
-      if (s.includes("juice")) return `${base}images/cat-juices.jpg`;
-      if (s.includes("moss")) return `${base}images/cat-seamoss.jpg`;
-      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return `${base}images/cat-kits.jpg`;
-      if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return `${base}images/cat-herbs.jpg`;
-      return `${base}images/product-fallback.jpg`;
-    };
+          const id = String(item?.id || "").trim();
+          if (!id) throw new Error("Missing product id");
 
-    const inferTag = (it) => {
-      const s = String(it?.category || it?.name || "").toLowerCase();
-      if (s.includes("juice") || s.includes("beverage")) return "juices";
-      if (s.includes("moss")) return "seamoss";
-      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "kits";
-      if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("therapeutic")) return "herbs";
-      return "all";
-    };
+          const variation_id = String(item?.variation_id || "").trim();
+          const k = keyOf(id, variation_id);
 
-    const cartCount = () => {
-      // Prefer Cart.count() if available
-      if (typeof Cart?.count === "function") return Number(Cart.count() || 0);
+          const found = items.find((x) => keyOf(x?.id, x?.variation_id) === k);
+          const qtyAdd = Math.max(1, Number(item?.qty || 1));
 
-      // Fallback to stored structure
-      const c = Cart.get?.();
-      const items = Array.isArray(c?.items) ? c.items : [];
-      return items.reduce((sum, it) => sum + Math.max(0, Number(it?.qty || 0)), 0);
-    };
+          if (found) {
+            found.qty = Math.max(1, Number(found.qty || 1)) + qtyAdd;
+          } else {
+            items.push({
+              id,
+              variation_id,
+              name: item?.name || "Item",
+              image_url: item?.image_url || "",
+              price_money: item?.price_money || null,
+              has_price: !!item?.has_price,
+              qty: qtyAdd,
+            });
+          }
 
-    const updateCartCount = () => {
-      if (countEl) countEl.textContent = String(cartCount());
-    };
+          writeCart({ v: 1, items });
+        },
+      };
 
-    const applySort = (items) => {
-      const mode = String(sort?.value || "featured");
-      const priceVal = (x) => (typeof x?.price_money?.amount === "number" ? x.price_money.amount : null);
+      const grid = document.getElementById("featGrid");
+      const hero = document.getElementById("featHero");
+      const q = document.getElementById("q");
+      const sort = document.getElementById("sort");
+      const countEl = document.getElementById("cartCount");
 
-      const copy = items.slice();
-      if (mode === "az") copy.sort((a,b) => String(a?.name||"").localeCompare(String(b?.name||"")));
-      if (mode === "za") copy.sort((a,b) => String(b?.name||"").localeCompare(String(a?.name||"")));
-      if (mode === "price_asc") copy.sort((a,b) => (priceVal(a) ?? 1e18) - (priceVal(b) ?? 1e18));
-      if (mode === "price_desc") copy.sort((a,b) => (priceVal(b) ?? -1) - (priceVal(a) ?? -1));
-      return copy;
-    };
+      if (!grid) return;
 
-    const selectItems = () => {
-      const term = String(q?.value || "").trim().toLowerCase();
-      let items = all.slice();
+      const endpoint = grid.getAttribute("data-endpoint") || "";
+      const base = grid.getAttribute("data-base") || "/";
+      const shopUrl = grid.getAttribute("data-shop") || `${base}shop`;
+      const productBase = grid.getAttribute("data-product-base") || `${base}product`;
 
-      if (filter !== "all") items = items.filter((it) => inferTag(it) === filter);
+      const fallbackProduct = grid.getAttribute("data-fallback-product") || `${base}images/product-fallback.jpg`;
+      const fallbackJuices = grid.getAttribute("data-fallback-juices") || `${base}images/cat-juices.jpg`;
+      const fallbackSeamoss = grid.getAttribute("data-fallback-seamoss") || `${base}images/cat-seamoss.jpg`;
+      const fallbackKits = grid.getAttribute("data-fallback-kits") || `${base}images/cat-kits.jpg`;
+      const fallbackHerbs = grid.getAttribute("data-fallback-herbs") || `${base}images/cat-herbs.jpg`;
 
-      if (term) {
-        items = items.filter((it) => {
-          const n = String(it?.name || "").toLowerCase();
-          const d = String(it?.description || "").toLowerCase();
-          return n.includes(term) || d.includes(term);
-        });
-      }
+      let all = [];
+      let filter = "all";
 
-      return applySort(items);
-    };
+      const escapeHtml = (s) =>
+        String(s ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
 
-    const toast = (msg) => {
-      let el = document.getElementById("toast");
-      if (!el) {
-        el = document.createElement("div");
-        el.id = "toast";
-        el.className = "toast";
-        el.setAttribute("aria-live", "polite");
-        document.body.appendChild(el);
-      }
-      el.textContent = msg;
-      el.style.display = "block";
-      clearTimeout(el._t);
-      el._t = setTimeout(() => (el.style.display = "none"), 1600);
-    };
+      const money = (pm) => {
+        if (!pm || typeof pm.amount !== "number") return "";
+        const amt = pm.amount / 100;
+        const cur = pm.currency || "USD";
+        try {
+          return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: cur,
+          }).format(amt);
+        } catch {
+          return `$${amt.toFixed(2)}`;
+        }
+      };
 
-    // ✅ Square-driven hero: pick first strong image_url
-    const setHeroFromItems = (items) => {
-      if (!hero) return;
-      const fallbackHero = hero.getAttribute("data-fallback-hero") || "";
-      const first = (items || []).find((x) => x?.image_url && String(x.image_url).trim());
-      const img = first?.image_url ? String(first.image_url).trim() : fallbackHero;
-      if (!img) return;
-      hero.style.backgroundImage = `url('${img}')`;
-    };
+      const productUrl = (id) => {
+        const cleanBase = productBase.endsWith("/") ? productBase.slice(0, -1) : productBase;
+        return `${cleanBase}/${encodeURIComponent(String(id || ""))}`;
+      };
 
-    const render = () => {
-      const items = selectItems();
-      grid.innerHTML = "";
+      const pickFallback = (name) => {
+        const s = String(name || "").toLowerCase();
+        if (s.includes("juice") || s.includes("lemonade")) return fallbackJuices;
+        if (s.includes("moss")) return fallbackSeamoss;
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return fallbackKits;
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("capsule")) return fallbackHerbs;
+        return fallbackProduct;
+      };
 
-      if (!Array.isArray(items) || items.length === 0) {
+      const inferTag = (it) => {
+        const s = `${String(it?.category || "")} ${String(it?.name || "")}`.toLowerCase();
+        if (s.includes("juice") || s.includes("beverage") || s.includes("lemonade")) return "juices";
+        if (s.includes("moss")) return "seamoss";
+        if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return "kits";
+        if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("therapeutic") || s.includes("capsule")) return "herbs";
+        return "all";
+      };
+
+      const updateCartCount = () => {
+        if (countEl) countEl.textContent = String(Cart.count());
+      };
+
+      const applySort = (items) => {
+        const mode = String(sort?.value || "featured");
+        const priceVal = (x) =>
+          typeof x?.price_money?.amount === "number" ? x.price_money.amount : null;
+
+        const copy = items.slice();
+
+        if (mode === "az") {
+          copy.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")));
+        } else if (mode === "za") {
+          copy.sort((a, b) => String(b?.name || "").localeCompare(String(a?.name || "")));
+        } else if (mode === "price_asc") {
+          copy.sort((a, b) => (priceVal(a) ?? Number.MAX_SAFE_INTEGER) - (priceVal(b) ?? Number.MAX_SAFE_INTEGER));
+        } else if (mode === "price_desc") {
+          copy.sort((a, b) => (priceVal(b) ?? -1) - (priceVal(a) ?? -1));
+        }
+
+        return copy;
+      };
+
+      const selectItems = () => {
+        const term = String(q?.value || "").trim().toLowerCase();
+        let items = all.slice();
+
+        if (filter !== "all") {
+          items = items.filter((it) => inferTag(it) === filter);
+        }
+
+        if (term) {
+          items = items.filter((it) => {
+            const n = String(it?.name || "").toLowerCase();
+            const d = String(it?.description || "").toLowerCase();
+            const c = String(it?.category || "").toLowerCase();
+            return n.includes(term) || d.includes(term) || c.includes(term);
+          });
+        }
+
+        return applySort(items);
+      };
+
+      const toast = (msg) => {
+        let el = document.getElementById("toast");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "toast";
+          el.className = "toast";
+          el.setAttribute("aria-live", "polite");
+          document.body.appendChild(el);
+        }
+        el.textContent = msg;
+        el.style.display = "block";
+        clearTimeout(el._t);
+        el._t = setTimeout(() => {
+          el.style.display = "none";
+        }, 1600);
+      };
+
+      const normalizeItems = (items) => {
+        if (!Array.isArray(items)) return [];
+        return items
+          .filter((it) => it && typeof it === "object" && String(it.id || "").trim())
+          .map((it) => ({
+            id: String(it.id || "").trim(),
+            name: String(it.name || "Product").trim(),
+            description: String(it.description || "").trim(),
+            image_url: String(it.image_url || "").trim(),
+            variation_id: String(it.variation_id || "").trim(),
+            has_price: !!it.has_price,
+            price_money:
+              it?.price_money && typeof it.price_money.amount === "number"
+                ? {
+                    amount: Number(it.price_money.amount),
+                    currency: String(it.price_money.currency || "USD"),
+                  }
+                : null,
+            category: String(it.category || "").trim(),
+            badge: String(it.badge || "").trim(),
+          }));
+      };
+
+      const demoItems = () => [
+        {
+          id: "featured-demo-1",
+          name: "Sea Moss Blend",
+          description: "Fallback featured item shown when the live feed is unavailable.",
+          image_url: fallbackSeamoss,
+          variation_id: "",
+          has_price: false,
+          price_money: null,
+          category: "seamoss",
+          badge: "Fallback",
+        },
+        {
+          id: "featured-demo-2",
+          name: "Signature Juice",
+          description: "A storefront-safe placeholder that keeps the page alive.",
+          image_url: fallbackJuices,
+          variation_id: "",
+          has_price: false,
+          price_money: null,
+          category: "juices",
+          badge: "Fallback",
+        },
+        {
+          id: "featured-demo-3",
+          name: "Herbal Kit",
+          description: "Use the Shop page for the full live catalog while featured reconnects.",
+          image_url: fallbackKits,
+          variation_id: "",
+          has_price: false,
+          price_money: null,
+          category: "kits",
+          badge: "Fallback",
+        },
+      ];
+
+      const setHeroFromItems = (items) => {
+        if (!hero) return;
+        const fallbackHero = hero.getAttribute("data-fallback-hero") || "";
+        const first = (items || []).find((x) => x?.image_url && String(x.image_url).trim());
+        const img = first?.image_url ? String(first.image_url).trim() : fallbackHero;
+        if (!img) return;
+        hero.style.backgroundImage = `url('${img.replaceAll("'", "%27")}')`;
+      };
+
+      const renderEmpty = () => {
         grid.innerHTML = `
           <div class="callout" style="grid-column:1/-1">
             <div class="kicker">Notice</div>
             <h3 class="h2" style="margin:6px 0 8px">Nothing matched</h3>
             <p class="p">Try clearing filters or searching by a different keyword.</p>
-          </div>`;
-        return;
-      }
-
-      items.forEach((it) => {
-        const id = it?.id || "";
-        const title = escapeHtml(it?.name || "Product");
-        const desc = escapeHtml(String(it?.description || "")).slice(0, 110);
-        const img = it?.image_url && String(it.image_url).trim() ? String(it.image_url).trim() : pickFallback(it?.name);
-        const price = it?.has_price ? money(it?.price_money) : "";
-        const variationId = String(it?.variation_id || "").trim();
-        const canCart = variationId.length > 0;
-
-        const card = document.createElement("div");
-        card.className = "card";
-
-        card.innerHTML = `
-          <a class="link" href="${escapeHtml(`${base}product/${encodeURIComponent(id)}`)}" aria-label="View ${title}">
-            <div class="media">
-              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy"
-                   onerror="this.onerror=null;this.src='${escapeHtml(pickFallback(it?.name))}';" />
-              <div class="glow" aria-hidden="true"></div>
-            </div>
-          </a>
-          <div class="body">
-            <div class="row">
-              <div class="ttl">${title}</div>
-              <div class="pr">${price ? escapeHtml(price) : '<span style="opacity:.7">Details</span>'}</div>
-            </div>
-            <div class="ds">${desc || "Tap to view details."}</div>
-
-            <div class="actions">
-              <a class="btn-mini" href="${escapeHtml(`${base}product/${encodeURIComponent(id)}`)}">View</a>
-              ${
-                canCart
-                  ? `<button class="btn-mini btn-mini--gold" data-add="1" data-id="${escapeHtml(id)}" data-vid="${escapeHtml(variationId)}">Add</button>`
-                  : `<span class="chip-mini" title="Requires variation_id">No quick add</span>`
-              }
+            <div class="btns" style="margin-top:12px">
+              <a class="btn btn-ghost" href="${escapeHtml(shopUrl)}">Back to Shop</a>
             </div>
           </div>
         `;
+      };
 
-        grid.appendChild(card);
-      });
+      const renderFallback = () => {
+        all = demoItems();
+        setHeroFromItems(all);
+        render();
+        toast("Featured fallback loaded");
+      };
 
-      grid.querySelectorAll("[data-add]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = btn.getAttribute("data-id") || "";
-          const vid = btn.getAttribute("data-vid") || "";
-          const it = all.find((x) => String(x?.id || "") === String(id));
-          if (!it || !vid) return;
+      const render = () => {
+        const items = selectItems();
+        grid.innerHTML = "";
 
-          try {
-            Cart.add({
-              id: String(it.id),
-              variation_id: vid,
-              name: it.name,
-              image_url: it.image_url || "",
-              price_money: it.price_money || null,
-              has_price: !!it.has_price,
-              qty: 1,
-            });
-            updateCartCount();
-            toast("Added to cart");
-          } catch (e) {
-            toast(e?.message || "Couldn’t add to cart");
+        if (!Array.isArray(items) || items.length === 0) {
+          renderEmpty();
+          return;
+        }
+
+        items.forEach((it) => {
+          const id = it?.id || "";
+          const title = escapeHtml(it?.name || "Product");
+          const desc = escapeHtml(String(it?.description || "")).slice(0, 120);
+          const img =
+            it?.image_url && String(it.image_url).trim()
+              ? String(it.image_url).trim()
+              : pickFallback(it?.name);
+          const price = it?.has_price ? money(it?.price_money) : "";
+          const variationId = String(it?.variation_id || "").trim();
+          const canCart = variationId.length > 0 && !!it?.price_money?.amount;
+          const badge = String(it?.badge || "").trim();
+
+          const card = document.createElement("article");
+          card.className = "card";
+
+          card.innerHTML = `
+            <a class="link" href="${escapeHtml(productUrl(id))}" aria-label="View ${title}">
+              <div class="media">
+                <img
+                  src="${escapeHtml(img)}"
+                  alt="${title}"
+                  loading="lazy"
+                  onerror="this.onerror=null;this.src='${escapeHtml(pickFallback(it?.name))}';"
+                />
+                <div class="glow" aria-hidden="true"></div>
+                ${badge ? `<div class="badge">${escapeHtml(badge)}</div>` : ""}
+              </div>
+            </a>
+
+            <div class="body">
+              <div class="row">
+                <div class="ttl">${title}</div>
+                <div class="pr">${price ? escapeHtml(price) : '<span style="opacity:.7">Details</span>'}</div>
+              </div>
+
+              <div class="ds">${desc || "Tap to view details."}</div>
+
+              <div class="actions">
+                <a class="btn-mini" href="${escapeHtml(productUrl(id))}">View</a>
+                ${
+                  canCart
+                    ? `<button class="btn-mini btn-mini--gold" type="button" data-add="1" data-id="${escapeHtml(id)}" data-vid="${escapeHtml(variationId)}">Add</button>`
+                    : `<span class="chip-mini" title="Requires variation_id and price">No quick add</span>`
+                }
+              </div>
+            </div>
+          `;
+
+          grid.appendChild(card);
+        });
+
+        grid.querySelectorAll("[data-add]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-id") || "";
+            const vid = btn.getAttribute("data-vid") || "";
+            const it = all.find((x) => String(x?.id || "") === String(id));
+
+            if (!it || !vid) {
+              toast("This item needs full product selection");
+              return;
+            }
+
+            try {
+              Cart.add({
+                id: String(it.id),
+                variation_id: vid,
+                name: it.name,
+                image_url: it.image_url || "",
+                price_money: it.price_money || null,
+                has_price: !!it.has_price,
+                qty: 1,
+              });
+              updateCartCount();
+              toast("Added to cart");
+            } catch (e) {
+              toast(e?.message || "Couldn’t add to cart");
+            }
+          });
+        });
+      };
+
+      const load = async () => {
+        try {
+          if (!endpoint) throw new Error("Missing featured endpoint");
+
+          const res = await fetch(endpoint, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            cache: "no-store",
+          });
+
+          const text = await res.text();
+
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!text || text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+          const data = JSON.parse(text);
+          if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
+
+          all = normalizeItems(data.items);
+
+          if (!all.length) {
+            throw new Error("No featured items returned");
           }
+
+          setHeroFromItems(all);
+          render();
+          updateCartCount();
+        } catch (e) {
+          console.error("[featured] load failed:", e);
+          renderFallback();
+          updateCartCount();
+        }
+      };
+
+      document.querySelectorAll(".chip").forEach((c) => {
+        c.addEventListener("click", () => {
+          document.querySelectorAll(".chip").forEach((x) => x.classList.remove("is-on"));
+          c.classList.add("is-on");
+          filter = c.getAttribute("data-filter") || "all";
+          render();
         });
       });
-    };
 
-    const load = async () => {
-      try {
-        const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
-        const text = await res.text();
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+      q?.addEventListener("input", render);
+      sort?.addEventListener("change", render);
+      window.addEventListener("storage", updateCartCount);
+      window.addEventListener("dts:cart", updateCartCount);
 
-        const data = JSON.parse(text);
-        if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
-
-        all = Array.isArray(data.items) ? data.items : [];
-
-        // ✅ Square hero image
-        setHeroFromItems(all);
-
-        render();
-        updateCartCount();
-      } catch (e) {
-        console.error("[featured] load failed:", e);
-        grid.innerHTML = `
-          <div class="callout" style="grid-column:1/-1">
-            <div class="kicker">Error</div>
-            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load featured</h3>
-            <p class="p">Check API base/app slug and the featured route.</p>
-          </div>`;
-      }
-    };
-
-    // filter chips
-    document.querySelectorAll(".chip").forEach((c) => {
-      c.addEventListener("click", () => {
-        document.querySelectorAll(".chip").forEach((x) => x.classList.remove("is-on"));
-        c.classList.add("is-on");
-        filter = c.getAttribute("data-filter") || "all";
-        render();
-      });
-    });
-
-    q?.addEventListener("input", () => render());
-    sort?.addEventListener("change", () => render());
-
-    // keep cart count synced across tabs + custom event
-    window.addEventListener("storage", updateCartCount);
-    window.addEventListener("dts:cart", updateCartCount);
-
-    load();
+      updateCartCount();
+      renderFallback();
+      load();
+    })();
   </script>
 
   <style>
-    .page{ padding: 22px 0 54px; }
-    .container{ width: min(1120px, calc(100% - 32px)); margin-inline:auto; }
+    .page { padding: 22px 0 54px; }
+    .container { width: min(1120px, calc(100% - 32px)); margin-inline: auto; }
 
-    .hero{
+    .hero {
       position: relative;
       border-radius: 28px;
       overflow: hidden;
@@ -394,80 +568,79 @@ type ApiItem = {
       border: 1px solid rgba(255,255,255,.12);
       box-shadow: 0 30px 90px rgba(0,0,0,.34);
     }
-    .hero::after{
-      content:"";
-      position:absolute; inset:0;
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
       background:
         radial-gradient(1200px 520px at 50% 18%, rgba(200,162,74,.16), transparent 62%),
         radial-gradient(900px 600px at 70% 80%, rgba(0,0,0,.22), transparent 55%);
-      pointer-events:none;
+      pointer-events: none;
       z-index: 1;
     }
-    .hero-overlay{
-      position:absolute; inset:0;
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
       background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.62));
       z-index: 0;
     }
-    .hero-inner{
+    .hero-inner {
       position: relative;
       z-index: 2;
       padding: 26px;
       max-width: 980px;
     }
-    .h1{
+    .h1 {
       font-family: var(--font-display);
       font-size: clamp(34px, 3.6vw, 54px);
       margin: 10px 0 10px;
       letter-spacing: -.01em;
       line-height: 1.02;
     }
-    .lead{
+    .lead {
       margin: 0;
       max-width: 70ch;
       opacity: .86;
       line-height: 1.6;
       font-size: 15px;
     }
-    .hero-actions{ margin-top: 14px; display:flex; gap: 10px; flex-wrap: wrap; align-items:center; }
-
-    .toolbar{
+    .hero-actions {
       margin-top: 14px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .toolbar {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       gap: 12px;
       flex-wrap: wrap;
     }
-    .chips{ display:flex; gap: 8px; flex-wrap: wrap; }
-    .chip{
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
       border-radius: 999px;
       padding: 8px 12px;
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.16);
       color: rgba(255,255,255,.86);
-      cursor:pointer;
+      cursor: pointer;
       font-size: 13px;
       transition: transform .12s ease, border-color .12s ease, background .12s ease;
     }
-    .chip:hover{ transform: translateY(-1px); border-color: rgba(200,162,74,.22); }
-    .chip.is-on{
+    .chip:hover { transform: translateY(-1px); border-color: rgba(200,162,74,.22); }
+    .chip.is-on {
       border-color: rgba(200,162,74,.35);
       background: rgba(200,162,74,.12);
       color: rgba(255,255,255,.92);
     }
 
-    .tools{ display:flex; gap: 10px; flex-wrap: wrap; align-items:center; }
-    .search input{
-      height: 38px;
-      width: min(320px, 72vw);
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.14);
-      color: rgba(255,255,255,.92);
-      padding: 0 14px;
-      outline: none;
-    }
-    .select select{
+    .tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .search input,
+    .select select {
       height: 38px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,.12);
@@ -476,52 +649,123 @@ type ApiItem = {
       padding: 0 14px;
       outline: none;
     }
-    .sr{ position:absolute; left:-9999px; }
+    .search input { width: min(320px, 72vw); }
 
-    .grid{
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .grid {
       margin-top: 14px;
-      display:grid;
+      display: grid;
       grid-template-columns: repeat(12, 1fr);
       gap: 14px;
     }
 
-    .card{
+    .card {
       grid-column: span 4;
       border-radius: 22px;
-      overflow:hidden;
+      overflow: hidden;
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.14);
       backdrop-filter: blur(10px);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
       transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
-      display:flex;
-      flex-direction:column;
+      display: flex;
+      flex-direction: column;
       min-height: 310px;
     }
-    .card:hover{
+    .card:hover {
       transform: translateY(-4px);
       box-shadow: 0 26px 64px rgba(0,0,0,.28);
       border-color: rgba(200,162,74,.22);
     }
-    .link{ text-decoration:none; color: inherit; display:block; }
-
-    .media{ aspect-ratio: 4/3; position:relative; background: rgba(255,255,255,.04); }
-    .media img{ width:100%; height:100%; object-fit: cover; display:block; }
-    .glow{
-      position:absolute; inset:0;
-      background: radial-gradient(800px 280px at 50% 20%, rgba(200,162,74,.12), transparent 55%),
-                  linear-gradient(180deg, transparent, rgba(0,0,0,.38));
-      pointer-events:none;
+    .link {
+      text-decoration: none;
+      color: inherit;
+      display: block;
     }
 
-    .body{ padding: 12px 12px 14px; display:grid; gap: 10px; }
-    .row{ display:flex; justify-content:space-between; gap: 10px; align-items:flex-start; }
-    .ttl{ font-weight: 750; font-size: 16px; line-height:1.2; }
-    .pr{ font-weight: 750; white-space:nowrap; opacity:.95; color: rgba(200,162,74,.95); }
-    .ds{ font-size: 13px; opacity:.86; line-height: 1.35; }
+    .media {
+      aspect-ratio: 4 / 3;
+      position: relative;
+      background: rgba(255,255,255,.04);
+    }
+    .media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .glow {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(800px 280px at 50% 20%, rgba(200,162,74,.12), transparent 55%),
+        linear-gradient(180deg, transparent, rgba(0,0,0,.38));
+      pointer-events: none;
+    }
+    .badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(200,162,74,.35);
+      background: rgba(200,162,74,.16);
+      color: rgba(255,255,255,.96);
+      backdrop-filter: blur(8px);
+    }
 
-    .actions{ display:flex; gap: 10px; align-items:center; justify-content:space-between; margin-top: 2px; }
-    .btn-mini{
+    .body {
+      padding: 12px 12px 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .ttl {
+      font-weight: 750;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+    .pr {
+      font-weight: 750;
+      white-space: nowrap;
+      opacity: .95;
+      color: rgba(200,162,74,.95);
+    }
+    .ds {
+      font-size: 13px;
+      opacity: .86;
+      line-height: 1.35;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 2px;
+    }
+    .btn-mini {
       border-radius: 999px;
       padding: 8px 12px;
       font-size: 12px;
@@ -530,17 +774,17 @@ type ApiItem = {
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.14);
       color: rgba(255,255,255,.92);
-      cursor:pointer;
-      text-decoration:none;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .btn-mini--gold{
+    .btn-mini--gold {
       border-color: rgba(200,162,74,.35);
       background: rgba(200,162,74,.14);
     }
-    .chip-mini{
+    .chip-mini {
       font-size: 12px;
       opacity: .75;
       padding: 8px 10px;
@@ -549,17 +793,16 @@ type ApiItem = {
       background: rgba(255,255,255,.03);
     }
 
-    .foot{
+    .foot {
       margin-top: 18px;
-      display:flex;
+      display: flex;
       gap: 10px;
-      justify-content:center;
+      justify-content: center;
       flex-wrap: wrap;
     }
 
-    /* Cart count */
-    .dot{
-      display:inline-block;
+    .dot {
+      display: inline-block;
       width: 6px;
       height: 6px;
       border-radius: 999px;
@@ -568,14 +811,14 @@ type ApiItem = {
       transform: translateY(-1px);
       opacity: .7;
     }
-    .cc{
-      display:inline-flex;
+    .cc {
+      display: inline-flex;
       min-width: 20px;
       height: 20px;
       padding: 0 7px;
       border-radius: 999px;
-      align-items:center;
-      justify-content:center;
+      align-items: center;
+      justify-content: center;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.18);
       color: rgba(255,255,255,.92);
@@ -583,19 +826,29 @@ type ApiItem = {
       font-weight: 750;
     }
 
-    /* Skeletons */
-    .skel-card{ pointer-events:none; }
-    .skel{
+    .callout {
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 46px rgba(0,0,0,.22);
+      padding: 18px;
+    }
+
+    .skel-card { pointer-events: none; }
+    .skel {
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
       background-size: 200% 100%;
       animation: shimmer 1.2s infinite;
       border-radius: 14px;
     }
-    .line{ height: 12px; }
-    @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
+    .line { height: 12px; }
+    @keyframes shimmer {
+      0% { background-position: 0% 0; }
+      100% { background-position: 200% 0; }
+    }
 
-    /* Toast */
-    .toast{
+    .toast {
       position: fixed;
       left: 50%;
       bottom: 22px;
@@ -608,10 +861,14 @@ type ApiItem = {
       color: rgba(255,255,255,.92);
       box-shadow: 0 18px 46px rgba(0,0,0,.28);
       z-index: 99;
-      display:none;
+      display: none;
     }
 
-    @media (max-width: 900px){ .card{ grid-column: span 6; } }
-    @media (max-width: 560px){ .card{ grid-column: span 12; } }
+    @media (max-width: 900px) {
+      .card { grid-column: span 6; }
+    }
+    @media (max-width: 560px) {
+      .card { grid-column: span 12; }
+    }
   </style>
 </BaseLayout>
