@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import BeverageQuestionnaire from "../../components/BeverageQuestionnaire.astro";
 
 export const prerender = true;
 
@@ -7,20 +8,36 @@ const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
 const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
+  "https://smashpro.app/api/v1/routes";
 
 const APP_SLUG =
-  import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
+  (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+  "deeper-than-skin";
 
 const { slug: slugParam } = Astro.params;
 
-// Normalize legacy slugs to API slugs
+const rawSlug = String(slugParam || "").trim().toLowerCase();
+
 const SLUG_ALIASES: Record<string, string> = {
-  seamoss: "sea-moss",
+  seamoss: "sea-moss-gel",
+  "sea-moss": "sea-moss-gel",
+  "sea-moss-gel": "sea-moss-gel",
+  "detox-cleanse-kits": "detox-cleanse-kits",
+  kits: "detox-cleanse-kits",
+  herbs: "herbal-teas",
+  "herbal-teas": "herbal-teas",
+  beverages: "beverages",
+  juices: "beverages",
+  "bath-body-oils": "bath-body-oils",
+  "body-butters": "body-butters",
+  skincare: "skincare",
+  wellness: "wellness",
 };
 
-const slug = String(slugParam || "").trim();
-const apiSlug = SLUG_ALIASES[slug] || slug;
+const apiSlug = SLUG_ALIASES[rawSlug] || rawSlug;
+const pageSlug = apiSlug;
+const isBeveragesPage = pageSlug === "beverages";
 
 const prettyTitleFromSlug = (s: string) =>
   String(s || "")
@@ -29,59 +46,85 @@ const prettyTitleFromSlug = (s: string) =>
     .replace(/\b\w/g, (m) => m.toUpperCase());
 
 export async function getStaticPaths() {
-  // Keep stable for GH Pages builds
-  const fallback = [
+  const slugs = [
     "skincare",
     "wellness",
-    "juices",
     "beverages",
-    "kits",
-    "herbs",
-    "bath-body-oils",
+    "juices",
     "body-butters",
+    "bath-body-oils",
+    "herbal-teas",
+    "herbs",
+    "sea-moss-gel",
     "sea-moss",
     "seamoss",
+    "detox-cleanse-kits",
+    "functional-gummies",
+    "capsules",
+    "therapeutic-oils",
+    "wellness-bundles",
+    "skincare-bundles",
   ];
-  return fallback.map((slug) => ({ params: { slug } }));
+
+  return Array.from(new Set(slugs)).map((slug) => ({ params: { slug } }));
 }
 
-// Products endpoint
-const endpoint =
+const productsEndpoint =
   `${API_BASE}/public.commerce.products.get.php` +
   `?app_slug=${encodeURIComponent(APP_SLUG)}` +
   `&limit=120` +
-  `&category_slug=${encodeURIComponent(apiSlug)}` +
   `&category=${encodeURIComponent(apiSlug)}`;
 
 const TITLE_MAP: Record<string, string> = {
   skincare: "Skincare",
   wellness: "Wellness",
-  juices: "Cold-Pressed Juices",
-  beverages: "Beverages",
-  "sea-moss": "Sea Moss Gel",
-  seamoss: "Sea Moss Gel",
-  kits: "Kits & Bundles",
-  herbs: "Herbal Teas & Oils",
-  "bath-body-oils": "Bath & Body Oils",
+  beverages: "Daily Hydration Elixirs",
+  "sea-moss-gel": "Ocean Mineral Renewal",
+  "detox-cleanse-kits": "Detox & Reset",
   "body-butters": "Body Butters",
+  "bath-body-oils": "Bath & Body Oils",
+  "herbal-teas": "Sacred Tea Rituals",
+  "functional-gummies": "Functional Wellness",
+  capsules: "Capsules",
+  "therapeutic-oils": "Therapeutic Oils",
+  "wellness-bundles": "Wellness Bundles",
+  "skincare-bundles": "Skincare Bundles",
 };
 
-const pageTitle = TITLE_MAP[slug] || prettyTitleFromSlug(slug) || "Category";
+const SUBTITLE_MAP: Record<string, string> = {
+  skincare: "Curated ritual-grade skincare for glow, softness, and restoration.",
+  wellness: "Daily support for balance, vitality, and intentional living.",
+  beverages: "Cold-pressed botanical beverages crafted for renewal.",
+  "sea-moss-gel": "Deep nourishment from mineral-rich sea botanicals.",
+  "detox-cleanse-kits": "Cleanse the body and restore energetic balance.",
+  "body-butters": "Whipped botanical hydration for soft, radiant skin.",
+  "bath-body-oils": "Plant oils for soak, softness, and luminous ritual care.",
+  "herbal-teas": "Ancient herbal infusions for calm and balance.",
+  "functional-gummies": "Targeted support for vitality and daily balance.",
+  capsules: "Concentrated support for consistent wellness rituals.",
+  "therapeutic-oils": "Restorative oils for body, breath, and reset.",
+  "wellness-bundles": "Curated pairings designed for transformation.",
+  "skincare-bundles": "Layered essentials for a complete skin ritual.",
+};
 
-// ✅ Hero should come from Square via categories endpoint at runtime.
-// Start with a safe fallback so page never flashes broken background.
+const pageTitle = TITLE_MAP[pageSlug] || prettyTitleFromSlug(pageSlug) || "Category";
+const pageSubtitle =
+  SUBTITLE_MAP[pageSlug] || "Browse curated essentials. Add to cart, then checkout when ready.";
+
 const heroImg = `${base}images/product-fallback.jpg`;
 const fallbackImg = `${base}images/product-fallback.jpg`;
 
 const ROUTES = {
+  home: `${base}`,
   shop: `${base}shop`,
+  featured: `${base}featured`,
   productBase: `${base}product/`,
   cart: `${base}cart`,
 };
 ---
 
 <BaseLayout title={`${pageTitle} | Deeper Than Skin`}>
-  <main class="section">
+  <main class="section category-page">
     <div class="container">
       <div class="toprow">
         <a class="crumb" href={ROUTES.shop}>← Back to Shop</a>
@@ -103,15 +146,22 @@ const ROUTES = {
       >
         <div class="hero-bg" aria-hidden="true"></div>
         <div class="hero-inner">
-          <div class="kicker">Category</div>
+          <div class="kicker kicker--light">Botanical Ritual</div>
           <h1 class="hero-title">{pageTitle}</h1>
-          <p class="hero-sub">Browse curated essentials. Add to cart, then checkout when ready.</p>
+          <p class="hero-sub">{pageSubtitle}</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
             <a class="btn btn-ghost" href={ROUTES.cart}>View Cart</a>
           </div>
         </div>
       </section>
+
+      {isBeveragesPage && (
+        <BeverageQuestionnaire
+          title="Build Your Custom Juice Plan"
+          categorySlug={pageSlug}
+        />
+      )}
 
       <section class="panel" style="margin-top:18px">
         <div class="panel-head">
@@ -127,7 +177,7 @@ const ROUTES = {
         <div
           class="grid"
           id="cat-grid"
-          data-endpoint={endpoint}
+          data-endpoint={productsEndpoint}
           data-fallback={fallbackImg}
           data-base={base}
           data-product-base={ROUTES.productBase}
@@ -147,7 +197,14 @@ const ROUTES = {
         <div id="empty" class="empty" hidden>
           <div class="kicker">Notice</div>
           <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
-          <p class="p">If this category should have items, it usually means the API mapping needs the Square category IDs.</p>
+          <p class="p">
+            This ritual is available, but it doesn’t have visible products yet. That usually means
+            the Square category sync or product-category mapping needs a refresh.
+          </p>
+          <div class="hero-actions" style="margin-top:14px">
+            <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
+            <a class="btn btn-ghost" href={ROUTES.featured}>View Featured</a>
+          </div>
         </div>
       </section>
     </div>
@@ -155,6 +212,18 @@ const ROUTES = {
 
   <script type="module" is:inline>
     import { Cart } from "/src/lib/cart.js";
+
+    /**
+     * @typedef {{
+     *   id?: string;
+     *   name?: string;
+     *   description?: string;
+     *   image_url?: string;
+     *   has_price?: boolean;
+     *   price_money?: { amount?: number; currency?: string } | null;
+     *   variation_id?: string;
+     * }} ProductItem
+     */
 
     const grid = document.getElementById("cat-grid");
     const empty = document.getElementById("empty");
@@ -181,8 +250,11 @@ const ROUTES = {
       if (!pm || typeof pm.amount !== "number") return "";
       const amt = pm.amount / 100;
       const cur = pm.currency || "USD";
-      try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
-      catch { return `$${amt.toFixed(2)}`; }
+      try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+      } catch {
+        return `$${amt.toFixed(2)}`;
+      }
     };
 
     const syncCartCount = () => {
@@ -195,8 +267,25 @@ const ROUTES = {
       });
     }
 
-    // ✅ HERO: pull category image from Square (via API routes)
-    async function syncHeroFromSquareCategory() {
+    function normalizeSlug(s) {
+      return String(s || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s]+/g, "-");
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+      return JSON.parse(text);
+    }
+
+    async function syncHeroFromCategory() {
       const hero = document.querySelector(".hero");
       if (!hero) return;
 
@@ -208,81 +297,64 @@ const ROUTES = {
       if (!catSlug || !apiBase || !appSlug) return;
 
       const candidates = [
-        `${apiBase}/public.commerce.categories.list.php?app_slug=${encodeURIComponent(appSlug)}&limit=250`,
-        `${apiBase}/public.commerce.categories.get.php?app_slug=${encodeURIComponent(appSlug)}&limit=250`,
-        `${apiBase}/public.commerce.categories.php?app_slug=${encodeURIComponent(appSlug)}&limit=250`,
-        // optional "index router" fallbacks (if you ever move endpoints behind index.php again)
-        `https://smashpro.app/api/v1/index.php?path=public/commerce/categories&app_slug=${encodeURIComponent(appSlug)}&limit=250`,
+        `${apiBase}/public.commerce.categories.get.php?app_slug=${encodeURIComponent(appSlug)}`,
+        `${apiBase}/public.commerce.categories.php?app_slug=${encodeURIComponent(appSlug)}`,
+        `https://smashpro.app/api/v1/index.php?path=public/commerce/categories&app_slug=${encodeURIComponent(appSlug)}`,
       ];
 
-      const pickArray = (data) =>
-        (Array.isArray(data?.items) && data.items) ||
-        (Array.isArray(data?.categories) && data.categories) ||
-        (Array.isArray(data?.data) && data.data) ||
-        (Array.isArray(data) && data) ||
-        [];
-
-      const norm = (s) =>
-        String(s || "")
-          .trim()
-          .toLowerCase()
-          .replace(/[-_]+/g, "-");
-
-      const target = norm(catSlug);
+      const target = normalizeSlug(catSlug);
 
       for (const url of candidates) {
         try {
-          const res = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
-          const text = await res.text();
-          if (!res.ok) continue;
-          if (text.trim().startsWith("<")) continue;
-
-          const data = JSON.parse(text);
-          const arr = pickArray(data);
+          const data = await fetchJson(url);
+          const arr =
+            (Array.isArray(data?.categories) && data.categories) ||
+            (Array.isArray(data?.items) && data.items) ||
+            (Array.isArray(data?.data) && data.data) ||
+            [];
 
           const found =
-            arr.find((c) => norm(c?.slug) === target || norm(c?.category_slug) === target) ||
-            arr.find((c) => norm(c?.name) === target);
+            arr.find((c) => normalizeSlug(c?.slug) === target) ||
+            arr.find((c) => normalizeSlug(c?.category_slug) === target) ||
+            arr.find((c) => normalizeSlug(c?.name) === target);
 
-          const img =
-            String(found?.image_url || found?.hero_image_url || found?.image || found?.square_image_url || "").trim();
+          const img = String(
+            found?.image_url ||
+            found?.hero_image_url ||
+            found?.image ||
+            found?.square_image_url ||
+            ""
+          ).trim();
 
           if (img) {
             hero.style.setProperty("--hero", `url('${img}')`);
             return;
           }
-        } catch {
-          // try next candidate
-        }
+        } catch {}
       }
 
-      // Optional: fallback to "first product image" if category image is missing
       try {
-        const res = await fetch(endpoint, { headers: { Accept: "application/json" }, cache: "no-store" });
-        const text = await res.text();
-        if (res.ok && !text.trim().startsWith("<")) {
-          const data = JSON.parse(text);
-          const first = Array.isArray(data?.items) ? data.items[0] : null;
-          const img = String(first?.image_url || "").trim();
-          if (img) {
-            hero.style.setProperty("--hero", `url('${img}')`);
-            return;
-          }
+        const data = await fetchJson(endpoint);
+        const first = Array.isArray(data?.items) ? data.items[0] : null;
+        const img = String(first?.image_url || "").trim();
+        if (img) {
+          hero.style.setProperty("--hero", `url('${img}')`);
+          return;
         }
       } catch {}
 
-      // Last resort fallback (already set in CSS var)
       hero.style.setProperty("--hero", `url('${baseLocal}images/product-fallback.jpg')`);
     }
 
+    /** @type {ProductItem[]} */
     let ALL = [];
 
     const cardHtml = (it) => {
       const id = String(it?.id || "");
       const title = escapeHtml(it?.name || "Product");
       const descRaw = String(it?.description || "");
-      const desc = escapeHtml(descRaw.length > 120 ? (descRaw.slice(0, 117) + "…") : descRaw);
-      const img = (it?.image_url && String(it.image_url).trim()) ? it.image_url : fallback;
+      const desc = escapeHtml(descRaw.length > 120 ? descRaw.slice(0, 117) + "…" : descRaw);
+      const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
       const price = it?.has_price ? money(it?.price_money) : "";
 
       return `
@@ -314,7 +386,7 @@ const ROUTES = {
       const query = String(q?.value || "").trim().toLowerCase();
 
       const filtered = query
-        ? ALL.filter(p =>
+        ? ALL.filter((p) =>
             String(p?.name || "").toLowerCase().includes(query) ||
             String(p?.description || "").toLowerCase().includes(query)
           )
@@ -326,6 +398,7 @@ const ROUTES = {
         if (empty) empty.hidden = false;
         return;
       }
+
       if (empty) empty.hidden = true;
 
       grid.innerHTML = filtered.map(cardHtml).join("");
@@ -333,16 +406,16 @@ const ROUTES = {
       grid.querySelectorAll(".card").forEach((card) => {
         const id = card.getAttribute("data-id");
         const btn = card.querySelector("button.add");
-        const p = filtered.find(x => String(x?.id || "") === String(id || ""));
+        const p = filtered.find((x) => String(x?.id || "") === String(id || ""));
         if (!btn || !p) return;
 
         btn.addEventListener("click", (e) => {
           e.preventDefault();
           try {
             Cart.add({
-              id: String(p.id),
+              id: String(p.id || ""),
               variation_id: String(p.variation_id || ""),
-              name: p.name,
+              name: p.name || "",
               image_url: p.image_url || "",
               price_money: p.price_money || null,
               has_price: !!p.has_price,
@@ -362,20 +435,19 @@ const ROUTES = {
     async function load() {
       try {
         if (!endpoint) throw new Error("Missing endpoint");
-        const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
-        const text = await res.text();
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
-        const data = JSON.parse(text);
+        const data = await fetchJson(endpoint);
 
-        if (!data || data.ok !== true) throw new Error(data?.error || "API not ok");
+        if (!data || data.ok !== true) {
+          throw new Error(data?.error || "API not ok");
+        }
+
         render(data.items || []);
       } catch (e) {
         console.error("[category] load failed:", e);
         grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
           <div class="kicker">Error</div>
           <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
-          <p class="p">Check API base/app slug and your category mapping (Square category IDs).</p>
+          <p class="p">Check API base, app slug, and category sync/mapping for this ritual.</p>
         </div>`;
       }
     }
@@ -386,18 +458,34 @@ const ROUTES = {
     window.addEventListener("storage", syncCartCount);
     window.addEventListener("dts:cart", syncCartCount);
 
-    // ✅ Set hero first (fast), then load products
-    syncHeroFromSquareCategory();
+    syncHeroFromCategory();
     load();
   </script>
 
   <style>
-    .toprow{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    .crumb{ text-decoration:none; opacity:.9; font-size:13px; }
+    .category-page {
+      padding-top: clamp(28px, 4vw, 44px);
+    }
+
+    .toprow{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .crumb{
+      text-decoration:none;
+      opacity:.9;
+      font-size:13px;
+    }
 
     .cartpill{
-      display:inline-flex; align-items:center; gap:10px;
-      border-radius:999px; padding:10px 12px;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      border-radius:999px;
+      padding:10px 12px;
       border:1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.18);
       backdrop-filter: blur(10px);
@@ -405,49 +493,90 @@ const ROUTES = {
       cursor:pointer;
       box-shadow: 0 12px 28px rgba(0,0,0,.22);
     }
+
     .cartpill-dot{
-      width:10px;height:10px;border-radius:999px;
+      width:10px;
+      height:10px;
+      border-radius:999px;
       background: rgba(200,162,74,.85);
       box-shadow: 0 0 24px rgba(200,162,74,.35);
     }
+
     .cartpill-count{
-      min-width: 22px; height: 22px;
-      display:inline-flex; justify-content:center; align-items:center;
-      border-radius:999px; padding:0 7px;
+      min-width: 22px;
+      height: 22px;
+      display:inline-flex;
+      justify-content:center;
+      align-items:center;
+      border-radius:999px;
+      padding:0 7px;
       font-weight: 700;
       border:1px solid rgba(200,162,74,.35);
       background: rgba(200,162,74,.12);
     }
 
     .hero{
-      position:relative; border-radius:26px; overflow:hidden;
+      position:relative;
+      border-radius:26px;
+      overflow:hidden;
       border:1px solid rgba(255,255,255,.12);
       box-shadow: 0 26px 70px rgba(0,0,0,.28);
-      margin-top:14px; min-height:260px;
+      margin-top:14px;
+      min-height:300px;
     }
+
     .hero-bg{
-      position:absolute; inset:0;
+      position:absolute;
+      inset:0;
       background-image: var(--hero);
-      background-size: cover; background-position:center;
+      background-size: cover;
+      background-position:center;
       filter: saturate(1.05) contrast(1.03);
       transform: scale(1.02);
     }
+
     .hero-bg::after{
-      content:""; position:absolute; inset:0;
+      content:"";
+      position:absolute;
+      inset:0;
       background:
         radial-gradient(900px 520px at 50% 28%, rgba(200,162,74,.20), transparent 60%),
-        linear-gradient(180deg, rgba(6,12,9,.22), rgba(6,12,9,.86));
+        linear-gradient(180deg, rgba(6,12,9,.20), rgba(6,12,9,.84));
     }
-    .hero-inner{ position:relative; z-index:2; padding:22px; max-width:760px; }
+
+    .hero-inner{
+      position:relative;
+      z-index:2;
+      padding:22px;
+      max-width:760px;
+    }
+
+    .kicker--light {
+      color: rgba(233, 206, 143, 0.92);
+    }
+
     .hero-title{
       font-family: var(--font-display);
       font-size: clamp(34px, 4.2vw, 54px);
       line-height:1.02;
-      margin:10px 0 6px;
+      margin:10px 0 8px;
       letter-spacing:-.02em;
     }
-    .hero-sub{ margin:0; opacity:.86; max-width:64ch; line-height:1.55; }
-    .hero-actions{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+
+    .hero-sub{
+      margin:0;
+      opacity:.88;
+      max-width:64ch;
+      line-height:1.55;
+      font-size: 1.02rem;
+    }
+
+    .hero-actions{
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+      flex-wrap:wrap;
+    }
 
     .panel{
       border-radius:26px;
@@ -457,63 +586,131 @@ const ROUTES = {
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
       padding:16px;
     }
+
     .panel-head{
-      display:flex; justify-content:space-between; align-items:flex-end;
-      gap:12px; flex-wrap:wrap;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:12px;
+      flex-wrap:wrap;
       padding:6px 4px 14px;
     }
-    .panel-title{ margin:0; font-family: var(--font-display); font-size:22px; }
-    .panel-sub{ margin:6px 0 0; opacity:.82; font-size:13px; }
+
+    .panel-title{
+      margin:0;
+      font-family: var(--font-display);
+      font-size:22px;
+    }
+
+    .panel-sub{
+      margin:6px 0 0;
+      opacity:.82;
+      font-size:13px;
+    }
+
     .search{
       width: min(360px, 100%);
-      border-radius:999px; padding:10px 12px;
+      border-radius:999px;
+      padding:10px 12px;
       border:1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.20);
       color: rgba(255,255,255,.92);
       outline:none;
     }
-    .search::placeholder{ color: rgba(255,255,255,.55); }
 
-    .grid{ display:grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap:14px; }
+    .search::placeholder{
+      color: rgba(255,255,255,.55);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap:14px;
+    }
 
     .card{
       grid-column: span 4;
-      border-radius:22px; overflow:hidden;
+      border-radius:22px;
+      overflow:hidden;
       border:1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.16);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
       transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
+
     .card:hover{
       transform: translateY(-4px);
       box-shadow: 0 26px 64px rgba(0,0,0,.28);
       border-color: rgba(200,162,74,.22);
     }
 
-    .card-link{ display:block; text-decoration:none; color:inherit; }
+    .card-link{
+      display:block;
+      text-decoration:none;
+      color:inherit;
+    }
 
-    .media{ aspect-ratio:4/3; position:relative; background: rgba(255,255,255,.04); }
-    .media img{ width:100%; height:100%; object-fit:cover; display:block; }
+    .media{
+      aspect-ratio:4/3;
+      position:relative;
+      background: rgba(255,255,255,.04);
+    }
+
+    .media img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
     .shine{
-      position:absolute; inset:0;
+      position:absolute;
+      inset:0;
       background: radial-gradient(800px 260px at 50% 18%, transparent, rgba(0,0,0,.38));
       pointer-events:none;
     }
 
-    .body{ padding:12px 12px 10px; }
-    .row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-    .title{ margin:0; font-size:16px; line-height:1.2; letter-spacing:-.01em; }
-    .price{ white-space:nowrap; font-weight:750; opacity:.95; }
+    .body{
+      padding:12px 12px 10px;
+    }
+
+    .row{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+    }
+
+    .title{
+      margin:0;
+      font-size:16px;
+      line-height:1.2;
+      letter-spacing:-.01em;
+    }
+
+    .price{
+      white-space:nowrap;
+      font-weight:750;
+      opacity:.95;
+    }
+
     .desc{
       margin:8px 0 0;
       font-size:13px;
       opacity:.85;
-      line-height:1.35;
-      min-height:2.7em;
+      line-height:1.4;
+      min-height:2.9em;
     }
 
-    .actions{ display:flex; gap:10px; padding:10px 12px 14px; }
-    .actions .btn{ flex:1; }
+    .actions{
+      display:flex;
+      gap:10px;
+      padding:10px 12px 14px;
+    }
+
+    .actions .btn{
+      flex:1;
+    }
 
     .empty{
       margin-top:14px;
@@ -523,17 +720,35 @@ const ROUTES = {
       background: rgba(0,0,0,.14);
     }
 
-    .skel-card{ pointer-events:none; }
+    .skel-card{
+      pointer-events:none;
+    }
+
     .skel{
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
       background-size: 200% 100%;
       animation: shimmer 1.2s infinite;
       border-radius: 14px;
     }
-    .line{ height:12px; margin-top:10px; }
-    @keyframes shimmer{ 0%{background-position:0% 0} 100%{background-position:200% 0} }
 
-    @media (max-width: 920px){ .card{ grid-column: span 6; } }
-    @media (max-width: 560px){ .card{ grid-column: span 12; } }
+    .line{
+      height:12px;
+      margin-top:10px;
+    }
+
+    @keyframes shimmer{
+      0%{ background-position:0% 0; }
+      100%{ background-position:200% 0; }
+    }
+
+    @media (max-width: 920px){
+      .card{ grid-column: span 6; }
+    }
+
+    @media (max-width: 560px){
+      .card{ grid-column: span 12; }
+      .hero{ min-height: 260px; }
+      .hero-inner{ padding:18px; }
+    }
   </style>
 </BaseLayout>

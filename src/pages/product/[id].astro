@@ -1,21 +1,10 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 
-export const prerender = true;
-
-type Money = { amount: number; currency: string };
+export const prerender = false;
 
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
-
-const SQUARE_SHOP = "https://deeper-than-skin-llc.square.site/s/shop";
-
-const ROUTES = {
-  shop: `${base}shop`,
-  featured: `${base}featured`,
-  wellness: `${base}category/wellness`,
-  cart: `${base}cart`,
-};
 
 const API_BASE =
   (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
@@ -25,70 +14,19 @@ const APP_SLUG =
   (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
   "deeper-than-skin";
 
+const ROUTES = {
+  shop: `${base}shop`,
+  featured: `${base}featured`,
+  wellness: `${base}category/wellness`,
+  cart: `${base}cart`,
+};
+
 const { id } = Astro.params;
 
-const productEndpoint =
-  `${API_BASE}/public.commerce.product.get.php` +
-  `?app_slug=${encodeURIComponent(APP_SLUG)}` +
-  `&id=${encodeURIComponent(String(id || ""))}`;
-
-const listEndpoint =
-  `${API_BASE}/public.commerce.products.get.php` +
-  `?app_slug=${encodeURIComponent(APP_SLUG)}` +
-  `&limit=700`;
-
+const pdpEndpoint = `${base}api/commerce/pdp/${encodeURIComponent(String(id || ""))}`;
 const checkoutEndpoint =
-  `${API_BASE}/public.commerce.checkout.post.php` +
-  `?app_slug=${encodeURIComponent(APP_SLUG)}`;
-
-export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
-  const API_BASE_INNER =
-    (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
-    "https://smashpro.app/api/v1/routes";
-
-  const APP_SLUG_INNER =
-    (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
-    "deeper-than-skin";
-
-  const candidates = [
-    `${API_BASE_INNER}/public.commerce.products.get.php?app_slug=${encodeURIComponent(APP_SLUG_INNER)}&limit=900`,
-    `${API_BASE_INNER}/public.commerce.products.list.php?app_slug=${encodeURIComponent(APP_SLUG_INNER)}&limit=900`,
-    `${API_BASE_INNER}/public.commerce.catalog.get.php?app_slug=${encodeURIComponent(APP_SLUG_INNER)}&limit=900`,
-  ];
-
-  const extractItems = (data: any) => {
-    if (!data) return [];
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.products)) return data.products;
-    if (Array.isArray(data.data)) return data.data;
-    return [];
-  };
-
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      const text = await res.text();
-      if (!res.ok) continue;
-      if (text.trim().startsWith("<")) continue;
-
-      const data = JSON.parse(text) as any;
-
-      const items = extractItems(data);
-      const ids = items
-        .map((p: any) => String(p?.id || p?.product_id || "").trim())
-        .filter(Boolean);
-
-      if (ids.length) {
-        const uniq = Array.from(new Set(ids));
-        return uniq.map((pid): { params: { id: string } } => ({ params: { id: String(pid) } }));
-      }
-    } catch {
-      // try next candidate
-    }
-  }
-
-  return [];
-}
+  `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
+const subscriptionCheckoutEndpoint = `${base}api/commerce/subscription-checkout`;
 ---
 
 <BaseLayout title="Product | Deeper Than Skin">
@@ -103,34 +41,45 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
       <div
         id="product"
         class="prod"
-        data-endpoint={productEndpoint}
-        data-list-endpoint={listEndpoint}
+        data-endpoint={pdpEndpoint}
         data-checkout={checkoutEndpoint}
-        data-square={SQUARE_SHOP}
+        data-subscription-checkout={subscriptionCheckoutEndpoint}
         data-base={base}
         data-id={String(id || "")}
         data-routes={JSON.stringify(ROUTES)}
       >
         <div class="prod-left">
           <div class="media skel" aria-hidden="true"></div>
+          <div class="thumb-row">
+            <div class="thumb skel" aria-hidden="true"></div>
+            <div class="thumb skel" aria-hidden="true"></div>
+            <div class="thumb skel" aria-hidden="true"></div>
+          </div>
         </div>
 
         <div class="prod-right">
           <div class="skel pill" aria-hidden="true"></div>
           <div class="skel title" aria-hidden="true"></div>
+          <div class="skel hook" aria-hidden="true"></div>
           <div class="skel price" aria-hidden="true"></div>
-          <div class="skel line w90" aria-hidden="true"></div>
-          <div class="skel line w80" aria-hidden="true"></div>
-          <div class="skel line w70" aria-hidden="true"></div>
-          <div class="btns" style="margin-top:18px">
-            <span class="btn btn-primary" aria-hidden="true">Loading…</span>
-            <span class="btn btn-ghost" aria-hidden="true">Loading…</span>
+          <div class="chip-row">
+            <span class="chip skel" aria-hidden="true"></span>
+            <span class="chip skel" aria-hidden="true"></span>
+            <span class="chip skel" aria-hidden="true"></span>
+          </div>
+          <div class="panel" style="margin-top:18px">
+            <div class="skel line w90" aria-hidden="true"></div>
+            <div class="skel line w80" aria-hidden="true"></div>
+            <div class="btns" style="margin-top:18px">
+              <span class="btn btn-primary" aria-hidden="true">Loading…</span>
+              <span class="btn btn-ghost" aria-hidden="true">Loading…</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <section class="panel" style="margin-top:18px">
-        <div class="kicker">Tip</div>
+      <section class="panel ritual-panel" style="margin-top:20px">
+        <div class="kicker">Ritual pairing</div>
         <h2 class="h2">Make it a ritual</h2>
         <p class="p">Pair a product with a wellness staple for a complete routine.</p>
         <div class="btns">
@@ -148,16 +97,31 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
     if (!root) throw new Error("product root missing");
 
     const endpoint = root.getAttribute("data-endpoint") || "";
-    const listEndpoint = root.getAttribute("data-list-endpoint") || "";
     const checkoutEndpoint = root.getAttribute("data-checkout") || "";
-    const squareShop = root.getAttribute("data-square") || "#";
+    const subscriptionCheckoutEndpoint = root.getAttribute("data-subscription-checkout") || "";
     const base = root.getAttribute("data-base") || "/";
     const wantedId = root.getAttribute("data-id") || "";
 
     const routes = (() => {
-      try { return JSON.parse(root.getAttribute("data-routes") || "{}"); }
-      catch { return {}; }
+      try {
+        return JSON.parse(root.getAttribute("data-routes") || "{}");
+      } catch {
+        return {};
+      }
     })();
+
+    /** @type {{
+     *   mode: "one-time" | "subscription";
+     *   selectedSubscriptionOptionId: string;
+     *   pdp: any;
+     *   qty: number;
+     * }} */
+    const state = {
+      mode: "one-time",
+      selectedSubscriptionOptionId: "",
+      pdp: null,
+      qty: 1,
+    };
 
     const escapeHtml = (s) =>
       String(s ?? "")
@@ -171,23 +135,11 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
       if (!pm || typeof pm.amount !== "number") return "";
       const amt = pm.amount / 100;
       const cur = pm.currency || "USD";
-      try { return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt); }
-      catch { return `$${amt.toFixed(2)}`; }
-    };
-
-    const pickFallback = (name) => {
-      const s = String(name || "").toLowerCase();
-      if (s.includes("juice")) return `${base}images/cat-juices.jpg`;
-      if (s.includes("moss")) return `${base}images/cat-seamoss.jpg`;
-      if (s.includes("kit") || s.includes("cleanse") || s.includes("detox")) return `${base}images/cat-kits.jpg`;
-      if (s.includes("tea") || s.includes("herb") || s.includes("oil")) return `${base}images/cat-herbs.jpg`;
-      return `${base}images/product-fallback.jpg`;
-    };
-
-    const bestBuyUrl = (p) => {
-      const url = p?.checkout_url || p?.buy_url || p?.square_url || p?.permalink || "";
-      if (url && typeof url === "string" && url.startsWith("http")) return url;
-      return squareShop;
+      try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
+      } catch {
+        return `$${amt.toFixed(2)}`;
+      }
     };
 
     async function fetchJson(url) {
@@ -198,100 +150,268 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
       return JSON.parse(text);
     }
 
-    function extractProduct(data) {
-      if (!data) return null;
-      if (data.item) return data.item;
-      if (data.product) return data.product;
-      if (Array.isArray(data.items) && data.items[0]) return data.items[0];
-      return null;
+    function normalizeDesc(desc) {
+      return String(desc || "")
+        .replace(/\s+/g, " ")
+        .replace(/\s*•\s*/g, " • ")
+        .trim();
     }
 
-    async function getProduct() {
-      try {
-        const data = await fetchJson(endpoint);
-        const p = extractProduct(data);
-        if (p) return p;
-      } catch (e) {
-        console.warn("[product] primary endpoint failed:", e);
+    function makeHook(name, desc) {
+      const normalized = normalizeDesc(desc);
+      if (normalized) {
+        const firstSentence = normalized.split(/(?<=[.!?])\s+/)[0]?.trim();
+        if (firstSentence && firstSentence.length <= 150) return firstSentence;
       }
 
-      const list = await fetchJson(listEndpoint);
-      const items =
-        (list?.ok === true && Array.isArray(list.items) ? list.items : null) ||
-        (Array.isArray(list?.items) ? list.items : null) ||
-        (Array.isArray(list?.products) ? list.products : null) ||
-        (Array.isArray(list) ? list : null) ||
-        [];
-
-      const found = items.find((x) => String(x?.id || x?.product_id || "") === String(wantedId));
-      if (!found) throw new Error("Product not found");
-      return found;
+      const safeName = String(name || "This ritual");
+      return `${safeName} is crafted to nourish skin, elevate the everyday, and turn care into ritual.`;
     }
 
-    function render(p) {
-      const name = escapeHtml(p?.name || "Product");
-      const desc = escapeHtml(p?.description || "");
-      const img = (p?.image_url && String(p.image_url).trim()) ? p.image_url : pickFallback(p?.name);
-      const price = p?.has_price ? money(p?.price_money) : "";
-      const buyUrl = bestBuyUrl(p);
+    function makeBenefits(desc) {
+      const text = String(desc || "").toLowerCase();
+      const picks = [];
 
-      const variationId = String(p?.variation_id || "").trim();
-      const canCart = variationId.length > 0;
+      const push = (label) => {
+        if (!picks.includes(label) && picks.length < 4) picks.push(label);
+      };
 
-      const cartUrl = escapeHtml(routes.cart || `${base}cart`);
-      const shopUrl = escapeHtml(routes.shop || `${base}shop`);
+      if (/hydrat|moistur|dry/.test(text)) push("Deep hydration");
+      if (/barrier|nourish|restore/.test(text)) push("Barrier support");
+      if (/soft|smooth|silk|velvet/.test(text)) push("Soft, silky finish");
+      if (/glow|radiant|luminous/.test(text)) push("Healthy glow");
+      if (/daily|ritual|everyday/.test(text)) push("Daily ritual care");
+      if (/calm|soothe|comfort/.test(text)) push("Comforting care");
 
-      root.innerHTML = `
-        <div class="prod-left">
-          <div class="media">
-            <img src="${escapeHtml(img)}" alt="${name}" loading="lazy"
-                 onerror="this.onerror=null;this.src='${escapeHtml(pickFallback(p?.name))}';" />
-            <div class="media-glow" aria-hidden="true"></div>
+      if (!picks.length) {
+        push("Daily ritual care");
+        push("Nourishing formula");
+        push("Soft skin finish");
+      }
+
+      return picks.slice(0, 4);
+    }
+
+    function getSelectedOption() {
+      const sub = state.pdp?.subscription;
+      if (!sub?.enabled || !Array.isArray(sub.options)) return null;
+      return sub.options.find((x) => x.id === state.selectedSubscriptionOptionId) || null;
+    }
+
+    function renderPriceBlock() {
+      const oneTime = state.pdp?.one_time;
+      const selected = getSelectedOption();
+
+      if (state.mode === "subscription" && selected) {
+        const subscriberPrice = money(selected.subscriber_price_money);
+        const compareAt = money(selected.compare_at_price_money);
+        const discount = selected.discount_percent ? `${selected.discount_percent}% off` : "";
+
+        return `
+          <div class="price-stack">
+            <div class="price">${escapeHtml(subscriberPrice)}</div>
+            <div class="price-subrow">
+              ${compareAt ? `<span class="compare-at">${escapeHtml(compareAt)}</span>` : ""}
+              ${discount ? `<span class="save-badge">${escapeHtml(discount)}</span>` : ""}
+            </div>
+          </div>
+        `;
+      }
+
+      if (oneTime?.has_price && oneTime?.price_money) {
+        return `
+          <div class="price-stack">
+            <div class="price">${escapeHtml(money(oneTime.price_money))}</div>
+          </div>
+        `;
+      }
+
+      return `<div class="price muted">See price at checkout</div>`;
+    }
+
+    function renderQty() {
+      return `
+        <div class="qty-wrap">
+          <div class="qty-label">Quantity</div>
+          <div class="qty-control">
+            <button type="button" class="qty-btn" data-qty="minus" aria-label="Decrease quantity">−</button>
+            <span class="qty-value" id="qty-value">${state.qty}</span>
+            <button type="button" class="qty-btn" data-qty="plus" aria-label="Increase quantity">+</button>
           </div>
         </div>
+      `;
+    }
 
-        <div class="prod-right">
-          <div class="pill">Deeper Than Skin</div>
-          <h1 class="title">${name}</h1>
+    function renderSubscriptionOptions(subscription) {
+      if (!subscription?.enabled || !Array.isArray(subscription.options) || !subscription.options.length) {
+        return "";
+      }
 
-          ${
-            price
-              ? `<div class="price">${escapeHtml(price)}</div>`
-              : `<div class="price muted">See price at checkout</div>`
-          }
+      const cards = subscription.options
+        .filter((opt) => opt?.enabled)
+        .map((opt) => {
+          const active = state.selectedSubscriptionOptionId === opt.id;
+          return `
+            <button
+              type="button"
+              class="sub-card ${active ? "is-active" : ""}"
+              data-sub-option="${escapeHtml(opt.id)}"
+            >
+              <div class="sub-top">
+                <div class="sub-title">${escapeHtml(opt.label)}</div>
+                ${opt.badge ? `<span class="sub-badge">${escapeHtml(opt.badge)}</span>` : ""}
+              </div>
+              ${opt.description ? `<div class="sub-desc">${escapeHtml(opt.description)}</div>` : ""}
+              <div class="sub-price-row">
+                <strong>${escapeHtml(money(opt.subscriber_price_money))}</strong>
+                ${opt.compare_at_price_money ? `<span class="compare-at">${escapeHtml(money(opt.compare_at_price_money))}</span>` : ""}
+              </div>
+            </button>
+          `;
+        })
+        .join("");
 
-          ${desc ? `<p class="desc">${desc}</p>` : `<p class="desc muted">No description yet.</p>`}
+      return `
+        <section class="purchase-panel ${state.mode === "subscription" ? "" : "is-hidden"}" id="subscription-panel">
+          <div class="section-head">
+            <h3 class="section-title">${escapeHtml(subscription.headline || "Subscribe & save")}</h3>
+            ${subscription.subheadline ? `<p class="section-copy">${escapeHtml(subscription.subheadline)}</p>` : ""}
+          </div>
+          <div class="sub-grid">${cards}</div>
+          <div class="policy-list">
+            ${subscription.cancellation_summary ? `<div>• ${escapeHtml(subscription.cancellation_summary)}</div>` : ""}
+            ${subscription.shipping_summary ? `<div>• ${escapeHtml(subscription.shipping_summary)}</div>` : ""}
+          </div>
+        </section>
+      `;
+    }
 
-          ${
-            canCart
-              ? `<div class="btns">
-                   <button class="btn btn-primary" id="add" type="button">Add to cart</button>
-                   <a class="btn btn-ghost" href="${cartUrl}">View cart <span class="dot"></span><span id="cc" class="cc">${Cart.count()}</span></a>
-                 </div>
-                 <div class="btns" style="margin-top:10px">
-                   <button class="btn btn-ghost" id="checkout" type="button">Checkout now</button>
-                   <a class="btn btn-ghost" href="${shopUrl}">Continue browsing</a>
-                 </div>
-                 <div class="fineprint">Payment happens securely at Square checkout.</div>
-                 <div class="error" id="err" style="display:none"></div>
-                 <div class="toast" id="toast" aria-live="polite" style="display:none"></div>`
-              : `<div class="panel-inline">
-                   <div class="kicker">Heads up</div>
-                   <div class="small" style="opacity:.86;line-height:1.5">
-                     This item is missing a <strong>variation_id</strong>, so it can’t be added to cart yet.
-                     You can still purchase it on Square.
-                   </div>
-                   <div class="btns" style="margin-top:12px">
-                     <a class="btn btn-primary" href="${escapeHtml(buyUrl)}" target="_blank" rel="noopener noreferrer">Buy on Square</a>
-                     <a class="btn btn-ghost" href="${shopUrl}">Continue browsing</a>
-                   </div>
-                 </div>`
-          }
+    function renderPurchaseModes(pdp) {
+      const hasOneTime = !!pdp?.one_time?.enabled;
+      const hasSub = !!pdp?.subscription?.enabled;
+
+      if (!hasOneTime && !hasSub) return "";
+
+      if (state.mode === "subscription" && !hasSub) state.mode = hasOneTime ? "one-time" : "subscription";
+      if (state.mode === "one-time" && !hasOneTime) state.mode = hasSub ? "subscription" : "one-time";
+
+      return `
+        <section class="purchase-shell">
+          <div class="buy-card-head">
+            <div>
+              <div class="buy-kicker">Purchase options</div>
+              <div class="buy-title">Choose your ritual</div>
+            </div>
+          </div>
+          <div class="mode-toggle" role="tablist" aria-label="Purchase options">
+            ${
+              hasOneTime
+                ? `<button type="button" class="mode-btn ${state.mode === "one-time" ? "is-active" : ""}" data-mode="one-time">One-time purchase</button>`
+                : ""
+            }
+            ${
+              hasSub
+                ? `<button type="button" class="mode-btn ${state.mode === "subscription" ? "is-active" : ""}" data-mode="subscription">Subscribe & save</button>`
+                : ""
+            }
+          </div>
+          ${state.mode === "one-time" ? renderQty() : ""}
+          ${renderSubscriptionOptions(pdp.subscription)}
+        </section>
+      `;
+    }
+
+    function renderCtas(pdp) {
+      const oneTime = pdp?.one_time;
+      const hasCart = !!oneTime?.enabled;
+      const hasSubscription = !!pdp?.subscription?.enabled;
+
+      if (state.mode === "subscription" && hasSubscription) {
+        return `
+          <div class="cta-stack">
+            <div class="btns btns-col">
+              <button class="btn btn-primary btn-wide" id="start-subscription" type="button">Start subscription</button>
+              <a class="btn btn-ghost btn-wide" href="${escapeHtml(routes.shop || `${base}shop`)}">Continue browsing</a>
+            </div>
+            <div class="fineprint">
+              You’ll complete signup in secure Square checkout.
+            </div>
+            <div class="trust-row">
+              <span>Secure hosted checkout</span>
+              <span>Flexible delivery cadence</span>
+            </div>
+            <div class="error" id="err" style="display:none"></div>
+            <div class="toast" id="toast" aria-live="polite" style="display:none"></div>
+          </div>
+        `;
+      }
+
+      if (hasCart) {
+        return `
+          <div class="cta-stack">
+            <div class="btns btns-col">
+              <button class="btn btn-primary btn-wide" id="add" type="button">Add to cart</button>
+              <button class="btn btn-ghost btn-wide" id="checkout" type="button">Buy now</button>
+            </div>
+            <div class="inline-links">
+              <a class="mini-link" href="${escapeHtml(routes.cart || `${base}cart`)}">View cart <span class="dot"></span><span id="cc" class="cc">${Cart.count()}</span></a>
+              <a class="mini-link" href="${escapeHtml(routes.shop || `${base}shop`)}">Continue browsing</a>
+            </div>
+            <div class="fineprint">${escapeHtml(pdp?.policies?.checkout_summary || "Payment happens securely at Square checkout.")}</div>
+            <div class="trust-row">
+              <span>Secure Square checkout</span>
+              <span>Fast hosted payment link</span>
+            </div>
+            <div class="error" id="err" style="display:none"></div>
+            <div class="toast" id="toast" aria-live="polite" style="display:none"></div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="panel-inline">
+          <div class="kicker">Heads up</div>
+          <div class="small" style="opacity:.86;line-height:1.5">
+            This item is not configured for purchase yet.
+          </div>
+          <div class="btns" style="margin-top:12px">
+            <a class="btn btn-primary" href="${escapeHtml(routes.shop || `${base}shop`)}">Back to shop</a>
+          </div>
         </div>
       `;
+    }
 
-      if (!canCart) return;
+    function renderAccordions(desc, benefits) {
+      const cleanDesc = normalizeDesc(desc);
+      const benefitList = benefits.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
 
+      return `
+        <section class="details-block">
+          <details class="detail-item" open>
+            <summary>Description</summary>
+            <div class="detail-copy">
+              <p>${escapeHtml(cleanDesc || "No description yet.")}</p>
+            </div>
+          </details>
+
+          <details class="detail-item">
+            <summary>Why you’ll love it</summary>
+            <div class="detail-copy">
+              <ul class="detail-list">${benefitList}</ul>
+            </div>
+          </details>
+
+          <details class="detail-item">
+            <summary>How to use</summary>
+            <div class="detail-copy">
+              <p>Warm a small amount between palms and massage into clean, dry or slightly damp skin as part of your daily ritual.</p>
+            </div>
+          </details>
+        </section>
+      `;
+    }
+
+    function bindEvents(pdp) {
       const showErr = (msg) => {
         const el = root.querySelector("#err");
         if (!el) return;
@@ -312,7 +432,7 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
         el.textContent = msg;
         el.style.display = "block";
         clearTimeout(el._t);
-        el._t = setTimeout(() => (el.style.display = "none"), 1600);
+        el._t = setTimeout(() => (el.style.display = "none"), 1800);
       };
 
       const updateCount = () => {
@@ -320,17 +440,41 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
         if (cc) cc.textContent = String(Cart.count());
       };
 
+      root.querySelectorAll("[data-mode]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.mode = btn.getAttribute("data-mode") || "one-time";
+          render(pdp);
+        });
+      });
+
+      root.querySelectorAll("[data-sub-option]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.selectedSubscriptionOptionId = btn.getAttribute("data-sub-option") || "";
+          render(pdp);
+        });
+      });
+
+      root.querySelectorAll("[data-qty]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const dir = btn.getAttribute("data-qty");
+          if (dir === "minus") state.qty = Math.max(1, state.qty - 1);
+          if (dir === "plus") state.qty = Math.min(20, state.qty + 1);
+          const value = root.querySelector("#qty-value");
+          if (value) value.textContent = String(state.qty);
+        });
+      });
+
       root.querySelector("#add")?.addEventListener("click", () => {
         hideErr();
         try {
           Cart.add({
-            id: String(p.id),
-            variation_id: variationId,
-            name: p.name,
-            image_url: p.image_url || "",
-            price_money: p.price_money || null,
-            has_price: !!p.has_price,
-            qty: 1,
+            id: String(pdp?.product?.id || ""),
+            variation_id: pdp?.one_time?.variation_id,
+            name: pdp?.product?.name || "",
+            image_url: pdp?.product?.image_url || "",
+            price_money: pdp?.one_time?.price_money || null,
+            has_price: !!pdp?.one_time?.has_price,
+            qty: state.qty,
           });
           updateCount();
           toast("Added to cart");
@@ -342,56 +486,156 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
       root.querySelector("#checkout")?.addEventListener("click", async () => {
         hideErr();
         try {
-          const { items } = Cart.get();
-          if (!items.length) throw new Error("Cart is empty");
-
-          const invalid = items.find((it) => !it?.variation_id);
-          if (invalid) throw new Error(`Missing variation_id: ${invalid?.name || invalid?.id}`);
+          const variationId = pdp?.one_time?.variation_id;
+          if (!variationId) throw new Error("Missing variation_id");
 
           const payload = {
-            cart: items.map((it) => ({
-              variation_id: it.variation_id,
-              qty: Number(it.qty || 1),
-            })),
+            cart: [
+              {
+                variation_id: variationId,
+                qty: Number(state.qty || 1),
+              },
+            ],
           };
 
           const res = await fetch(checkoutEndpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
             body: JSON.stringify(payload),
           });
 
           const text = await res.text();
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 160)}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 180)}`);
           if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
 
           const data = JSON.parse(text);
-          if (!data?.ok || !data?.checkout_url) throw new Error(data?.error || "Checkout unavailable");
+          if (!data?.ok || !data?.checkout_url) {
+            throw new Error(data?.error || "Checkout unavailable");
+          }
+
           window.location.href = data.checkout_url;
         } catch (e) {
           showErr(e?.message || "Checkout failed");
         }
       });
 
+      root.querySelector("#start-subscription")?.addEventListener("click", async () => {
+        hideErr();
+        try {
+          const selected = getSelectedOption();
+          if (!selected) throw new Error("Please choose a delivery frequency");
+
+          const res = await fetch(subscriptionCheckoutEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify({
+              productId: pdp?.product?.id,
+              optionId: selected.id,
+            }),
+          });
+
+          const text = await res.text();
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 180)}`);
+          if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
+          const data = JSON.parse(text);
+          if (!data?.ok || !data?.checkoutUrl) {
+            throw new Error(data?.error || "Subscription checkout unavailable");
+          }
+
+          window.location.href = data.checkoutUrl;
+        } catch (e) {
+          showErr(e?.message || "Unable to start subscription");
+        }
+      });
+
       window.addEventListener("dts:cart", updateCount);
+    }
+
+    function render(pdp) {
+      state.pdp = pdp;
+
+      const name = escapeHtml(pdp?.product?.name || "Product");
+      const rawDesc = String(pdp?.product?.description || "");
+      const img = escapeHtml(pdp?.product?.image_url || `${base}images/product-fallback.jpg`);
+      const hook = makeHook(pdp?.product?.name, rawDesc);
+      const benefits = makeBenefits(rawDesc);
+
+      if (
+        pdp?.subscription?.enabled &&
+        !state.selectedSubscriptionOptionId &&
+        Array.isArray(pdp.subscription.options)
+      ) {
+        const firstEnabled = pdp.subscription.options.find((x) => x?.enabled);
+        if (firstEnabled) state.selectedSubscriptionOptionId = firstEnabled.id;
+      }
+
+      root.innerHTML = `
+        <div class="prod-left">
+          <div class="media-shell">
+            <div class="media">
+              <img src="${img}" alt="${name}" loading="lazy"
+                onerror="this.onerror=null;this.src='${escapeHtml(`${base}images/product-fallback.jpg`)}';" />
+              <div class="media-glow" aria-hidden="true"></div>
+            </div>
+            ${Array.isArray(pdp?.product?.gallery) && pdp.product.gallery.length > 1 ? `
+            <div class="thumb-row">
+              ${pdp.product.gallery.map((src, i) => `
+                <button class="thumb ${i === 0 ? "is-active" : ""}" type="button" data-gallery="${escapeHtml(src)}">
+                  <img src="${escapeHtml(src)}" alt="" />
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
+          </div>
+        </div>
+
+        <div class="prod-right">
+          <div class="pill">${escapeHtml(pdp?.product?.brand || "Deeper Than Skin")}</div>
+
+          <h1 class="title">${name}</h1>
+
+          <p class="hook">${escapeHtml(hook)}</p>
+
+          ${renderPriceBlock()}
+
+          <div class="benefits">
+            ${benefits.map((b) => `<span>${escapeHtml(b)}</span>`).join("")}
+          </div>
+
+          <div class="buy-card">
+            ${renderPurchaseModes(pdp)}
+            ${renderCtas(pdp)}
+          </div>
+
+          ${renderAccordions(rawDesc, benefits)}
+        </div>
+      `;
+
+      bindEvents(pdp);
     }
 
     (async function load() {
       try {
-        const p = await getProduct();
-        render(p);
+        const data = await fetchJson(endpoint);
+        if (!data?.ok) throw new Error(data?.error || "Unable to load product");
+        render(data);
       } catch (e) {
         console.error("[product] load failed:", e);
-        const shopUrl = escapeHtml(routes.shop || `${base}shop`);
-        const featuredUrl = escapeHtml(routes.featured || `${base}featured`);
         root.innerHTML = `
           <div class="panel" style="grid-column:1/-1">
             <div class="kicker">Error</div>
             <h2 class="h2" style="margin:6px 0 8px">Couldn’t load product</h2>
-            <p class="p">Check product id and API route. If needed, confirm the product exists in the list endpoint.</p>
+            <p class="p">Check product id and API route. If needed, confirm the product exists and that the local PDP API is available.</p>
             <div class="btns">
-              <a class="btn btn-primary" href="${shopUrl}">Back to shop</a>
-              <a class="btn btn-ghost" href="${featuredUrl}">Featured</a>
+              <a class="btn btn-primary" href="${escapeHtml(routes.shop || `${base}shop`)}">Back to shop</a>
+              <a class="btn btn-ghost" href="${escapeHtml(routes.featured || `${base}featured`)}">Featured</a>
             </div>
             <p class="fineprint" style="margin-top:10px">Product id: <span style="opacity:.9">${escapeHtml(wantedId)}</span></p>
           </div>
@@ -400,8 +644,728 @@ export async function getStaticPaths(): Promise<{ params: { id: string } }[]> {
     })();
   </script>
 
-  <!-- keep your existing styles block as-is (no changes needed) -->
   <style>
-    /* (paste your current product styles here unchanged) */
+    :root{
+      --bg:#07110d;
+      --panel:#0c1813;
+      --panel-2:#102019;
+      --line:rgba(205,186,133,.16);
+      --line-2:rgba(255,255,255,.08);
+      --text:#f5f0e6;
+      --muted:rgba(245,240,230,.74);
+      --gold:#ccb56c;
+      --gold-2:#e4d19a;
+      --danger:#ffb0a8;
+      --shadow:0 20px 60px rgba(0,0,0,.25);
+      --radius:24px;
+    }
+
+    .page{
+      background:
+        radial-gradient(circle at top, rgba(208,183,107,.12), transparent 24%),
+        linear-gradient(180deg, #08120e 0%, #06100c 100%);
+      min-height:100vh;
+      color:var(--text);
+    }
+
+    .container{
+      width:min(1240px, calc(100% - 32px));
+      margin:0 auto;
+      padding:20px 0 56px;
+    }
+
+    .crumbs{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:var(--muted);
+      font-size:.92rem;
+      margin-bottom:18px;
+    }
+
+    .crumbs a{
+      color:var(--text);
+      text-decoration:none;
+      opacity:.88;
+    }
+
+    .sep,.muted{ opacity:.64; }
+
+    .prod{
+      display:grid;
+      grid-template-columns:minmax(320px, 560px) minmax(320px, 1fr);
+      gap:34px;
+      align-items:start;
+    }
+
+    .prod-left,
+    .prod-right{
+      min-width:0;
+    }
+
+    .media-shell{
+      display:grid;
+      gap:14px;
+    }
+
+    .media{
+      position:relative;
+      border:1px solid var(--line);
+      border-radius:28px;
+      overflow:hidden;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      box-shadow:var(--shadow);
+    }
+
+    .media img{
+      display:block;
+      width:100%;
+      aspect-ratio:1/1;
+      object-fit:cover;
+    }
+
+    .media-glow{
+      position:absolute;
+      inset:auto 10% -15% 10%;
+      height:22%;
+      background:radial-gradient(circle, rgba(228,209,154,.22), transparent 65%);
+      pointer-events:none;
+      filter:blur(20px);
+    }
+
+    .thumb-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .thumb{
+      width:82px;
+      height:82px;
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid var(--line-2);
+      background:rgba(255,255,255,.02);
+      padding:0;
+    }
+
+    .thumb img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    .thumb.is-active{
+      border-color:rgba(204,181,108,.42);
+      box-shadow:0 10px 24px rgba(0,0,0,.14);
+    }
+
+    .prod-right{
+      padding:4px 2px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      min-height:34px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      color:var(--gold-2);
+      font-size:.84rem;
+      letter-spacing:.02em;
+    }
+
+    .title{
+      margin:14px 0 8px;
+      font-size:clamp(2.2rem, 4vw, 3.35rem);
+      line-height:1.02;
+      letter-spacing:-.03em;
+      max-width:12ch;
+    }
+
+    .hook{
+      margin:10px 0 0;
+      font-size:1.05rem;
+      line-height:1.65;
+      color:rgba(245,240,230,.92);
+      max-width:52ch;
+    }
+
+    .price-stack{ margin:18px 0 8px; }
+
+    .price{
+      font-size:1.9rem;
+      font-weight:700;
+      color:var(--text);
+      letter-spacing:-.02em;
+    }
+
+    .price-subrow{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+
+    .compare-at{
+      color:var(--muted);
+      text-decoration:line-through;
+      font-size:.95rem;
+    }
+
+    .save-badge{
+      display:inline-flex;
+      align-items:center;
+      padding:4px 10px;
+      border-radius:999px;
+      background:rgba(204,181,108,.14);
+      border:1px solid var(--line);
+      color:var(--gold-2);
+      font-size:.82rem;
+      font-weight:600;
+    }
+
+    .benefits{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin:16px 0 0;
+    }
+
+    .benefits span{
+      font-size:.8rem;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      color:var(--gold-2);
+      white-space:nowrap;
+    }
+
+    .buy-card{
+      margin-top:22px;
+      padding:18px;
+      border-radius:24px;
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+      box-shadow:var(--shadow);
+    }
+
+    .buy-card-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:start;
+      gap:12px;
+      margin-bottom:12px;
+    }
+
+    .buy-kicker{
+      font-size:.76rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--gold-2);
+      opacity:.82;
+    }
+
+    .buy-title{
+      margin-top:5px;
+      font-size:1.02rem;
+      font-weight:700;
+    }
+
+    .purchase-shell{
+      display:grid;
+      gap:14px;
+    }
+
+    .mode-toggle{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .mode-btn{
+      min-height:52px;
+      border-radius:16px;
+      border:1px solid var(--line-2);
+      background:rgba(255,255,255,.02);
+      color:var(--text);
+      font:inherit;
+      cursor:pointer;
+      padding:0 16px;
+      text-align:center;
+      transition:.18s ease;
+    }
+
+    .mode-btn:hover{
+      border-color:var(--line);
+      transform:translateY(-1px);
+    }
+
+    .mode-btn.is-active{
+      background:linear-gradient(180deg, rgba(204,181,108,.18), rgba(204,181,108,.08));
+      border-color:rgba(204,181,108,.38);
+      color:var(--gold-2);
+      box-shadow:0 10px 30px rgba(0,0,0,.18);
+    }
+
+    .qty-wrap{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid var(--line-2);
+      background:rgba(255,255,255,.02);
+    }
+
+    .qty-label{
+      color:var(--muted);
+      font-size:.92rem;
+    }
+
+    .qty-control{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .qty-btn{
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      font-size:1.1rem;
+      cursor:pointer;
+    }
+
+    .qty-value{
+      min-width:22px;
+      text-align:center;
+      font-weight:700;
+    }
+
+    .purchase-panel{
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:18px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+    }
+
+    .purchase-panel.is-hidden{
+      display:none;
+    }
+
+    .section-head{
+      margin-bottom:14px;
+    }
+
+    .section-title{
+      margin:0;
+      font-size:1.05rem;
+      letter-spacing:.01em;
+    }
+
+    .section-copy{
+      margin:8px 0 0;
+      color:var(--muted);
+      line-height:1.6;
+      font-size:.95rem;
+    }
+
+    .sub-grid{
+      display:grid;
+      gap:12px;
+    }
+
+    .sub-card{
+      width:100%;
+      text-align:left;
+      border-radius:18px;
+      border:1px solid var(--line-2);
+      background:rgba(255,255,255,.02);
+      color:var(--text);
+      padding:14px;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .sub-card:hover{
+      transform:translateY(-1px);
+      border-color:var(--line);
+    }
+
+    .sub-card.is-active{
+      border-color:rgba(204,181,108,.42);
+      background:linear-gradient(180deg, rgba(204,181,108,.14), rgba(204,181,108,.05));
+      box-shadow:0 10px 24px rgba(0,0,0,.16);
+    }
+
+    .sub-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .sub-title{
+      font-weight:700;
+      font-size:1rem;
+    }
+
+    .sub-badge{
+      display:inline-flex;
+      align-items:center;
+      min-height:28px;
+      padding:0 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(204,181,108,.12);
+      color:var(--gold-2);
+      font-size:.78rem;
+      white-space:nowrap;
+    }
+
+    .sub-desc{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:.92rem;
+      line-height:1.55;
+    }
+
+    .sub-price-row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:10px;
+      flex-wrap:wrap;
+    }
+
+    .policy-list{
+      display:grid;
+      gap:6px;
+      margin-top:14px;
+      color:var(--muted);
+      font-size:.92rem;
+      line-height:1.55;
+    }
+
+    .cta-stack{
+      margin-top:16px;
+    }
+
+    .btns{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:20px;
+    }
+
+    .btns-col{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+      margin-top:0;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:48px;
+      padding:0 16px;
+      border-radius:14px;
+      text-decoration:none;
+      border:1px solid var(--line);
+      font-weight:600;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .btn:hover{ transform:translateY(-1px); }
+
+    .btn-primary{
+      background:linear-gradient(180deg, rgba(204,181,108,.24), rgba(204,181,108,.10));
+      color:var(--text);
+    }
+
+    .btn-ghost{
+      background:rgba(255,255,255,.02);
+      color:var(--text);
+    }
+
+    .btn-wide{
+      width:100%;
+    }
+
+    .inline-links{
+      display:flex;
+      align-items:center;
+      gap:16px;
+      flex-wrap:wrap;
+      margin-top:14px;
+    }
+
+    .mini-link{
+      color:var(--text);
+      text-decoration:none;
+      opacity:.88;
+      font-size:.94rem;
+    }
+
+    .mini-link:hover{
+      opacity:1;
+    }
+
+    .dot{
+      display:inline-block;
+      width:4px;
+      height:4px;
+      border-radius:50%;
+      background:currentColor;
+      opacity:.45;
+      margin:0 8px;
+    }
+
+    .cc{
+      min-width:1ch;
+      text-align:center;
+    }
+
+    .fineprint{
+      margin-top:12px;
+      color:var(--muted);
+      font-size:.88rem;
+      line-height:1.55;
+    }
+
+    .trust-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px 14px;
+      margin-top:12px;
+      color:var(--gold-2);
+      opacity:.86;
+      font-size:.82rem;
+    }
+
+    .trust-row span{
+      position:relative;
+      padding-left:14px;
+    }
+
+    .trust-row span::before{
+      content:"";
+      position:absolute;
+      left:0;
+      top:50%;
+      width:6px;
+      height:6px;
+      border-radius:999px;
+      transform:translateY(-50%);
+      background:rgba(204,181,108,.9);
+    }
+
+    .details-block{
+      margin-top:22px;
+      border-top:1px solid var(--line);
+    }
+
+    .detail-item{
+      border-bottom:1px solid var(--line);
+      padding:14px 0;
+    }
+
+    .detail-item summary{
+      cursor:pointer;
+      font-weight:700;
+      list-style:none;
+    }
+
+    .detail-item summary::-webkit-details-marker{
+      display:none;
+    }
+
+    .detail-item summary::after{
+      content:"+";
+      float:right;
+      opacity:.7;
+    }
+
+    .detail-item[open] summary::after{
+      content:"−";
+    }
+
+    .detail-copy{
+      margin-top:12px;
+      color:var(--muted);
+      line-height:1.68;
+    }
+
+    .detail-list{
+      margin:0;
+      padding-left:18px;
+    }
+
+    .error{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,176,168,.22);
+      background:rgba(255,176,168,.08);
+      color:var(--danger);
+      font-size:.92rem;
+      line-height:1.5;
+    }
+
+    .toast{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      z-index:30;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(10,18,14,.94);
+      color:var(--text);
+      box-shadow:var(--shadow);
+      font-size:.92rem;
+    }
+
+    .panel,
+    .panel-inline{
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+
+    .ritual-panel{
+      margin-top:24px;
+    }
+
+    .kicker{
+      font-size:.82rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--gold-2);
+      opacity:.88;
+    }
+
+    .h2{
+      margin:8px 0 10px;
+      font-size:1.5rem;
+    }
+
+    .p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.65;
+    }
+
+    .small{
+      color:var(--muted);
+    }
+
+    .skel{
+      position:relative;
+      overflow:hidden;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line-2);
+    }
+
+    .skel::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      transform:translateX(-100%);
+      background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+      animation:shimmer 1.2s infinite;
+    }
+
+    .skel.media{
+      aspect-ratio:1/1;
+      border-radius:28px;
+    }
+
+    .skel.pill{
+      width:148px;
+      height:34px;
+      border-radius:999px;
+    }
+
+    .skel.title{
+      width:62%;
+      height:46px;
+      border-radius:12px;
+      margin-top:14px;
+    }
+
+    .skel.hook{
+      width:78%;
+      height:18px;
+      border-radius:10px;
+      margin-top:12px;
+    }
+
+    .skel.price{
+      width:28%;
+      height:30px;
+      border-radius:10px;
+      margin-top:16px;
+    }
+
+    .chip-row{
+      display:flex;
+      gap:8px;
+      margin-top:16px;
+    }
+
+    .chip{
+      width:96px;
+      height:30px;
+      border-radius:999px;
+    }
+
+    .skel.line{
+      height:14px;
+      border-radius:8px;
+      margin-top:12px;
+    }
+
+    .skel.line.w90{ width:90%; }
+    .skel.line.w80{ width:80%; }
+    .skel.line.w70{ width:70%; }
+
+    @keyframes shimmer {
+      100% { transform:translateX(100%); }
+    }
+
+    @media (max-width: 920px){
+      .prod{
+        grid-template-columns:1fr;
+      }
+
+      .mode-toggle{
+        grid-template-columns:1fr;
+      }
+
+      .title{
+        max-width:none;
+      }
+
+      .hook{
+        max-width:none;
+      }
+    }
   </style>
 </BaseLayout>

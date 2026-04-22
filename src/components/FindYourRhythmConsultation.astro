@@ -1,0 +1,367 @@
+---
+// src/components/FindYourRhythmConsultation.astro
+
+const squareLinks = {
+  quick: "https://squareup.com/appointments/book/QUICK-CONSULT-LINK",
+  deep: "https://squareup.com/appointments/book/DEEP-CONSULT-LINK",
+  juice: "https://squareup.com/appointments/book/JUICE-PLAN-LINK",
+  mobile: "https://squareup.com/appointments/book/MOBILE-CONSULT-LINK",
+  virtual: "https://squareup.com/appointments/book/VIRTUAL-CONSULT-LINK",
+};
+
+const goalCards = [
+  { key: "gut", label: "Gut Support" },
+  { key: "kidney", label: "Kidney Support" },
+  { key: "pressure", label: "Blood Pressure" },
+  { key: "energy", label: "Energy & Recovery" },
+  { key: "reset", label: "Full Body Reset" },
+];
+---
+
+<section class="rhythm-shell">
+  <div class="rhythm-copy">
+    <p class="eyebrow">consultation</p>
+    <h2>Find your rhythm</h2>
+    <p class="lede">
+      Start with a guided consultation and get matched to the right wellness path,
+      then book directly through Square Appointments.
+    </p>
+  </div>
+
+  <div class="rhythm-grid">
+    <div class="rhythm-panel">
+      <form id="rhythm-form" class="rhythm-form">
+        <fieldset>
+          <legend>What are you looking to support?</legend>
+          <div class="chip-grid">
+            {goalCards.map((goal) => (
+              <label class="chip">
+                <input type="radio" name="goal" value={goal.key} />
+                <span>{goal.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>What kind of guidance do you want?</legend>
+          <div class="choice-grid">
+            <label class="choice">
+              <input type="radio" name="consultType" value="quick" checked />
+              <span>
+                <strong>Quick Check-In</strong>
+                <small>Best for simple questions and direction</small>
+              </span>
+            </label>
+
+            <label class="choice">
+              <input type="radio" name="consultType" value="deep" />
+              <span>
+                <strong>Deep Consultation</strong>
+                <small>Best for layered wellness needs</small>
+              </span>
+            </label>
+
+            <label class="choice">
+              <input type="radio" name="consultType" value="juice" />
+              <span>
+                <strong>Custom Juice Planning</strong>
+                <small>Best for a tailored beverage plan</small>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Preferred format</legend>
+          <div class="choice-grid compact">
+            <label class="choice">
+              <input type="radio" name="format" value="virtual" checked />
+              <span><strong>Virtual</strong></span>
+            </label>
+
+            <label class="choice">
+              <input type="radio" name="format" value="mobile" />
+              <span><strong>Mobile Service</strong></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <label class="notes">
+          <span>Anything you want us to know before booking?</span>
+          <textarea
+            id="rhythm-notes"
+            name="notes"
+            rows="4"
+            maxlength="400"
+            placeholder="Example: Looking for support with gut balance and blood pressure, and I’d like a juice routine that fits mornings."
+          ></textarea>
+        </label>
+
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">Book Consultation</button>
+          <a href="/shop" class="btn btn-secondary">Shop Wellness</a>
+          <a href="/featured" class="btn btn-ghost">View All</a>
+        </div>
+      </form>
+    </div>
+
+    <aside class="rhythm-panel rhythm-summary">
+      <p class="summary-kicker">How this works</p>
+      <ol>
+        <li>Choose your wellness focus</li>
+        <li>Select the consultation style</li>
+        <li>Pick virtual or mobile service</li>
+        <li>Continue into Square to book your appointment</li>
+      </ol>
+
+      <div class="summary-note">
+        <strong>Booking powered by Square Appointments</strong>
+        <p>
+          Availability, confirmation, reminders, and calendar management are handled
+          through Square once you continue.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script define:vars={{ squareLinks }}>
+  const form = document.getElementById("rhythm-form");
+
+  function buildBookingUrl(type, format, goal, notes) {
+    let base = squareLinks.quick;
+
+    if (type === "deep") base = squareLinks.deep;
+    if (type === "juice") base = squareLinks.juice;
+    if (format === "mobile") base = squareLinks.mobile;
+    if (format === "virtual" && type === "deep") base = squareLinks.deep;
+
+    const url = new URL(base);
+
+    if (goal) url.searchParams.set("goal", goal);
+    if (format) url.searchParams.set("format", format);
+    if (type) url.searchParams.set("consult_type", type);
+    if (notes) url.searchParams.set("notes", notes.slice(0, 400));
+
+    return url.toString();
+  }
+
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const data = new FormData(form);
+    const goal = data.get("goal")?.toString() || "";
+    const consultType = data.get("consultType")?.toString() || "quick";
+    const format = data.get("format")?.toString() || "virtual";
+    const notes = data.get("notes")?.toString().trim() || "";
+
+    const bookingUrl = buildBookingUrl(consultType, format, goal, notes);
+    window.location.href = bookingUrl;
+  });
+</script>
+
+<style>
+  .rhythm-shell {
+    border: 1px solid rgba(201, 169, 97, 0.35);
+    border-radius: 18px;
+    padding: 1.25rem;
+    background:
+      linear-gradient(135deg, rgba(17, 45, 35, 0.96), rgba(5, 24, 19, 0.98));
+    color: #f7f1e8;
+  }
+
+  .eyebrow {
+    margin: 0 0 .35rem;
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #d6bf87;
+  }
+
+  .rhythm-copy h2 {
+    margin: 0 0 .35rem;
+    font-size: clamp(1.6rem, 3vw, 2.25rem);
+    line-height: 1.05;
+  }
+
+  .lede {
+    margin: 0 0 1rem;
+    max-width: 60ch;
+    color: rgba(247, 241, 232, 0.82);
+  }
+
+  .rhythm-grid {
+    display: grid;
+    grid-template-columns: 1.6fr .9fr;
+    gap: 1rem;
+  }
+
+  .rhythm-panel {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(201, 169, 97, 0.22);
+    border-radius: 16px;
+    padding: 1rem;
+    backdrop-filter: blur(6px);
+  }
+
+  .rhythm-form {
+    display: grid;
+    gap: 1rem;
+  }
+
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  legend {
+    margin-bottom: .55rem;
+    font-weight: 700;
+    color: #f3e6cb;
+  }
+
+  .chip-grid,
+  .choice-grid {
+    display: grid;
+    gap: .65rem;
+  }
+
+  .chip-grid {
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  }
+
+  .choice-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .choice-grid.compact {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .chip input,
+  .choice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .chip span,
+  .choice span {
+    display: block;
+    width: 100%;
+    border-radius: 999px;
+    border: 1px solid rgba(201, 169, 97, 0.35);
+    background: rgba(255,255,255,0.04);
+    color: #f7f1e8;
+    padding: .8rem .95rem;
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+
+  .choice span {
+    border-radius: 14px;
+  }
+
+  .chip input:checked + span,
+  .choice input:checked + span {
+    background: rgba(201, 169, 97, 0.16);
+    border-color: #d6bf87;
+    transform: translateY(-1px);
+  }
+
+  .choice strong {
+    display: block;
+    margin-bottom: .15rem;
+  }
+
+  .choice small {
+    color: rgba(247, 241, 232, 0.7);
+  }
+
+  .notes span {
+    display: block;
+    margin-bottom: .45rem;
+    font-weight: 700;
+    color: #f3e6cb;
+  }
+
+  .notes textarea {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid rgba(201, 169, 97, 0.3);
+    background: rgba(255,255,255,0.05);
+    color: #f7f1e8;
+    padding: .9rem 1rem;
+    resize: vertical;
+    outline: none;
+  }
+
+  .notes textarea::placeholder {
+    color: rgba(247, 241, 232, 0.45);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    align-items: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: .8rem 1rem;
+    border-radius: 999px;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid transparent;
+  }
+
+  .btn-primary {
+    background: #d6bf87;
+    color: #13291f;
+  }
+
+  .btn-secondary,
+  .btn-ghost {
+    background: transparent;
+    color: #f7f1e8;
+    border-color: rgba(201, 169, 97, 0.35);
+  }
+
+  .rhythm-summary ol {
+    margin: .5rem 0 1rem 1.1rem;
+    padding: 0;
+    color: rgba(247, 241, 232, 0.85);
+  }
+
+  .summary-kicker {
+    margin: 0 0 .4rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-size: .72rem;
+    color: #d6bf87;
+  }
+
+  .summary-note {
+    padding: .85rem;
+    border-radius: 14px;
+    background: rgba(214, 191, 135, 0.08);
+    border: 1px solid rgba(214, 191, 135, 0.18);
+  }
+
+  .summary-note p {
+    margin: .35rem 0 0;
+    color: rgba(247, 241, 232, 0.76);
+  }
+
+  @media (max-width: 900px) {
+    .rhythm-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
