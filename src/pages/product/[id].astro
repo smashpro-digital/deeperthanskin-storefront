@@ -22,11 +22,43 @@ const ROUTES = {
 type ProductListItem = {
   id?: string | number;
   product_id?: string | number;
+  variation_id?: string | number;
+  variationId?: string | number;
   name?: string;
   title?: string;
+  description?: string;
   image_url?: string;
   image?: string;
+  brand?: string;
   slug?: string;
+  gallery?: string[];
+  one_time?: {
+    enabled?: boolean;
+    variation_id?: string;
+    has_price?: boolean;
+    price_money?: { amount: number; currency?: string };
+  };
+  subscription?: {
+    enabled?: boolean;
+    headline?: string;
+    subheadline?: string;
+    cancellation_summary?: string;
+    shipping_summary?: string;
+    options?: Array<{
+      id: string;
+      label?: string;
+      badge?: string;
+      description?: string;
+      enabled?: boolean;
+      discount_percent?: number;
+      subscriber_price_money?: { amount: number; currency?: string };
+      compare_at_price_money?: { amount: number; currency?: string };
+    }>;
+  };
+  policies?: {
+    checkout_summary?: string;
+  };
+  price_money?: { amount: number; currency?: string };
 };
 
 export async function getStaticPaths() {
@@ -60,7 +92,7 @@ export async function getStaticPaths() {
 
     const data = JSON.parse(text);
 
-    const items = Array.isArray(data?.items)
+    const items: ProductListItem[] = Array.isArray(data?.items)
       ? data.items
       : Array.isArray(data?.products)
         ? data.products
@@ -95,10 +127,9 @@ export async function getStaticPaths() {
 const { id } = Astro.params;
 const { productSeed = null } = Astro.props;
 
-const pdpEndpoint =
-  `${API_BASE}/public.commerce.product.get.php` +
-  `?app_slug=${encodeURIComponent(APP_SLUG)}` +
-  `&id=${encodeURIComponent(String(id || ""))}`;
+const productsEndpoint =
+  `${API_BASE}/public.commerce.products.get.php` +
+  `?app_slug=${encodeURIComponent(APP_SLUG)}`;
 
 const checkoutEndpoint =
   `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
@@ -123,7 +154,7 @@ const pageTitle = productSeed?.name
       <div
         id="product"
         class="prod"
-        data-endpoint={pdpEndpoint}
+        data-endpoint={productsEndpoint}
         data-checkout={checkoutEndpoint}
         data-subscription-checkout={subscriptionCheckoutEndpoint}
         data-base={base}
@@ -289,20 +320,37 @@ const pageTitle = productSeed?.name
       return picks.slice(0, 4);
     }
 
-    function normalizePdpResponse(data) {
-      if (data?.ok && data?.product) return data;
+    function extractItems(payload) {
+      return Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.products)
+          ? payload.products
+          : Array.isArray(payload)
+            ? payload
+            : [];
+    }
 
-      const product = data?.product || data?.item || data || {};
+    function findProductById(items, id) {
+      const wanted = String(id || "").trim();
+      if (!wanted) return null;
+
+      return (
+        items.find((item) => String(item?.id ?? item?.product_id ?? "") === wanted) ||
+        items.find((item) => String(item?.variation_id ?? item?.variationId ?? "") === wanted) ||
+        null
+      );
+    }
+
+    function normalizePdpResponse(product) {
       const oneTime =
-        data?.one_time ||
         product?.one_time || {
-          enabled: !!product?.variation_id,
-          variation_id: product?.variation_id || product?.variationId || "",
-          has_price: !!product?.price_money,
-          price_money: product?.price_money || null,
+          enabled: !!(product?.variation_id || product?.variationId || product?.price_money),
+          variation_id: product?.one_time?.variation_id || product?.variation_id || product?.variationId || "",
+          has_price: !!(product?.one_time?.price_money || product?.price_money),
+          price_money: product?.one_time?.price_money || product?.price_money || null,
         };
 
-      const subscription = data?.subscription || product?.subscription || {
+      const subscription = product?.subscription || {
         enabled: false,
         options: [],
       };
@@ -319,7 +367,7 @@ const pageTitle = productSeed?.name
         },
         one_time: oneTime,
         subscription,
-        policies: data?.policies || product?.policies || {},
+        policies: product?.policies || {},
       };
     }
 
@@ -754,12 +802,14 @@ const pageTitle = productSeed?.name
     (async function load() {
       try {
         const raw = await fetchJson(endpoint);
-        const data = normalizePdpResponse(raw);
+        const items = extractItems(raw);
+        const found = findProductById(items, wantedId);
 
-        if (!data?.product?.id && !wantedId) {
-          throw new Error("Unable to load product");
+        if (!found) {
+          throw new Error("Product not found");
         }
 
+        const data = normalizePdpResponse(found);
         render(data);
       } catch (e) {
         console.error("[product] load failed:", e);
@@ -767,7 +817,7 @@ const pageTitle = productSeed?.name
           <div class="panel" style="grid-column:1/-1">
             <div class="kicker">Error</div>
             <h2 class="h2" style="margin:6px 0 8px">Couldn’t load product</h2>
-            <p class="p">Check the product endpoint and confirm this product exists in the commerce API.</p>
+            <p class="p">Check the products endpoint and confirm this product exists in the commerce API list response.</p>
             <div class="btns">
               <a class="btn btn-primary" href="${escapeHtml(routes.shop || `${base}shop`)}">Back to shop</a>
               <a class="btn btn-ghost" href="${escapeHtml(routes.featured || `${base}featured`)}">Featured</a>
