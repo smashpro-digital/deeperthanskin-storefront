@@ -1,6 +1,6 @@
 // src/pages/api/commerce/pdp/[id].ts
 import type { APIRoute } from "astro";
-import { getSubscriptionConfig } from "../../../../lib/subscription-catalog";
+import { getSubscriptionConfig } from "../../../../../lib/subscription-catalog";
 
 export const prerender = false;
 

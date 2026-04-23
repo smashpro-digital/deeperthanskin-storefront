@@ -1,0 +1,603 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const baseRaw = import.meta.env.BASE_URL || "/";
+const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
+
+const API_BASE =
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
+  "https://smashpro.app/api/v1/routes";
+
+const APP_SLUG =
+  (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+  "deeper-than-skin";
+
+type ServiceItem = {
+  slug?: string;
+  id?: string | number;
+  service_id?: string | number;
+  name?: string;
+  title?: string;
+  description?: string;
+  short_description?: string;
+  image_url?: string;
+  image?: string;
+  badge?: string;
+  category?: string;
+  duration?: string;
+  price_label?: string;
+};
+
+function slugify(value: string) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export async function getStaticPaths() {
+  const apiBase =
+    (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
+    "https://smashpro.app/api/v1/routes";
+
+  const appSlug =
+    (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+    "deeper-than-skin";
+
+  try {
+    const res = await fetch(
+      `${apiBase}/public.commerce.services.get.php?app_slug=${encodeURIComponent(appSlug)}`,
+      {
+        headers: { Accept: "application/json" },
+      }
+    );
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      console.error("[services/[slug]] getStaticPaths HTTP error:", res.status, text.slice(0, 300));
+      return [];
+    }
+
+    if (text.trim().startsWith("<")) {
+      console.error("[services/[slug]] getStaticPaths received HTML instead of JSON");
+      return [];
+    }
+
+    const data = JSON.parse(text);
+
+    const items: ServiceItem[] = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data?.services)
+        ? data.services
+        : Array.isArray(data)
+          ? data
+          : [];
+
+    return items
+      .map((item) => {
+        const slug = item?.slug || slugify(item?.name || item?.title || "");
+        if (!slug) return null;
+
+        return {
+          params: { slug },
+          props: {
+            serviceSeed: item,
+          },
+        };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.error("[services/[slug]] getStaticPaths failed:", error);
+    return [];
+  }
+}
+
+const { slug } = Astro.params;
+const { serviceSeed = null } = Astro.props;
+
+const pageTitle = serviceSeed?.name || serviceSeed?.title
+  ? `${serviceSeed?.name || serviceSeed?.title} | Deeper Than Skin`
+  : "Service | Deeper Than Skin";
+
+const servicesEndpoint =
+  `${API_BASE}/public.commerce.services.get.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
+---
+
+<BaseLayout title={pageTitle}>
+  <main class="service-page">
+    <div class="container">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href={`${base}shop`}>Shop</a>
+        <span class="sep">/</span>
+        <a href={`${base}services`}>Services</a>
+        <span class="sep">/</span>
+        <span class="muted">{serviceSeed?.name || serviceSeed?.title || "Service"}</span>
+      </nav>
+
+      <section
+        id="service-root"
+        class="hero"
+        data-endpoint={servicesEndpoint}
+        data-base={base}
+        data-slug={String(slug || "")}
+        data-service-seed={JSON.stringify(serviceSeed || {})}
+      >
+        <div class="hero-media skel" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <div class="pill skel" aria-hidden="true"></div>
+          <div class="line skel w60" aria-hidden="true"></div>
+          <div class="line skel w90" aria-hidden="true"></div>
+          <div class="line skel w75" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="service-grid" id="service-body">
+        <article class="panel">
+          <div class="kicker">What to expect</div>
+          <h2 class="h2">A guided ritual experience</h2>
+          <p class="p">
+            Every service is designed to feel personal, supportive, and easy to book.
+            You’ll see details, timing, and the best next step once the service loads.
+          </p>
+        </article>
+
+        <aside class="panel">
+          <div class="kicker">Next step</div>
+          <h2 class="h2">Ready when you are</h2>
+          <p class="p">
+            Continue exploring the wellness collection or return to services if you want to compare options.
+          </p>
+          <div class="btns">
+            <a class="btn btn-primary" href={`${base}services`}>All services</a>
+            <a class="btn btn-ghost" href={`${base}featured`}>Featured</a>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" is:inline>
+    const root = document.getElementById("service-root");
+    const body = document.getElementById("service-body");
+    if (!root || !body) throw new Error("service root missing");
+
+    const endpoint = root.getAttribute("data-endpoint") || "";
+    const base = root.getAttribute("data-base") || "/";
+    const wantedSlug = root.getAttribute("data-slug") || "";
+
+    const seed = (() => {
+      try {
+        return JSON.parse(root.getAttribute("data-service-seed") || "{}");
+      } catch {
+        return {};
+      }
+    })();
+
+    const escapeHtml = (s) =>
+      String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    const slugify = (value) =>
+      String(value || "")
+        .toLowerCase()
+        .trim()
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    async function fetchJson(url) {
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+      });
+
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 180)}`);
+      if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+      return JSON.parse(text);
+    }
+
+    function pickService(payload, slug) {
+      const items = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.services)
+          ? payload.services
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+      return (
+        items.find((item) => {
+          const itemSlug = item?.slug || slugify(item?.name || item?.title || "");
+          return itemSlug === slug;
+        }) || null
+      );
+    }
+
+    function normalizeService(item) {
+      return {
+        id: item?.id || item?.service_id || "",
+        slug: item?.slug || slugify(item?.name || item?.title || ""),
+        name: item?.name || item?.title || seed?.name || seed?.title || "Service",
+        description:
+          item?.description ||
+          item?.short_description ||
+          seed?.description ||
+          "A tailored service experience from Deeper Than Skin.",
+        image_url: item?.image_url || item?.image || seed?.image_url || seed?.image || `${base}images/product-fallback.jpg`,
+        badge: item?.badge || item?.category || "Signature Service",
+        duration: item?.duration || "",
+        price_label: item?.price_label || "",
+        booking_url: item?.booking_url || item?.url || "",
+      };
+    }
+
+    function renderHero(service) {
+      const duration = service.duration
+        ? `<span>${escapeHtml(service.duration)}</span>`
+        : "";
+      const price = service.price_label
+        ? `<span>${escapeHtml(service.price_label)}</span>`
+        : "";
+
+      root.innerHTML = `
+        <div class="hero-media-wrap">
+          <div class="hero-media">
+            <img
+              src="${escapeHtml(service.image_url)}"
+              alt="${escapeHtml(service.name)}"
+              loading="lazy"
+              onerror="this.onerror=null;this.src='${escapeHtml(`${base}images/product-fallback.jpg`)}';"
+            />
+          </div>
+        </div>
+
+        <div class="hero-copy">
+          <div class="pill">${escapeHtml(service.badge)}</div>
+          <h1 class="title">${escapeHtml(service.name)}</h1>
+          <p class="lede">${escapeHtml(service.description)}</p>
+
+          ${(duration || price)
+            ? `<div class="meta-row">${duration}${price}</div>`
+            : ""}
+
+          <div class="btns">
+            ${
+              service.booking_url
+                ? `<a class="btn btn-primary" href="${escapeHtml(service.booking_url)}" target="_blank" rel="noreferrer">Book now</a>`
+                : `<a class="btn btn-primary" href="${escapeHtml(`${base}services`)}">Explore services</a>`
+            }
+            <a class="btn btn-ghost" href="${escapeHtml(`${base}featured`)}">View featured</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBody(service) {
+      body.innerHTML = `
+        <article class="panel">
+          <div class="kicker">Service details</div>
+          <h2 class="h2">Designed around your rhythm</h2>
+          <p class="p">${escapeHtml(service.description)}</p>
+
+          <div class="detail-list">
+            ${
+              service.duration
+                ? `<div class="detail-chip">Duration: ${escapeHtml(service.duration)}</div>`
+                : ""
+            }
+            ${
+              service.price_label
+                ? `<div class="detail-chip">Pricing: ${escapeHtml(service.price_label)}</div>`
+                : ""
+            }
+            <div class="detail-chip">Personalized support</div>
+            <div class="detail-chip">Wellness-first approach</div>
+          </div>
+        </article>
+
+        <aside class="panel">
+          <div class="kicker">What happens next</div>
+          <h2 class="h2">Simple, clear, luxurious</h2>
+          <p class="p">
+            Choose your service, review the details, and move into booking when you’re ready.
+          </p>
+          <div class="btns">
+            ${
+              service.booking_url
+                ? `<a class="btn btn-primary" href="${escapeHtml(service.booking_url)}" target="_blank" rel="noreferrer">Start booking</a>`
+                : `<a class="btn btn-primary" href="${escapeHtml(`${base}services`)}">Back to services</a>`
+            }
+            <a class="btn btn-ghost" href="${escapeHtml(`${base}shop`)}">Shop wellness</a>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderError() {
+      root.innerHTML = `
+        <div class="panel error-panel" style="grid-column:1/-1">
+          <div class="kicker">Service unavailable</div>
+          <h1 class="title">We couldn’t load this service</h1>
+          <p class="lede">
+            Check the service slug or confirm the service exists in the commerce API.
+          </p>
+          <div class="btns">
+            <a class="btn btn-primary" href="${escapeHtml(`${base}services`)}">Back to services</a>
+            <a class="btn btn-ghost" href="${escapeHtml(`${base}featured`)}">Featured</a>
+          </div>
+        </div>
+      `;
+
+      body.innerHTML = "";
+    }
+
+    (async function load() {
+      try {
+        const payload = await fetchJson(endpoint);
+        const found = pickService(payload, wantedSlug);
+
+        if (!found) {
+          throw new Error("Service not found");
+        }
+
+        const service = normalizeService(found);
+        renderHero(service);
+        renderBody(service);
+      } catch (error) {
+        console.error("[services/[slug]] load failed:", error);
+        renderError();
+      }
+    })();
+  </script>
+
+  <style>
+    :root{
+      --bg:#07110d;
+      --panel:#0c1813;
+      --line:rgba(205,186,133,.16);
+      --line-2:rgba(255,255,255,.08);
+      --text:#f5f0e6;
+      --muted:rgba(245,240,230,.74);
+      --gold:#ccb56c;
+      --gold-2:#e4d19a;
+      --shadow:0 20px 60px rgba(0,0,0,.25);
+    }
+
+    .service-page{
+      min-height:100vh;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top, rgba(208,183,107,.12), transparent 24%),
+        linear-gradient(180deg, #08120e 0%, #06100c 100%);
+    }
+
+    .container{
+      width:min(1240px, calc(100% - 32px));
+      margin:0 auto;
+      padding:20px 0 56px;
+    }
+
+    .crumbs{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:var(--muted);
+      font-size:.92rem;
+      margin-bottom:18px;
+    }
+
+    .crumbs a{
+      color:var(--text);
+      text-decoration:none;
+      opacity:.88;
+    }
+
+    .sep,.muted{ opacity:.64; }
+
+    .hero{
+      display:grid;
+      grid-template-columns:minmax(320px, 560px) minmax(320px, 1fr);
+      gap:34px;
+      align-items:center;
+      margin-bottom:24px;
+    }
+
+    .hero-media-wrap{
+      min-width:0;
+    }
+
+    .hero-media{
+      overflow:hidden;
+      border-radius:28px;
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+    }
+
+    .hero-media img{
+      display:block;
+      width:100%;
+      aspect-ratio:1/1;
+      object-fit:cover;
+    }
+
+    .hero-copy{
+      min-width:0;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      min-height:34px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      color:var(--gold-2);
+      font-size:.84rem;
+      letter-spacing:.02em;
+      margin-bottom:12px;
+    }
+
+    .title{
+      margin:0 0 10px;
+      font-size:clamp(2.2rem, 4vw, 3.35rem);
+      line-height:1.02;
+      letter-spacing:-.03em;
+    }
+
+    .lede{
+      margin:0;
+      font-size:1.05rem;
+      line-height:1.7;
+      color:rgba(245,240,230,.92);
+      max-width:60ch;
+    }
+
+    .meta-row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:16px;
+      color:var(--gold-2);
+      font-size:.9rem;
+    }
+
+    .meta-row span{
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+    }
+
+    .service-grid{
+      display:grid;
+      grid-template-columns:1.2fr .8fr;
+      gap:20px;
+    }
+
+    .panel{
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+
+    .kicker{
+      font-size:.82rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--gold-2);
+      opacity:.88;
+    }
+
+    .h2{
+      margin:8px 0 10px;
+      font-size:1.5rem;
+    }
+
+    .p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.68;
+    }
+
+    .detail-list{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:18px;
+    }
+
+    .detail-chip{
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.03);
+      color:var(--gold-2);
+      font-size:.86rem;
+    }
+
+    .btns{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:20px;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:48px;
+      padding:0 16px;
+      border-radius:14px;
+      text-decoration:none;
+      border:1px solid var(--line);
+      font-weight:600;
+      cursor:pointer;
+      transition:.18s ease;
+      color:var(--text);
+    }
+
+    .btn:hover{ transform:translateY(-1px); }
+
+    .btn-primary{
+      background:linear-gradient(180deg, rgba(204,181,108,.24), rgba(204,181,108,.10));
+    }
+
+    .btn-ghost{
+      background:rgba(255,255,255,.02);
+    }
+
+    .skel{
+      position:relative;
+      overflow:hidden;
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line-2);
+      border-radius:18px;
+    }
+
+    .skel::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      transform:translateX(-100%);
+      background:linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+      animation:shimmer 1.2s infinite;
+    }
+
+    .hero > .hero-media{
+      aspect-ratio:1/1;
+      border-radius:28px;
+    }
+
+    .line{
+      height:18px;
+      margin-top:12px;
+    }
+
+    .w60{ width:60%; }
+    .w90{ width:90%; }
+    .w75{ width:75%; }
+
+    @keyframes shimmer {
+      100% { transform:translateX(100%); }
+    }
+
+    @media (max-width: 920px){
+      .hero,
+      .service-grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</BaseLayout>
