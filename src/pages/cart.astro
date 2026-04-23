@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-export const prerender = false;
+export const prerender = true;
 
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
@@ -29,7 +29,7 @@ const checkoutEndpoint =
 <BaseLayout title="Cart | Deeper Than Skin">
   <main class="page">
     <div class="container">
-      <div class="row-top">
+      <div class="row-top page-top">
         <a class="small back-link" href={ROUTES.shop}>← Continue shopping</a>
         <div class="pill">Cart</div>
       </div>
@@ -228,7 +228,7 @@ const checkoutEndpoint =
 
       const cartShell = (items, subtotalLabel) => {
         const shop = escapeHtml(routes.shop || `${base}shop`);
-        const featured = escapeHtml(routes.featured || `${base}featured}`);
+        const featured = escapeHtml(routes.featured || `${base}featured`);
 
         const count = items.reduce((sum, it) => sum + Math.max(1, Number(it?.qty || 1)), 0);
 
@@ -279,7 +279,7 @@ const checkoutEndpoint =
                       </div>
 
                       <div class="row-copy">
-                        <div class="row-top">
+                        <div class="row-top item-top">
                           <div class="row-title-wrap">
                             <div class="row-title">${name}</div>
                             <div class="row-meta">
@@ -317,15 +317,15 @@ const checkoutEndpoint =
             <aside class="card summary-card" aria-label="Order summary">
               <div class="summary-glow" aria-hidden="true"></div>
 
-              <div class="kicker">Order summary</div>
-              <h3 class="section-title summary-title">Quiet luxury, clear totals</h3>
+              <div class="summary-kicker">Order summary</div>
+              <h3 class="summary-heading">Quiet luxury, clear totals</h3>
+
+              <div class="summary-total-bar">
+                <span>Subtotal</span>
+                <strong class="summary-price">${escapeHtml(subtotalLabel)}</strong>
+              </div>
 
               <div class="summary-block">
-                <div class="sumline total-line">
-                  <span>Subtotal</span>
-                  <strong class="price">${escapeHtml(subtotalLabel)}</strong>
-                </div>
-
                 <div class="sumline soft">
                   <span>Shipping</span>
                   <span>Calculated in checkout</span>
@@ -515,10 +515,14 @@ const checkoutEndpoint =
       --line-soft:rgba(255,255,255,.08);
       --text:#f5f0e6;
       --muted:rgba(245,240,230,.76);
-      --muted-2:rgba(245,240,230,.58);
       --gold:#ccb56c;
       --gold-2:#e4d19a;
       --shadow:0 20px 60px rgba(0,0,0,.28);
+      --summary-bg:#f6f1e7;
+      --summary-text:#171612;
+      --summary-muted:#5d584f;
+      --summary-line:#d8cdb7;
+      --summary-accent:#2d2a22;
     }
 
     .page{
@@ -535,7 +539,7 @@ const checkoutEndpoint =
       padding:28px 0 56px;
     }
 
-    .row-top{
+    .page-top{
       display:flex;
       align-items:center;
       justify-content:space-between;
@@ -640,10 +644,6 @@ const checkoutEndpoint =
       color:var(--text);
     }
 
-    .summary-title{
-      color:var(--gold-2);
-    }
-
     .head-actions{
       display:flex;
       gap:10px;
@@ -687,7 +687,7 @@ const checkoutEndpoint =
       min-width:0;
     }
 
-    .row-top{
+    .item-top{
       display:flex;
       justify-content:space-between;
       gap:14px;
@@ -790,8 +790,13 @@ const checkoutEndpoint =
       top:96px;
       height:fit-content;
       padding:24px;
-      background:linear-gradient(180deg, rgba(24,37,30,.99), rgba(12,20,16,.99));
-      border-color:rgba(204,181,108,.18);
+      background:var(--summary-bg);
+      border:1px solid var(--summary-line);
+      color:var(--summary-text);
+    }
+
+    .summary-card::before{
+      background:linear-gradient(90deg, transparent, rgba(23,22,18,.18), transparent);
     }
 
     .summary-glow{
@@ -800,19 +805,51 @@ const checkoutEndpoint =
       top:-30px;
       width:180px;
       height:180px;
-      background:radial-gradient(circle, rgba(204,181,108,.16), transparent 65%);
+      background:radial-gradient(circle, rgba(204,181,108,.14), transparent 65%);
       filter:blur(8px);
       pointer-events:none;
     }
 
-    .summary-block{
+    .summary-kicker{
+      font-size:.78rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:#6d6557;
+    }
+
+    .summary-heading{
+      margin:8px 0 0;
+      font-size:1.5rem;
+      line-height:1.12;
+      color:var(--summary-text);
+      letter-spacing:-.02em;
+    }
+
+    .summary-total-bar{
       margin-top:18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:16px 18px;
+      border-radius:18px;
+      background:var(--summary-accent);
+      color:#f8f3ea;
+    }
+
+    .summary-price{
+      font-size:1.5rem;
+      font-weight:850;
+      letter-spacing:-.02em;
+      color:#fff;
+    }
+
+    .summary-block{
+      margin-top:12px;
       display:grid;
       gap:12px;
-      padding:16px;
-      border-radius:18px;
-      background:rgba(255,255,255,.035);
-      border:1px solid rgba(255,255,255,.08);
+      padding:16px 2px 6px;
+      color:var(--summary-text);
     }
 
     .sumline{
@@ -820,23 +857,11 @@ const checkoutEndpoint =
       justify-content:space-between;
       align-items:center;
       gap:12px;
-      color:var(--text);
       font-size:.97rem;
     }
 
     .sumline.soft{
-      color:var(--muted);
-    }
-
-    .total-line{
-      padding-bottom:4px;
-    }
-
-    .price{
-      font-size:1.5rem;
-      font-weight:850;
-      letter-spacing:-.02em;
-      color:var(--gold-2);
+      color:var(--summary-muted);
     }
 
     .summary-actions{
@@ -872,10 +897,22 @@ const checkoutEndpoint =
       color:#fff8e9;
     }
 
+    .summary-card .btn-primary{
+      background:var(--summary-accent);
+      border-color:var(--summary-accent);
+      color:#fff;
+    }
+
     .btn-ghost{
       background:rgba(255,255,255,.03);
       border-color:rgba(255,255,255,.12);
       color:var(--text);
+    }
+
+    .summary-card .btn-ghost{
+      background:transparent;
+      border-color:var(--summary-line);
+      color:var(--summary-text);
     }
 
     .btn-wide{
@@ -892,7 +929,7 @@ const checkoutEndpoint =
       flex-wrap:wrap;
       gap:8px 14px;
       margin-top:16px;
-      color:var(--gold-2);
+      color:#6d6557;
       font-size:.82rem;
     }
 
@@ -910,27 +947,27 @@ const checkoutEndpoint =
       height:6px;
       border-radius:999px;
       transform:translateY(-50%);
-      background:rgba(204,181,108,.9);
+      background:#8c8069;
     }
 
     .summary-note{
       margin-top:14px;
-      color:var(--muted);
+      color:var(--summary-muted);
       font-size:.94rem;
       line-height:1.65;
       padding:14px 16px;
       border-radius:16px;
-      background:rgba(255,255,255,.025);
-      border:1px solid rgba(255,255,255,.06);
+      background:rgba(23,22,18,.04);
+      border:1px solid var(--summary-line);
     }
 
     .error{
       margin-top:14px;
       border-radius:16px;
       padding:12px 14px;
-      border:1px solid rgba(255, 211, 198, .18);
-      background:rgba(255, 211, 198, .08);
-      color:rgba(255, 211, 198, .95);
+      border:1px solid rgba(190, 98, 84, .25);
+      background:rgba(190, 98, 84, .08);
+      color:#7d3027;
       line-height:1.45;
     }
 
@@ -1047,7 +1084,7 @@ const checkoutEndpoint =
         border-radius:12px;
       }
 
-      .row-top{
+      .item-top{
         flex-direction:column;
         gap:6px;
       }
