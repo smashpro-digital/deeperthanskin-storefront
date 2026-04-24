@@ -1,4 +1,4 @@
-// /src/lib/cart.js
+// ../lib/cart.js
 // Deeper Than Skin — Cart v1 (single source of truth)
 // Storage shape is ALWAYS: { v: 1, items: [...] }
 
