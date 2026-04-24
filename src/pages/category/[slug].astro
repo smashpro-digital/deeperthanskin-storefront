@@ -210,9 +210,10 @@ const ROUTES = {
     </div>
   </main>
 
-  <script type="module" is:inline>
-    import { Cart } from "../lib/cart.js";
-
+  <script>
+      // @ts-nocheck
+    import { Cart } from "../../lib/cart.js";
+    import "../../lib/beveragePlanner.js";
     /**
      * @typedef {{
      *   id?: string;

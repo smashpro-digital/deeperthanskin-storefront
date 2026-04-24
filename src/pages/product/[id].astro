@@ -204,8 +204,9 @@ const pageTitle = productSeed?.name
     </div>
   </main>
 
-  <script type="module" is:inline>
-    import { Cart } from "../lib/cart.js";
+  <script>
+    // @ts-nocheck
+    import { Cart } from "../../lib/cart.js";
 
     const root = document.getElementById("product");
     if (!root) throw new Error("product root missing");
