@@ -190,81 +190,114 @@ const canonical = (() => {
       </div>
     </footer>
 
-    <script is:inline data-astro-rerun>
-      (() => {
-        const bindDrawer = () => {
-          const header = document.querySelector("[data-nav]");
-          const burger = document.querySelector("[data-burger]");
-          const drawer = document.querySelector("[data-drawer]");
-          const closeBtn = document.querySelector("[data-drawer-close]");
-          const backdrop = document.querySelector("[data-drawer-backdrop]");
+   <script is:inline>
+  (() => {
+    const getParts = () => ({
+      header: document.querySelector("[data-nav]"),
+      burger: document.querySelector("[data-burger]"),
+      drawer: document.querySelector("[data-drawer]"),
+      closeBtn: document.querySelector("[data-drawer-close]"),
+      backdrop: document.querySelector("[data-drawer-backdrop]"),
+    });
 
-          if (!header || !burger || !drawer || !backdrop) return;
+    const forceShow = (drawer, backdrop) => {
+      backdrop.style.cssText = `
+        position: fixed !important;
+        inset: 0 !important;
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        background: rgba(0,0,0,.55) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        z-index: 2147483646 !important;
+      `;
 
-          const openDrawer = () => {
-            header.classList.add("nav-is-open");
-            drawer.classList.add("is-open");
-            backdrop.classList.add("is-open");
+      drawer.style.cssText = `
+        position: fixed !important;
+        top: 88px !important;
+        left: 12px !important;
+        right: 12px !important;
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: none !important;
+        z-index: 2147483647 !important;
+      `;
+    };
 
-            drawer.setAttribute("aria-hidden", "false");
-            backdrop.setAttribute("aria-hidden", "false");
-            burger.setAttribute("aria-expanded", "true");
-            burger.setAttribute("aria-label", "Close menu");
+    const forceHide = (drawer, backdrop) => {
+      drawer.removeAttribute("style");
+      backdrop.removeAttribute("style");
+    };
 
-            document.documentElement.classList.add("no-scroll");
-            document.body.classList.add("no-scroll");
-          };
+    const openDrawer = () => {
+      const { header, burger, drawer, backdrop } = getParts();
+      if (!header || !burger || !drawer || !backdrop) return;
 
-          const closeDrawer = () => {
-            header.classList.remove("nav-is-open");
-            drawer.classList.remove("is-open");
-            backdrop.classList.remove("is-open");
+      header.classList.add("nav-is-open");
+      drawer.classList.add("is-open");
+      backdrop.classList.add("is-open");
 
-            drawer.setAttribute("aria-hidden", "true");
-            backdrop.setAttribute("aria-hidden", "true");
-            burger.setAttribute("aria-expanded", "false");
-            burger.setAttribute("aria-label", "Open menu");
+      drawer.setAttribute("aria-hidden", "false");
+      backdrop.setAttribute("aria-hidden", "false");
+      burger.setAttribute("aria-expanded", "true");
+      burger.setAttribute("aria-label", "Close menu");
 
-            document.documentElement.classList.remove("no-scroll");
-            document.body.classList.remove("no-scroll");
-          };
+      document.documentElement.classList.add("no-scroll");
+      document.body.classList.add("no-scroll", "menu-open");
 
-          const toggleDrawer = (event) => {
-            event.preventDefault();
-            event.stopPropagation();
+      forceShow(drawer, backdrop);
+    };
 
-            if (drawer.classList.contains("is-open")) closeDrawer();
-            else openDrawer();
-          };
+    const closeDrawer = () => {
+      const { header, burger, drawer, backdrop } = getParts();
+      if (!header || !burger || !drawer || !backdrop) return;
 
-          burger.onclick = toggleDrawer;
-          if (closeBtn) closeBtn.onclick = closeDrawer;
-          backdrop.onclick = closeDrawer;
+      header.classList.remove("nav-is-open");
+      drawer.classList.remove("is-open");
+      backdrop.classList.remove("is-open");
 
-          drawer.querySelectorAll("a").forEach((a) => {
-            a.onclick = closeDrawer;
-          });
+      drawer.setAttribute("aria-hidden", "true");
+      backdrop.setAttribute("aria-hidden", "true");
+      burger.setAttribute("aria-expanded", "false");
+      burger.setAttribute("aria-label", "Open menu");
 
-          if (!window.__dtsDrawerEscapeBound) {
-            window.addEventListener("keydown", (event) => {
-              if (event.key === "Escape") closeDrawer();
-            });
-            window.__dtsDrawerEscapeBound = true;
-          }
+      document.documentElement.classList.remove("no-scroll");
+      document.body.classList.remove("no-scroll", "menu-open");
 
-          if (!window.__dtsDrawerResizeBound) {
-            window.addEventListener("resize", () => {
-              if (window.innerWidth > 820) closeDrawer();
-            });
-            window.__dtsDrawerResizeBound = true;
-          }
-        };
+      forceHide(drawer, backdrop);
+    };
 
-        bindDrawer();
-        document.addEventListener("astro:page-load", bindDrawer);
-        document.addEventListener("astro:after-swap", bindDrawer);
-      })();
-    </script>
+    document.addEventListener("click", (event) => {
+      const burger = event.target.closest("[data-burger]");
+      const closeBtn = event.target.closest("[data-drawer-close]");
+      const backdrop = event.target.closest("[data-drawer-backdrop]");
+      const drawerLink = event.target.closest("[data-drawer] a");
+
+      if (burger) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const { drawer } = getParts();
+        if (drawer?.classList.contains("is-open")) closeDrawer();
+        else openDrawer();
+
+        return;
+      }
+
+      if (closeBtn || backdrop || drawerLink) {
+        closeDrawer();
+      }
+    }, true);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeDrawer();
+    });
+  })();
+</script>
 
     <script is:inline>
       (() => {
@@ -563,6 +596,20 @@ const canonical = (() => {
           transition: none !important;
         }
       }
+      body.menu-open .nav-drawer {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1) !important;
+  z-index: 999999 !important;
+}
+
+body.menu-open .nav-drawer-backdrop {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 999998 !important;
+}
     </style>
   </body>
 </html>
