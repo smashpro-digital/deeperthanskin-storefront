@@ -1,6 +1,5 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import BeverageQuestionnaire from "../../components/BeverageQuestionnaire.astro";
 
 export const prerender = true;
 
@@ -16,7 +15,6 @@ const APP_SLUG =
   "deeper-than-skin";
 
 const { slug: slugParam } = Astro.params;
-
 const rawSlug = String(slugParam || "").trim().toLowerCase();
 
 const SLUG_ALIASES: Record<string, string> = {
@@ -38,12 +36,6 @@ const SLUG_ALIASES: Record<string, string> = {
 const apiSlug = SLUG_ALIASES[rawSlug] || rawSlug;
 const pageSlug = apiSlug;
 const isBeveragesPage = pageSlug === "beverages";
-
-const prettyTitleFromSlug = (s: string) =>
-  String(s || "")
-    .replace(/[-_]+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (m) => m.toUpperCase());
 
 export async function getStaticPaths() {
   const slugs = [
@@ -91,6 +83,12 @@ const productsEndpoint = publicApiUrl("public/commerce/products", {
 
 const categoriesEndpoint = publicApiUrl("public/commerce/categories");
 
+const prettyTitleFromSlug = (s: string) =>
+  String(s || "")
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+
 const TITLE_MAP: Record<string, string> = {
   skincare: "Skincare",
   wellness: "Wellness",
@@ -127,11 +125,9 @@ const pageTitle = TITLE_MAP[pageSlug] || prettyTitleFromSlug(pageSlug) || "Categ
 const pageSubtitle =
   SUBTITLE_MAP[pageSlug] || "Browse curated essentials. Add to cart, then checkout when ready.";
 
-const heroImg = `${base}images/product-fallback.jpg`;
 const fallbackImg = `${base}images/product-fallback.jpg`;
 
 const ROUTES = {
-  home: `${base}`,
   shop: `${base}shop`,
   featured: `${base}featured`,
   productBase: `${base}product/`,
@@ -154,7 +150,7 @@ const ROUTES = {
 
       <section
         class="hero"
-        style={`--hero:url('${heroImg}');`}
+        style={`--hero:url('${fallbackImg}');`}
         data-cat-slug={apiSlug}
         data-categories-endpoint={categoriesEndpoint}
         data-base={base}
@@ -172,10 +168,46 @@ const ROUTES = {
       </section>
 
       {isBeveragesPage && (
-        <BeverageQuestionnaire
-          title="Build Your Custom Juice Plan"
-          categorySlug={pageSlug}
-        />
+        <section class="planner" id="beverage-planner">
+          <div>
+            <div class="kicker kicker--light">Custom Juice Plan</div>
+            <h2 class="planner-title">Build Your Custom Juice Plan</h2>
+            <p class="planner-copy">
+              Tell us your rhythm, goals, and delivery preference. We’ll shape the next step around your wellness routine.
+            </p>
+          </div>
+
+          <form class="planner-form">
+            <label>
+              Wellness focus
+              <select>
+                <option>Gut support</option>
+                <option>Energy</option>
+                <option>Detox reset</option>
+                <option>Kidney support</option>
+                <option>Blood pressure support</option>
+                <option>Custom blend guidance</option>
+              </select>
+            </label>
+
+            <label>
+              Order style
+              <select>
+                <option>One-time trial</option>
+                <option>Weekly recurring plan</option>
+                <option>Bi-weekly recurring plan</option>
+                <option>Consultation first</option>
+              </select>
+            </label>
+
+            <label>
+              Notes
+              <textarea rows="4" placeholder="Share ingredients to avoid, health goals, or preferred flavors."></textarea>
+            </label>
+
+            <a class="btn btn-primary" href={ROUTES.shop}>Start with available juices</a>
+          </form>
+        </section>
       )}
 
       <section class="panel" style="margin-top:18px">
@@ -184,9 +216,7 @@ const ROUTES = {
             <h2 class="panel-title">Products</h2>
             <p class="panel-sub">Tap a card for details, or add straight to your cart.</p>
           </div>
-          <div class="panel-tools">
-            <input id="q" class="search" type="search" placeholder="Search this category…" />
-          </div>
+          <input id="q" class="search" type="search" placeholder="Search this category…" />
         </div>
 
         <div
@@ -213,8 +243,7 @@ const ROUTES = {
           <div class="kicker">Notice</div>
           <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
           <p class="p">
-            This ritual is available, but it doesn’t have visible products yet. That usually means
-            the Square category sync or product-category mapping needs a refresh.
+            This ritual is available, but it doesn’t have visible products yet.
           </p>
           <div class="hero-actions" style="margin-top:14px">
             <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
@@ -225,10 +254,48 @@ const ROUTES = {
     </div>
   </main>
 
-  <script>
-    // @ts-nocheck
-    import { Cart } from "../../lib/cart.js";
-    import "../../lib/beveragePlanner.js";
+  <script is:inline>
+    const CART_KEY = "dts_cart_v1";
+
+    const Cart = {
+      read() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(CART_KEY) || "null");
+          if (Array.isArray(raw)) return { v: 1, items: raw };
+          if (raw && Array.isArray(raw.items)) return { v: 1, items: raw.items };
+        } catch {}
+        return { v: 1, items: [] };
+      },
+
+      write(state) {
+        const next = { v: 1, items: Array.isArray(state?.items) ? state.items : [] };
+        localStorage.setItem(CART_KEY, JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent("dts:cart", { detail: next }));
+      },
+
+      count() {
+        return this.read().items.reduce((sum, item) => sum + Number(item.qty || 1), 0);
+      },
+
+      add(item) {
+        const state = this.read();
+        const id = String(item.id || "");
+        const variationId = String(item.variation_id || "");
+        const key = variationId || id;
+
+        const existing = state.items.find((x) =>
+          String(x.variation_id || x.id || "") === key
+        );
+
+        if (existing) {
+          existing.qty = Number(existing.qty || 1) + Number(item.qty || 1);
+        } else {
+          state.items.push({ ...item, qty: Number(item.qty || 1) });
+        }
+
+        this.write(state);
+      },
+    };
 
     const grid = document.getElementById("cat-grid");
     const empty = document.getElementById("empty");
@@ -258,7 +325,7 @@ const ROUTES = {
       try {
         return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(amt);
       } catch {
-        return `$${amt.toFixed(2)}`;
+        return "$" + amt.toFixed(2);
       }
     };
 
@@ -273,10 +340,7 @@ const ROUTES = {
     }
 
     function normalizeSlug(s) {
-      return String(s || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[_\s]+/g, "-");
+      return String(s || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
     }
 
     async function fetchJson(url) {
@@ -287,15 +351,8 @@ const ROUTES = {
 
       const text = await res.text();
 
-      if (!res.ok) {
-        console.error("[category] API failed", res.status, url, text.slice(0, 500));
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      if (text.trim().startsWith("<")) {
-        console.error("[category] Non-JSON response", url, text.slice(0, 500));
-        throw new Error("Non-JSON response");
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
 
       return JSON.parse(text);
     }
@@ -318,18 +375,11 @@ const ROUTES = {
       const categoriesEndpoint = hero.getAttribute("data-categories-endpoint") || "";
       const baseLocal = hero.getAttribute("data-base") || "/";
 
-      if (!catSlug || !categoriesEndpoint) return;
-
-      const target = normalizeSlug(catSlug);
-
       try {
         const data = await fetchJson(categoriesEndpoint);
-        const arr =
-          (Array.isArray(data?.categories) && data.categories) ||
-          (Array.isArray(data?.items) && data.items) ||
-          (Array.isArray(data?.data) && data.data) ||
-          [];
+        const arr = unwrapItems(data).length ? unwrapItems(data) : data?.categories || [];
 
+        const target = normalizeSlug(catSlug);
         const found =
           arr.find((c) => normalizeSlug(c?.slug) === target) ||
           arr.find((c) => normalizeSlug(c?.category_slug) === target) ||
@@ -347,9 +397,7 @@ const ROUTES = {
           hero.style.setProperty("--hero", `url('${img}')`);
           return;
         }
-      } catch (e) {
-        console.warn("[category] hero category image skipped:", e);
-      }
+      } catch {}
 
       try {
         const data = await fetchJson(endpoint);
@@ -373,14 +421,14 @@ const ROUTES = {
       const descRaw = String(it?.description || "");
       const desc = escapeHtml(descRaw.length > 120 ? descRaw.slice(0, 117) + "…" : descRaw);
       const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
-      const price = it?.has_price ? money(it?.price_money) : money(it?.price_money);
+      const price = money(it?.price_money);
 
       return `
         <article class="card" data-id="${escapeHtml(id)}">
           <a class="card-link" href="${productBase}${encodeURIComponent(id)}" aria-label="View ${title}">
             <div class="media">
               <img src="${escapeHtml(img)}" alt="${title}" loading="lazy"
-                   onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';" />
+                onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';" />
               <div class="shine" aria-hidden="true"></div>
             </div>
             <div class="body">
@@ -418,48 +466,37 @@ const ROUTES = {
       }
 
       if (empty) empty.hidden = true;
-
       grid.innerHTML = filtered.map(cardHtml).join("");
 
       grid.querySelectorAll(".card").forEach((card) => {
         const id = card.getAttribute("data-id");
         const btn = card.querySelector("button.add");
-        const p = filtered.find((x) =>
-          String(x?.id || x?.product_id || "") === String(id || "")
-        );
+        const p = filtered.find((x) => String(x?.id || x?.product_id || "") === String(id || ""));
 
         if (!btn || !p) return;
 
         btn.addEventListener("click", (e) => {
           e.preventDefault();
 
-          try {
-            Cart.add({
-              id: String(p.id || p.product_id || ""),
-              variation_id: String(p.variation_id || ""),
-              name: p.name || p.title || "",
-              image_url: p.image_url || "",
-              price_money: p.price_money || null,
-              has_price: !!p.has_price || !!p.price_money,
-              qty: 1,
-            });
+          Cart.add({
+            id: String(p.id || p.product_id || ""),
+            variation_id: String(p.variation_id || ""),
+            name: p.name || p.title || "",
+            image_url: p.image_url || "",
+            price_money: p.price_money || null,
+            has_price: !!p.has_price || !!p.price_money,
+            qty: 1,
+          });
 
-            syncCartCount();
-            btn.textContent = "Added ✓";
-            setTimeout(() => (btn.textContent = "Add to cart"), 900);
-          } catch (err) {
-            console.error("[category] add failed:", err);
-            btn.textContent = "Error";
-            setTimeout(() => (btn.textContent = "Add to cart"), 900);
-          }
+          syncCartCount();
+          btn.textContent = "Added ✓";
+          setTimeout(() => (btn.textContent = "Add to cart"), 900);
         });
       });
     };
 
     async function load() {
       try {
-        if (!endpoint) throw new Error("Missing endpoint");
-
         const data = await fetchJson(endpoint);
 
         if (data && data.ok === false) {
@@ -473,7 +510,7 @@ const ROUTES = {
         grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
           <div class="kicker">Error</div>
           <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
-          <p class="p">The storefront reached production, but the product API rejected the request. Check app slug and public commerce route permissions.</p>
+          <p class="p">The storefront loaded, but the product API rejected the request.</p>
         </div>`;
       }
     }
@@ -489,22 +526,9 @@ const ROUTES = {
   </script>
 
   <style>
-    .category-page {
-      padding-top: clamp(28px, 4vw, 44px);
-    }
-
-    .toprow {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .crumb {
-      text-decoration: none;
-      opacity: .9;
-      font-size: 13px;
-    }
+    .category-page { padding-top: clamp(28px, 4vw, 44px); }
+    .toprow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .crumb { text-decoration: none; opacity: .9; font-size: 13px; }
 
     .cartpill {
       display: inline-flex;
@@ -514,10 +538,8 @@ const ROUTES = {
       padding: 10px 12px;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.18);
-      backdrop-filter: blur(10px);
       color: rgba(255,255,255,.92);
       cursor: pointer;
-      box-shadow: 0 12px 28px rgba(0,0,0,.22);
     }
 
     .cartpill-dot {
@@ -525,7 +547,6 @@ const ROUTES = {
       height: 10px;
       border-radius: 999px;
       background: rgba(200,162,74,.85);
-      box-shadow: 0 0 24px rgba(200,162,74,.35);
     }
 
     .cartpill-count {
@@ -557,7 +578,6 @@ const ROUTES = {
       background-image: var(--hero);
       background-size: cover;
       background-position: center;
-      filter: saturate(1.05) contrast(1.03);
       transform: scale(1.02);
     }
 
@@ -577,9 +597,7 @@ const ROUTES = {
       max-width: 760px;
     }
 
-    .kicker--light {
-      color: rgba(233, 206, 143, 0.92);
-    }
+    .kicker--light { color: rgba(233, 206, 143, 0.92); }
 
     .hero-title {
       font-family: var(--font-display);
@@ -604,12 +622,56 @@ const ROUTES = {
       flex-wrap: wrap;
     }
 
+    .planner {
+      margin-top: 18px;
+      border-radius: 26px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.16);
+      padding: 18px;
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 18px;
+    }
+
+    .planner-title {
+      font-family: var(--font-display);
+      font-size: clamp(26px, 3vw, 38px);
+      margin: 8px 0;
+    }
+
+    .planner-copy {
+      opacity: .86;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .planner-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .planner-form label {
+      display: grid;
+      gap: 7px;
+      font-size: 13px;
+      opacity: .9;
+    }
+
+    .planner-form select,
+    .planner-form textarea {
+      width: 100%;
+      border-radius: 16px;
+      padding: 11px 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.22);
+      color: rgba(255,255,255,.92);
+      outline: none;
+    }
+
     .panel {
       border-radius: 26px;
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.14);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 18px 46px rgba(0,0,0,.22);
       padding: 16px;
     }
 
@@ -644,10 +706,6 @@ const ROUTES = {
       outline: none;
     }
 
-    .search::placeholder {
-      color: rgba(255,255,255,.55);
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -661,13 +719,6 @@ const ROUTES = {
       border: 1px solid rgba(255,255,255,.12);
       background: rgba(0,0,0,.16);
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 26px 64px rgba(0,0,0,.28);
-      border-color: rgba(200,162,74,.22);
     }
 
     .card-link {
@@ -696,9 +747,7 @@ const ROUTES = {
       pointer-events: none;
     }
 
-    .body {
-      padding: 12px 12px 10px;
-    }
+    .body { padding: 12px 12px 10px; }
 
     .row {
       display: flex;
@@ -711,13 +760,11 @@ const ROUTES = {
       margin: 0;
       font-size: 16px;
       line-height: 1.2;
-      letter-spacing: -.01em;
     }
 
     .price {
       white-space: nowrap;
       font-weight: 750;
-      opacity: .95;
     }
 
     .desc {
@@ -734,9 +781,7 @@ const ROUTES = {
       padding: 10px 12px 14px;
     }
 
-    .actions .btn {
-      flex: 1;
-    }
+    .actions .btn { flex: 1; }
 
     .empty {
       margin-top: 14px;
@@ -746,9 +791,7 @@ const ROUTES = {
       background: rgba(0,0,0,.14);
     }
 
-    .skel-card {
-      pointer-events: none;
-    }
+    .skel-card { pointer-events: none; }
 
     .skel {
       background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.11), rgba(255,255,255,.05));
@@ -768,23 +811,14 @@ const ROUTES = {
     }
 
     @media (max-width: 920px) {
-      .card {
-        grid-column: span 6;
-      }
+      .card { grid-column: span 6; }
+      .planner { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 560px) {
-      .card {
-        grid-column: span 12;
-      }
-
-      .hero {
-        min-height: 260px;
-      }
-
-      .hero-inner {
-        padding: 18px;
-      }
+      .card { grid-column: span 12; }
+      .hero { min-height: 260px; }
+      .hero-inner { padding: 18px; }
     }
   </style>
 </BaseLayout>
