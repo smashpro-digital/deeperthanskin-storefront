@@ -1,5 +1,4 @@
 ---
-// KEEP YOUR IMPORTS
 import {
   WELLNESS_GOALS,
   DELIVERY_CADENCE,
@@ -7,205 +6,820 @@ import {
 } from "../lib/beveragePlanner.js";
 
 const {
-  title = "Find Your Custom Beverage Plan",
+  title = "Build Your Custom Juice Plan",
   categorySlug = "",
 } = Astro.props;
+
+const API_ROOT =
+  import.meta.env.PUBLIC_COMMERCE_API_ROOT ||
+  "https://smashpro.app/api/v1/index.php";
+
+const APP_SLUG =
+  import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
+  "deeper-than-skin";
+
+const checkoutUrl = new URL(API_ROOT);
+checkoutUrl.searchParams.set("path", "public/commerce/juice-plan-checkout");
+checkoutUrl.searchParams.set("app_slug", APP_SLUG);
 ---
 
-<section class="bev-quiz" data-category={categorySlug}>
-  <div class="bev-quiz__shell">
+<section class="bev-lux" data-category={categorySlug}>
+  <div class="bev-head">
+    <p class="bev-kicker">Personalized Juice Ritual</p>
+    <h2>{title}</h2>
+    <p>
+      Tell us your wellness focus and delivery rhythm. We’ll build your plan,
+      then send you to secure Square checkout.
+    </p>
+  </div>
 
-    <!-- INTRO -->
-    <div class="bev-quiz__intro">
-      <p class="bev-quiz__eyebrow">Custom Wellness Experience</p>
-      <h2>{title}</h2>
-      <p>
-        Build your custom juice plan based on your wellness goals, then start your delivery.
-      </p>
-    </div>
-
-    <!-- FORM -->
-    <form id="bev-form">
-
-      <!-- GOALS -->
-      <div class="group">
-        <h4>What support are you looking for?</h4>
-        <div class="chips">
-          {WELLNESS_GOALS.map(g => (
-            <label class="chip">
-              <input type="checkbox" name="goals" value={g.id} />
-              {g.label}
-            </label>
-          ))}
+  <form id="bev-form" class="bev-form">
+    <section class="bev-step">
+      <div class="bev-step-head">
+        <span>01</span>
+        <div>
+          <h3>Choose your wellness focus</h3>
+          <p>Select one or more areas you want support with.</p>
         </div>
       </div>
 
-      <!-- PREFERENCES -->
-      <div class="group">
-        <h4>Preferences</h4>
-        <div class="chips">
-          {PREFERENCES.map(p => (
-            <label class="chip">
-              <input type="checkbox" name="preferences" value={p.id} />
-              {p.label}
-            </label>
-          ))}
+      <div class="bev-card-grid">
+        {WELLNESS_GOALS.map((goal) => (
+          <label class="bev-choice-card">
+            <input type="checkbox" name="goals" value={goal.id} />
+            <span>
+              <strong>{goal.label}</strong>
+              {goal.helper && <small>{goal.helper}</small>}
+            </span>
+          </label>
+        ))}
+      </div>
+    </section>
+
+    <section class="bev-step">
+      <div class="bev-step-head">
+        <span>02</span>
+        <div>
+          <h3>Set your preferences</h3>
+          <p>We’ll use these to shape the blend profile.</p>
         </div>
       </div>
 
-      <!-- CADENCE -->
-      <div class="group">
-        <h4>Delivery</h4>
-        <div class="chips">
-          {DELIVERY_CADENCE.map(c => (
-            <label class="chip">
-              <input
-                type="radio"
-                name="cadence"
-                value={c.id}
-                checked={c.id === "one_time"}
-              />
-              {c.label}
-            </label>
-          ))}
+      <div class="bev-chip-grid">
+        {PREFERENCES.map((pref) => (
+          <label class="bev-chip">
+            <input type="checkbox" name="preferences" value={pref.id} />
+            <span>{pref.label}</span>
+          </label>
+        ))}
+      </div>
+    </section>
+
+    <section class="bev-step">
+      <div class="bev-step-head">
+        <span>03</span>
+        <div>
+          <h3>Pick your delivery rhythm</h3>
+          <p>Start with a trial or choose a recurring plan.</p>
         </div>
       </div>
 
-      <!-- NOTES -->
+      <div class="bev-chip-grid">
+        {DELIVERY_CADENCE.map((cadence) => (
+          <label class="bev-chip bev-chip--cadence">
+            <input
+              type="radio"
+              name="cadence"
+              value={cadence.id}
+              checked={cadence.id === "one_time"}
+            />
+            <span>
+              <strong>{cadence.label}</strong>
+              {cadence.helper && <small>{cadence.helper}</small>}
+            </span>
+          </label>
+        ))}
+      </div>
+    </section>
+
+    <label class="bev-notes">
+      <span>Custom notes</span>
       <textarea
         name="notes"
-        placeholder="Anything we should know? (optional)"
+        rows="4"
+        placeholder="Ingredients to avoid, flavor preferences, medications/diet restrictions to keep in mind, or delivery notes."
       ></textarea>
+    </label>
 
-      <!-- ACTION -->
-      <button type="button" id="build-btn" class="btn-primary">
+    <div class="bev-actions">
+      <button type="button" id="bev-build" class="bev-btn bev-btn--gold">
         Build My Plan
       </button>
+      <p>No charge yet. Review your recommendation first.</p>
+    </div>
+  </form>
 
-    </form>
-
-    <!-- RESULT -->
-    <div id="result" hidden>
-
-      <h3 id="r-title"></h3>
-      <p id="r-size"></p>
-
-      <ul id="r-list"></ul>
-      <ul id="r-summary"></ul>
-      <ul id="r-warnings"></ul>
-
-      <div id="r-ingredients"></div>
-
-      <!-- FINAL CTA -->
-      <button id="checkout-btn" class="btn-primary">
-        Start Checkout
-      </button>
-
+  <section id="bev-result" class="bev-result" hidden>
+    <div class="bev-result-head">
+      <p class="bev-kicker">Your Plan Is Ready</p>
+      <h3 id="result-title"></h3>
+      <p id="result-sub"></p>
     </div>
 
-  </div>
+    <div id="result-meta" class="result-meta"></div>
+
+    <div class="result-panel">
+      <h4>Recommended blends</h4>
+      <div id="result-blends" class="result-blends"></div>
+    </div>
+
+    <div class="result-panel">
+      <h4>Ingredient focus</h4>
+      <div id="result-ingredients" class="result-tags"></div>
+    </div>
+
+    <div class="result-panel">
+      <h4>Plan summary</h4>
+      <ul id="result-summary"></ul>
+    </div>
+
+    <div id="result-warnings" class="result-warnings"></div>
+
+    <div class="checkout-box">
+      <div>
+        <strong>Ready to start?</strong>
+        <span>Secure checkout is powered by Square.</span>
+      </div>
+      <button type="button" id="bev-checkout" class="bev-btn bev-btn--gold">
+        Start Checkout
+      </button>
+    </div>
+
+    <button type="button" id="bev-copy" class="bev-copy">
+      Copy plan details
+    </button>
+  </section>
 </section>
 
-<script type="module">
-import { buildBeveragePlan } from "../lib/beveragePlanner.js";
+<script define:vars={{ checkoutUrl: checkoutUrl.toString() }}>
+  const form = document.getElementById("bev-form");
+  const buildBtn = document.getElementById("bev-build");
+  const checkoutBtn = document.getElementById("bev-checkout");
+  const copyBtn = document.getElementById("bev-copy");
 
-const form = document.getElementById("bev-form");
-const buildBtn = document.getElementById("build-btn");
+  const result = document.getElementById("bev-result");
+  const resultTitle = document.getElementById("result-title");
+  const resultSub = document.getElementById("result-sub");
+  const resultMeta = document.getElementById("result-meta");
+  const resultBlends = document.getElementById("result-blends");
+  const resultIngredients = document.getElementById("result-ingredients");
+  const resultSummary = document.getElementById("result-summary");
+  const resultWarnings = document.getElementById("result-warnings");
 
-const result = document.getElementById("result");
-const rTitle = document.getElementById("r-title");
-const rSize = document.getElementById("r-size");
-const rList = document.getElementById("r-list");
-const rSummary = document.getElementById("r-summary");
-const rWarnings = document.getElementById("r-warnings");
-const rIngredients = document.getElementById("r-ingredients");
+  let latestPlan = null;
 
-const checkoutBtn = document.getElementById("checkout-btn");
+  const LABELS = {
+    gut: "Gut Support",
+    kidney: "Kidney-Conscious Hydration",
+    pressure: "Blood Pressure / Heart Support",
+    blood_sugar: "Blood Sugar Conscious",
+    inflammation: "Inflammation Support",
+    immune: "Immune Support",
+    energy: "Natural Energy",
+    stress: "Stress / Calm Support",
+    skin: "Skin Glow Support",
+    low_sugar: "Low Sugar",
+    low_sodium: "Low Sodium",
+    low_potassium: "Lower Potassium",
+    no_citrus: "No Citrus",
+    caffeine_free: "Caffeine Free",
+    hydration_focus: "Hydration Focus",
+    ginger_forward: "Ginger Forward",
+    greens_forward: "Greens Forward",
+    fruit_light: "Fruit-Light",
+  };
 
-let latestPlan = null;
+  const CADENCE = {
+    one_time: "One-time Trial",
+    weekly: "Weekly Delivery",
+    biweekly: "Biweekly Delivery",
+    monthly: "Monthly Reset",
+  };
 
-function getValues(name) {
-  return [...form.querySelectorAll(`[name="${name}"]:checked`)].map(i => i.value);
-}
+  const BLENDS = {
+    gut: {
+      name: "Gut-Friendly Greens",
+      note: "Digestive-support-forward greens with ginger, herbs, and fruit-light balance.",
+      ingredients: ["cucumber", "celery", "ginger", "mint", "green apple"],
+    },
+    kidney: {
+      name: "Kidney-Conscious Hydration",
+      note: "A lighter hydration profile with mineral awareness.",
+      ingredients: ["cucumber", "mint", "apple", "lemon"],
+      warning: "Kidney-conscious does not mean kidney treatment. Some people may need to limit potassium, sodium, or fluids.",
+    },
+    pressure: {
+      name: "Heart & Circulation Support",
+      note: "Low-sodium, veggie-forward blends for a steady wellness ritual.",
+      ingredients: ["beet", "celery", "apple", "ginger", "lemon"],
+      warning: "Blood pressure support does not replace medication, monitoring, or medical care.",
+    },
+    blood_sugar: {
+      name: "Blood Sugar Conscious Blend",
+      note: "Lower-sugar, veggie-forward blends for steadier daily routines.",
+      ingredients: ["cucumber", "greens", "celery", "lemon", "ginger"],
+      warning: "Blood sugar conscious does not mean diabetes treatment. Juice may contain carbohydrates and natural sugars.",
+    },
+    inflammation: {
+      name: "Golden Botanical Support",
+      note: "Ginger, turmeric, greens, and antioxidant-rich produce.",
+      ingredients: ["turmeric", "ginger", "greens", "lemon"],
+    },
+    immune: {
+      name: "Immune Glow Blend",
+      note: "Vitamin-rich fruits, herbs, and greens for everyday support.",
+      ingredients: ["ginger", "berries", "greens", "lemon"],
+    },
+    energy: {
+      name: "Clean Energy Elixir",
+      note: "Bright, nutrient-dense blends without heavy stimulants.",
+      ingredients: ["green apple", "greens", "ginger", "cucumber"],
+    },
+    stress: {
+      name: "Calm Ritual Blend",
+      note: "A gentle hydration profile for a calmer daily rhythm.",
+      ingredients: ["cucumber", "mint", "apple", "lemon"],
+    },
+    skin: {
+      name: "Skin Glow Hydration",
+      note: "Hydrating, antioxidant-rich blends for beauty-from-within rituals.",
+      ingredients: ["carrot", "cucumber", "berries", "ginger"],
+    },
+  };
 
-function render(plan) {
-  latestPlan = plan;
-
-  rTitle.textContent = plan.resultHeadline;
-  rSize.textContent = `${plan.size} • ${plan.cadenceLabel}`;
-
-  rList.innerHTML = plan.recommendations.map(r =>
-    `<li><strong>${r.name}</strong><br>${r.note}</li>`
-  ).join("");
-
-  rSummary.innerHTML = plan.summary.map(s => `<li>${s}</li>`).join("");
-
-  rWarnings.innerHTML = (plan.warnings || [])
-    .map(w => `<li>${w}</li>`).join("");
-
-  if (plan.ingredientFocus?.length) {
-    rIngredients.innerHTML =
-      "<strong>Ingredient focus:</strong> " +
-      plan.ingredientFocus.join(", ");
+  function esc(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
-  checkoutBtn.textContent = plan.primaryCta;
+  function checked(name) {
+    return Array.from(form.querySelectorAll(`[name="${name}"]:checked`)).map((el) => el.value);
+  }
 
-  result.hidden = false;
-  result.scrollIntoView({ behavior: "smooth" });
-}
+  function unique(items) {
+    return Array.from(new Set(items.filter(Boolean)));
+  }
 
-buildBtn.onclick = () => {
-  const plan = buildBeveragePlan({
-    goals: getValues("goals"),
-    preferences: getValues("preferences"),
-    cadence: form.cadence.value,
-    notes: form.notes.value
+  function readCart() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("dts_cart_v1") || "null");
+      if (Array.isArray(raw)) return raw;
+      if (raw && Array.isArray(raw.items)) return raw.items;
+    } catch {}
+    return [];
+  }
+
+  function buildPlan() {
+    const goals = checked("goals");
+    const preferences = checked("preferences");
+    const cadence = form.querySelector('[name="cadence"]:checked')?.value || "one_time";
+    const notes = String(form.querySelector('[name="notes"]')?.value || "").trim();
+
+    const selectedGoals = goals.length ? goals : ["gut", "energy", "skin"];
+    const isRecurring = cadence !== "one_time";
+
+    const recommendations = selectedGoals
+      .map((goal) => {
+        const base = BLENDS[goal];
+        if (!base) return null;
+
+        const adjustments = [];
+        if (preferences.includes("low_sugar") || preferences.includes("fruit_light")) adjustments.push("fruit-light");
+        if (preferences.includes("low_sodium")) adjustments.push("low-sodium conscious");
+        if (preferences.includes("low_potassium")) adjustments.push("lower-potassium review");
+        if (preferences.includes("no_citrus")) adjustments.push("no-citrus adjustment");
+        if (preferences.includes("hydration_focus")) adjustments.push("hydration-forward");
+
+        return {
+          key: goal,
+          name: base.name,
+          note: adjustments.length ? `${base.note} Adjusted for ${adjustments.join(", ")}.` : base.note,
+          ingredients: base.ingredients,
+          warning: base.warning || "",
+        };
+      })
+      .filter(Boolean);
+
+    const goalLabels = goals.map((id) => LABELS[id] || id);
+    const preferenceLabels = preferences.map((id) => LABELS[id] || id);
+
+    const warnings = unique([
+      ...recommendations.map((item) => item.warning),
+      preferences.includes("low_potassium")
+        ? "Lower potassium preferences should be reviewed with a clinician or renal dietitian if kidney disease is present."
+        : "",
+      goals.some((goal) => ["kidney", "pressure", "blood_sugar"].includes(goal))
+        ? "Please consult a healthcare professional if you are pregnant, managing a medical condition, taking medication, or following a restricted diet."
+        : "",
+    ]);
+
+    return {
+      title: goals.length ? "Your Custom Juice Plan" : "Your Starter Juice Plan",
+      resultHeadline: isRecurring ? "Your recurring juice rhythm is ready." : "Your custom trial set is ready.",
+      resultSubheadline: isRecurring
+        ? "Review your recommendation, then continue to Square to start your plan."
+        : "Review your recommendation, then continue to checkout for your trial set.",
+      size: isRecurring ? "9-Pack Subscription Set" : "6-Pack Trial Set",
+      cadence,
+      cadenceLabel: CADENCE[cadence] || CADENCE.one_time,
+      planType: isRecurring ? "subscription" : "trial",
+      primaryCta: isRecurring ? "Start Plan Checkout" : "Start Trial Checkout",
+      goals,
+      goalLabels,
+      preferences,
+      preferenceLabels,
+      notes,
+      recommendations,
+      ingredientFocus: unique(recommendations.flatMap((item) => item.ingredients || [])),
+      warnings,
+      summary: [
+        goalLabels.length ? `Goals: ${goalLabels.join(", ")}` : "Goals: General Wellness",
+        preferenceLabels.length ? `Preferences: ${preferenceLabels.join(", ")}` : "Preferences: None selected",
+        `Cadence: ${CADENCE[cadence] || CADENCE.one_time}`,
+        `Plan Type: ${isRecurring ? "Recurring" : "One-time Trial"}`,
+        notes ? `Notes: ${notes}` : "",
+      ].filter(Boolean),
+    };
+  }
+
+  function renderPlan(plan) {
+    latestPlan = plan;
+
+    resultTitle.textContent = plan.resultHeadline;
+    resultSub.textContent = plan.resultSubheadline;
+
+    resultMeta.innerHTML = `
+      <span>${esc(plan.size)}</span>
+      <span>${esc(plan.cadenceLabel)}</span>
+      <span>${esc(plan.planType)}</span>
+    `;
+
+    resultBlends.innerHTML = plan.recommendations
+      .map(
+        (item) => `
+          <article>
+            <strong>${esc(item.name)}</strong>
+            <p>${esc(item.note)}</p>
+          </article>
+        `
+      )
+      .join("");
+
+    resultIngredients.innerHTML = plan.ingredientFocus
+      .map((item) => `<span>${esc(item)}</span>`)
+      .join("");
+
+    resultSummary.innerHTML = plan.summary
+      .map((item) => `<li>${esc(item)}</li>`)
+      .join("");
+
+    resultWarnings.innerHTML = plan.warnings.length
+      ? `<strong>Wellness note</strong>${plan.warnings.map((item) => `<p>${esc(item)}</p>`).join("")}`
+      : "";
+
+    checkoutBtn.textContent = plan.primaryCta;
+    result.hidden = false;
+    result.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  buildBtn?.addEventListener("click", () => {
+    renderPlan(buildPlan());
   });
 
-  render(plan);
-};
+  copyBtn?.addEventListener("click", async () => {
+    if (!latestPlan) return;
 
-checkoutBtn.onclick = async () => {
-  if (!latestPlan) return;
+    const text = [
+      latestPlan.title,
+      `${latestPlan.size} • ${latestPlan.cadenceLabel}`,
+      "",
+      "Recommended blends:",
+      ...latestPlan.recommendations.map((item) => `- ${item.name}: ${item.note}`),
+      "",
+      ...latestPlan.summary.map((item) => `- ${item}`),
+    ].join("\n");
 
-  checkoutBtn.textContent = "Creating checkout...";
-
-  const API_BASE =
-    import.meta.env.PUBLIC_COMMERCE_API_BASE ||
-    "https://smashpro.app/api/v1/routes";
-
-  const APP_SLUG =
-    import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
-    "deeper-than-skin";
-
-  const res = await fetch(
-    `${API_BASE}/public.commerce.juice-plan-checkout.post.php?app_slug=${APP_SLUG}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        cart: [],
-        plan: {
-          cadence: latestPlan.cadence,
-          goals: latestPlan.goals,
-          preferences: latestPlan.preferences,
-          notes: latestPlan.notes,
-          recommendations: latestPlan.recommendations
-        }
-      })
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = "Copied";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy plan details";
+      }, 1200);
+    } catch {
+      copyBtn.textContent = "Copy failed";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy plan details";
+      }, 1200);
     }
-  );
+  });
 
-  const data = await res.json();
+  checkoutBtn?.addEventListener("click", async () => {
+    if (!latestPlan) return;
 
-  if (data?.checkout_url) {
-    window.location.href = data.checkout_url;
-  } else {
-    checkoutBtn.textContent = "Try Again";
-    console.error(data);
-  }
-};
+    checkoutBtn.disabled = true;
+    checkoutBtn.textContent = "Creating Square checkout…";
+
+    try {
+      const res = await fetch(checkoutUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          cart: readCart(),
+          plan: {
+            cadence: latestPlan.cadence,
+            planType: latestPlan.planType,
+            goals: latestPlan.goalLabels,
+            preferences: latestPlan.preferenceLabels,
+            notes: latestPlan.notes,
+            recommendations: latestPlan.recommendations,
+          },
+          redirect_url: `${window.location.origin}/checkout?status=juice-plan-started`,
+        }),
+      });
+
+      const text = await res.text();
+      let data = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text || "Invalid checkout response");
+      }
+
+      if (!res.ok || !data?.checkout_url) {
+        throw new Error(data?.error || "Square checkout failed");
+      }
+
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      console.error("[juice-plan-checkout]", err);
+      checkoutBtn.disabled = false;
+      checkoutBtn.textContent = "Try Again";
+    }
+  });
 </script>
+
+<style>
+  .bev-lux {
+    margin-top: 20px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 30px;
+    padding: clamp(18px, 4vw, 32px);
+    border: 1px solid rgba(233, 206, 143, .22);
+    background:
+      radial-gradient(900px 500px at 8% 0%, rgba(214,184,105,.18), transparent 58%),
+      linear-gradient(135deg, rgba(8,18,15,.97), rgba(2,10,8,.98));
+    box-shadow: 0 30px 90px rgba(0,0,0,.34);
+  }
+
+  .bev-head {
+    max-width: 820px;
+    margin-bottom: 24px;
+  }
+
+  .bev-kicker {
+    margin: 0 0 8px;
+    color: rgba(233,206,143,.95);
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .bev-head h2,
+  .bev-result h3 {
+    margin: 0 0 10px;
+    font-family: var(--font-display);
+    line-height: 1.02;
+    letter-spacing: -.03em;
+  }
+
+  .bev-head h2 {
+    font-size: clamp(32px, 5vw, 58px);
+  }
+
+  .bev-result h3 {
+    font-size: clamp(28px, 4vw, 46px);
+  }
+
+  .bev-head p,
+  .bev-result p {
+    color: rgba(255,255,255,.82);
+    line-height: 1.6;
+  }
+
+  .bev-form {
+    display: grid;
+    gap: 18px;
+  }
+
+  .bev-step {
+    border-radius: 24px;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.035);
+  }
+
+  .bev-step-head {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .bev-step-head > span {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #151008;
+    background: linear-gradient(135deg, #f2d982, #c79d3e);
+    font-weight: 900;
+  }
+
+  .bev-step h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 18px;
+  }
+
+  .bev-step p {
+    margin: 4px 0 0;
+    color: rgba(255,255,255,.65);
+    font-size: 13px;
+  }
+
+  .bev-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .bev-chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .bev-choice-card,
+  .bev-chip {
+    cursor: pointer;
+    transition: transform .18s ease, border-color .18s ease, background .18s ease;
+  }
+
+  .bev-choice-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 88px;
+    border-radius: 20px;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.13);
+    background: rgba(0,0,0,.20);
+  }
+
+  .bev-choice-card:hover,
+  .bev-chip:hover {
+    transform: translateY(-2px);
+    border-color: rgba(214,184,105,.58);
+    background: rgba(214,184,105,.08);
+  }
+
+  .bev-choice-card input,
+  .bev-chip input {
+    accent-color: #d6b869;
+  }
+
+  .bev-choice-card strong,
+  .bev-chip strong {
+    display: block;
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .bev-choice-card small,
+  .bev-chip small {
+    display: block;
+    margin-top: 5px;
+    color: rgba(255,255,255,.64);
+    line-height: 1.35;
+  }
+
+  .bev-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 11px 14px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.20);
+    color: #fff;
+    font-weight: 800;
+  }
+
+  .bev-chip--cadence {
+    align-items: flex-start;
+    border-radius: 18px;
+    min-width: 190px;
+  }
+
+  .bev-notes {
+    display: grid;
+    gap: 8px;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  .bev-notes textarea {
+    width: 100%;
+    resize: vertical;
+    border-radius: 22px;
+    padding: 14px;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(0,0,0,.24);
+    outline: none;
+  }
+
+  .bev-actions,
+  .checkout-box {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .bev-actions p {
+    margin: 0;
+    color: rgba(255,255,255,.66);
+    font-size: 13px;
+  }
+
+  .bev-btn {
+    border: 0;
+    border-radius: 999px;
+    padding: 14px 20px;
+    font-weight: 950;
+    cursor: pointer;
+    min-width: 180px;
+  }
+
+  .bev-btn--gold {
+    color: #16110a;
+    background: linear-gradient(135deg, #f2d982, #c79d3e);
+    box-shadow: 0 18px 36px rgba(214,184,105,.20);
+  }
+
+  .bev-result {
+    margin-top: 24px;
+    border-radius: 28px;
+    border: 1px solid rgba(214,184,105,.28);
+    background: rgba(255,255,255,.045);
+    padding: clamp(18px, 3vw, 26px);
+  }
+
+  .result-meta,
+  .result-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .result-meta {
+    margin: 16px 0;
+  }
+
+  .result-meta span,
+  .result-tags span {
+    border-radius: 999px;
+    padding: 8px 11px;
+    background: rgba(214,184,105,.10);
+    border: 1px solid rgba(214,184,105,.24);
+    color: rgba(255,255,255,.90);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .result-panel {
+    margin-top: 14px;
+    border-radius: 22px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(0,0,0,.16);
+    padding: 16px;
+  }
+
+  .result-panel h4 {
+    margin: 0 0 10px;
+    color: rgba(233,206,143,.95);
+    font-size: 15px;
+  }
+
+  .result-blends {
+    display: grid;
+    gap: 10px;
+  }
+
+  .result-blends article {
+    border-radius: 18px;
+    padding: 14px;
+    background: rgba(255,255,255,.04);
+  }
+
+  .result-blends strong {
+    color: #fff;
+  }
+
+  .result-blends p {
+    margin: 5px 0 0;
+  }
+
+  .result-panel ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .result-panel li {
+    margin: 8px 0;
+    color: rgba(255,255,255,.82);
+  }
+
+  .result-warnings {
+    margin-top: 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,.78);
+  }
+
+  .result-warnings strong {
+    color: rgba(233,206,143,.95);
+  }
+
+  .checkout-box {
+    margin-top: 18px;
+    border-radius: 22px;
+    padding: 16px;
+    background: rgba(214,184,105,.08);
+    border: 1px solid rgba(214,184,105,.22);
+  }
+
+  .checkout-box strong,
+  .checkout-box span {
+    display: block;
+  }
+
+  .checkout-box span {
+    margin-top: 4px;
+    color: rgba(255,255,255,.68);
+    font-size: 13px;
+  }
+
+  .bev-copy {
+    margin-top: 12px;
+    color: rgba(255,255,255,.78);
+    background: transparent;
+    border: 0;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  @media (max-width: 900px) {
+    .bev-card-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .bev-lux {
+      padding: 16px;
+      border-radius: 24px;
+    }
+
+    .bev-card-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .bev-chip,
+    .bev-chip--cadence,
+    .bev-btn {
+      width: 100%;
+    }
+  }
+</style>
