@@ -12,16 +12,33 @@ const u = (path: string) => {
   return `${b}${p}`;
 };
 
-const API_BASE =
-  import.meta.env.PUBLIC_COMMERCE_API_BASE || "https://smashpro.app/api/v1/routes";
+const API_ROOT =
+  import.meta.env.PUBLIC_COMMERCE_API_ROOT || "https://smashpro.app/api/v1/index.php";
+
 const APP_SLUG =
   import.meta.env.PUBLIC_COMMERCE_APP_SLUG || "deeper-than-skin";
 
-const endpoint =
-  `${API_BASE}/public.commerce.featured.get.php` +
-  `?app_slug=${encodeURIComponent(APP_SLUG)}` +
-  `&section=${encodeURIComponent("homepage_signature_ritual")}` +
-  `&limit=60`;
+function publicApiUrl(
+  path: string,
+  params: Record<string, string | number | boolean> = {}
+) {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v) !== "") {
+      url.searchParams.set(k, String(v));
+    }
+  });
+
+  return url.toString();
+}
+
+const endpoint = publicApiUrl("public/commerce/featured", {
+  section: "homepage_signature_ritual",
+  limit: 60,
+});
 
 const FALLBACKS = {
   juices: u("/images/cat-juices.jpg"),
