@@ -8,8 +8,8 @@ const base = import.meta.env.BASE_URL || "/";
 const ROUTES = {
   shop: `${base}shop`,
   featured: `${base}featured`,
-  skincare: `${base}skincare`,
-  wellness: `${base}wellness`,
+  skincare: `${base}category/skincare`,
+  wellness: `${base}category/wellness`,
 };
 ---
 
@@ -81,13 +81,13 @@ const ROUTES = {
       {
         title: "Skincare",
         description: "Skin-focused essentials and botanical rituals.",
-        url: "/skincare",
+        url: "/category/skincare",
         tags: ["skin", "skincare", "face", "body"],
       },
       {
         title: "Wellness",
         description: "Wellness blends, consultations, and daily rhythm support.",
-        url: "/wellness",
+        url: "/category/wellness",
         tags: ["wellness", "juice", "health", "consultation", "rhythm"],
       },
       {
@@ -150,7 +150,6 @@ const ROUTES = {
       if (!results || !resultCount || !emptyState) return;
 
       const q = normalize(query);
-
       results.innerHTML = "";
 
       if (!q) {
@@ -207,15 +206,7 @@ const ROUTES = {
 
     form?.addEventListener("submit", (event: SubmitEvent) => {
       event.preventDefault();
-
-      const q = input?.value.trim() || "";
-
-      if (!q) {
-        render("");
-        return;
-      }
-
-      render(q);
+      render(input?.value.trim() || "");
     });
 
     render(initialQuery);
