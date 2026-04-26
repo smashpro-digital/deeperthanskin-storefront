@@ -1,12 +1,14 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 
+export const prerender = true;
+
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
-const API_BASE =
-  (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
-  "https://smashpro.app/api/v1/routes";
+const API_ROOT =
+  (import.meta.env.PUBLIC_COMMERCE_API_ROOT as string | undefined) ||
+  "https://smashpro.app/api/v1/index.php";
 
 const APP_SLUG =
   (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
@@ -61,22 +63,39 @@ type ProductListItem = {
   price_money?: { amount: number; currency?: string };
 };
 
+function extractItems(payload: any): ProductListItem[] {
+  return Array.isArray(payload?.items)
+    ? payload.items
+    : Array.isArray(payload?.products)
+      ? payload.products
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : Array.isArray(payload)
+            ? payload
+            : [];
+}
+
 export async function getStaticPaths() {
-  const apiBase =
-    (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
-    "https://smashpro.app/api/v1/routes";
+  const apiRoot =
+    (import.meta.env.PUBLIC_COMMERCE_API_ROOT as string | undefined) ||
+    "https://smashpro.app/api/v1/index.php";
 
   const appSlug =
     (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
     "deeper-than-skin";
 
+  // 👇 INLINE everything (no external helpers)
+  const url = new URL(apiRoot);
+  url.searchParams.set("path", "public/commerce/products");
+  url.searchParams.set("app_slug", appSlug);
+  url.searchParams.set("limit", "500");
+
   try {
-    const res = await fetch(
-      `${apiBase}/public.commerce.products.get.php?app_slug=${encodeURIComponent(appSlug)}`,
-      {
-        headers: { Accept: "application/json" },
-      }
-    );
+    const res = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+    });
 
     const text = await res.text();
 
@@ -92,18 +111,25 @@ export async function getStaticPaths() {
 
     const data = JSON.parse(text);
 
-    const items: ProductListItem[] = Array.isArray(data?.items)
-      ? data.items
-      : Array.isArray(data?.products)
-        ? data.products
-        : Array.isArray(data)
-          ? data
-          : [];
+    // 👇 INLINE extractItems logic
+    const items: ProductListItem[] = (
+  Array.isArray(data?.items)
+    ? data.items
+    : Array.isArray(data?.products)
+      ? data.products
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : []
+) as ProductListItem[];
 
     return items
       .map((item) => {
         const id = item?.id ?? item?.product_id;
-        if (id == null || id === "") return null;
+        if (!id) return null;
 
         return {
           params: { id: String(id) },
@@ -123,19 +149,26 @@ export async function getStaticPaths() {
     return [];
   }
 }
+function publicApiUrl(path: string, params: Record<string, string | number | boolean> = {}) {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value) !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
 
 const { id } = Astro.params;
 const { productSeed = null } = Astro.props;
 
-const productsEndpoint =
-  `${API_BASE}/public.commerce.products.get.php` +
-  `?app_slug=${encodeURIComponent(APP_SLUG)}`;
-
-const checkoutEndpoint =
-  `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
-
-const subscriptionCheckoutEndpoint =
-  `${API_BASE}/public.commerce.subscription.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
+const productsEndpoint = publicApiUrl("public/commerce/products", { limit: 500 });
+const checkoutEndpoint = publicApiUrl("public/commerce/checkout");
+const subscriptionCheckoutEndpoint = publicApiUrl("public/commerce/subscription/checkout");
 
 const pageTitle = productSeed?.name
   ? `${productSeed.name} | Deeper Than Skin`
