@@ -1,0 +1,380 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+export const prerender = true;
+
+const base = import.meta.env.BASE_URL || "/";
+
+const ROUTES = {
+  shop: `${base}shop`,
+  featured: `${base}featured`,
+  skincare: `${base}skincare`,
+  wellness: `${base}wellness`,
+};
+---
+
+<BaseLayout title="Search | Deeper Than Skin">
+  <main class="search-page">
+    <section class="hero">
+      <p class="eyebrow">Search</p>
+      <h1>Find your ritual.</h1>
+      <p class="lede">
+        Search products, wellness blends, skincare, and featured collections.
+      </p>
+
+      <form class="search-box" id="searchForm">
+        <input
+          id="searchInput"
+          type="search"
+          name="q"
+          placeholder="Search deeper than skin..."
+          autocomplete="off"
+          autofocus
+        />
+        <button type="submit">Search</button>
+      </form>
+    </section>
+
+    <section class="results-wrap">
+      <div class="results-head">
+        <p id="resultCount">Start typing to search.</p>
+      </div>
+
+      <div id="results" class="results"></div>
+
+      <div id="emptyState" class="empty" hidden>
+        <h2>No ritual found yet.</h2>
+        <p>Try “juice”, “skincare”, “wellness”, “featured”, or browse the shop.</p>
+        <div class="empty-actions">
+          <a href={ROUTES.shop}>Shop all</a>
+          <a href={ROUTES.featured}>Featured</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const SEARCH_ITEMS = [
+      {
+        title: "Shop",
+        description: "Browse all Deeper Than Skin products.",
+        url: "/shop",
+        tags: ["shop", "products", "store", "buy"],
+      },
+      {
+        title: "Featured",
+        description: "Explore highlighted rituals, blends, and collections.",
+        url: "/featured",
+        tags: ["featured", "popular", "collection"],
+      },
+      {
+        title: "Skincare",
+        description: "Skin-focused essentials and botanical rituals.",
+        url: "/skincare",
+        tags: ["skin", "skincare", "face", "body"],
+      },
+      {
+        title: "Wellness",
+        description: "Wellness blends, consultations, and daily rhythm support.",
+        url: "/wellness",
+        tags: ["wellness", "juice", "health", "consultation", "rhythm"],
+      },
+      {
+        title: "Cart",
+        description: "Review your selected items.",
+        url: "/cart",
+        tags: ["cart", "checkout", "bag"],
+      },
+    ];
+
+    const form = document.getElementById("searchForm");
+    const input = document.getElementById("searchInput");
+    const results = document.getElementById("results");
+    const resultCount = document.getElementById("resultCount");
+    const emptyState = document.getElementById("emptyState");
+
+    const params = new URLSearchParams(window.location.search);
+    const initialQuery = params.get("q") || "";
+
+    if (input) {
+      input.value = initialQuery;
+    }
+
+    function normalize(value) {
+      return String(value || "").toLowerCase().trim();
+    }
+
+    function getBasePath() {
+      const baseTag = document.querySelector("main.search-page");
+      return "/";
+    }
+
+    function scoreItem(item, query) {
+      const haystack = [
+        item.title,
+        item.description,
+        ...(item.tags || []),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      if (!query) return 0;
+
+      let score = 0;
+
+      if (normalize(item.title).includes(query)) score += 10;
+      if (haystack.includes(query)) score += 5;
+
+      query.split(/\s+/).forEach((word) => {
+        if (word && haystack.includes(word)) score += 2;
+      });
+
+      return score;
+    }
+
+    function render(query) {
+      const q = normalize(query);
+
+      results.innerHTML = "";
+
+      if (!q) {
+        resultCount.textContent = "Start typing to search.";
+        emptyState.hidden = true;
+        return;
+      }
+
+      const matches = SEARCH_ITEMS
+        .map((item) => ({ ...item, score: scoreItem(item, q) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      resultCount.textContent =
+        matches.length === 1
+          ? "1 result found."
+          : `${matches.length} results found.`;
+
+      emptyState.hidden = matches.length > 0;
+
+      matches.forEach((item) => {
+        const card = document.createElement("a");
+        card.className = "result-card";
+        card.href = item.url;
+
+        card.innerHTML = `
+          <span>${item.title}</span>
+          <p>${item.description}</p>
+        `;
+
+        results.appendChild(card);
+      });
+    }
+
+    input?.addEventListener("input", () => {
+      const q = input.value || "";
+      const url = new URL(window.location.href);
+
+      if (q.trim()) {
+        url.searchParams.set("q", q.trim());
+      } else {
+        url.searchParams.delete("q");
+      }
+
+      window.history.replaceState({}, "", url);
+      render(q);
+    });
+
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const q = input?.value?.trim() || "";
+
+      if (!q) {
+        render("");
+        return;
+      }
+
+      render(q);
+    });
+
+    render(initialQuery);
+  </script>
+
+  <style>
+    .search-page {
+      min-height: calc(100vh - 90px);
+      background:
+        radial-gradient(circle at top left, rgba(191, 159, 77, 0.18), transparent 34rem),
+        linear-gradient(135deg, #10180f 0%, #071b18 100%);
+      color: #f7f1e4;
+      padding: clamp(3rem, 7vw, 6rem) 1.25rem;
+    }
+
+    .hero,
+    .results-wrap {
+      width: min(980px, 100%);
+      margin: 0 auto;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .eyebrow {
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      color: #c8ad61;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.6rem, 7vw, 5rem);
+      line-height: 0.95;
+      margin: 0;
+    }
+
+    .lede {
+      max-width: 640px;
+      margin: 1.2rem auto 2rem;
+      color: rgba(247, 241, 228, 0.78);
+      font-size: 1.05rem;
+      line-height: 1.7;
+    }
+
+    .search-box {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      max-width: 720px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(200, 173, 97, 0.32);
+      border-radius: 999px;
+      padding: 0.55rem;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(14px);
+    }
+
+    input {
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #fff;
+      font: inherit;
+      padding: 0.95rem 1.1rem;
+    }
+
+    input::placeholder {
+      color: rgba(247, 241, 228, 0.55);
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.95rem 1.35rem;
+      background: #c8ad61;
+      color: #10180f;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .results-head {
+      color: rgba(247, 241, 228, 0.68);
+      margin-bottom: 1rem;
+    }
+
+    .results {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .result-card {
+      display: block;
+      text-decoration: none;
+      color: #f7f1e4;
+      padding: 1.25rem;
+      border: 1px solid rgba(200, 173, 97, 0.26);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.06);
+      transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease;
+    }
+
+    .result-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(200, 173, 97, 0.58);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .result-card span {
+      display: block;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.45rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .result-card p {
+      margin: 0;
+      color: rgba(247, 241, 228, 0.72);
+      line-height: 1.6;
+    }
+
+    .empty {
+      text-align: center;
+      margin-top: 2rem;
+      padding: 2rem;
+      border: 1px solid rgba(200, 173, 97, 0.26);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .empty h2 {
+      margin: 0 0 0.5rem;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 2rem;
+    }
+
+    .empty p {
+      color: rgba(247, 241, 228, 0.72);
+    }
+
+    .empty-actions {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1.25rem;
+    }
+
+    .empty-actions a {
+      color: #10180f;
+      background: #c8ad61;
+      text-decoration: none;
+      padding: 0.8rem 1.1rem;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .empty-actions a + a {
+      color: #f7f1e4;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(200, 173, 97, 0.35);
+    }
+
+    @media (max-width: 640px) {
+      .search-box {
+        grid-template-columns: 1fr;
+        border-radius: 28px;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</BaseLayout>
