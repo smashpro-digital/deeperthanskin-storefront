@@ -1,4 +1,5 @@
 ---
+// KEEP YOUR IMPORTS
 import {
   WELLNESS_GOALS,
   DELIVERY_CADENCE,
@@ -11,379 +12,200 @@ const {
 } = Astro.props;
 ---
 
-<section class="bev-quiz" aria-labelledby="bev-quiz-title" data-category={categorySlug}>
+<section class="bev-quiz" data-category={categorySlug}>
   <div class="bev-quiz__shell">
+
+    <!-- INTRO -->
     <div class="bev-quiz__intro">
       <p class="bev-quiz__eyebrow">Custom Wellness Experience</p>
-      <h2 id="bev-quiz-title">{title}</h2>
-      <p class="bev-quiz__copy">
-        Answer a few quick questions and get a personalized beverage plan with
-        a one-time trial or recurring delivery option.
-      </p>
-      <p class="bev-quiz__fineprint">
-        These blends are intended for wellness support and are not medical treatment.
+      <h2>{title}</h2>
+      <p>
+        Build your custom juice plan based on your wellness goals, then start your delivery.
       </p>
     </div>
 
-    <form class="bev-quiz__form" id="beverage-questionnaire">
-      <fieldset class="bev-quiz__group">
-        <legend>What support are you looking for?</legend>
-        <div class="bev-quiz__options">
-          {WELLNESS_GOALS.map((item) => (
+    <!-- FORM -->
+    <form id="bev-form">
+
+      <!-- GOALS -->
+      <div class="group">
+        <h4>What support are you looking for?</h4>
+        <div class="chips">
+          {WELLNESS_GOALS.map(g => (
             <label class="chip">
-              <input type="checkbox" name="goals" value={item.id} />
-              <span>{item.label}</span>
+              <input type="checkbox" name="goals" value={g.id} />
+              {g.label}
             </label>
           ))}
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset class="bev-quiz__group">
-        <legend>Any preferences?</legend>
-        <div class="bev-quiz__options">
-          {PREFERENCES.map((item) => (
+      <!-- PREFERENCES -->
+      <div class="group">
+        <h4>Preferences</h4>
+        <div class="chips">
+          {PREFERENCES.map(p => (
             <label class="chip">
-              <input type="checkbox" name="preferences" value={item.id} />
-              <span>{item.label}</span>
+              <input type="checkbox" name="preferences" value={p.id} />
+              {p.label}
             </label>
           ))}
         </div>
-      </fieldset>
+      </div>
 
-      <fieldset class="bev-quiz__group">
-        <legend>How would you like to order?</legend>
-        <div class="bev-quiz__options bev-quiz__options--radio">
-          {DELIVERY_CADENCE.map((item) => (
-            <label class="chip chip--radio">
+      <!-- CADENCE -->
+      <div class="group">
+        <h4>Delivery</h4>
+        <div class="chips">
+          {DELIVERY_CADENCE.map(c => (
+            <label class="chip">
               <input
                 type="radio"
                 name="cadence"
-                value={item.id}
-                checked={item.id === "one_time"}
+                value={c.id}
+                checked={c.id === "one_time"}
               />
-              <span>{item.label}</span>
+              {c.label}
             </label>
           ))}
         </div>
-      </fieldset>
-
-      <div class="bev-quiz__actions">
-        <button type="button" class="btn-primary" id="bev-quiz-build">
-          Build My Plan
-        </button>
-        <button type="reset" class="btn-secondary" id="bev-quiz-reset">
-          Reset
-        </button>
       </div>
+
+      <!-- NOTES -->
+      <textarea
+        name="notes"
+        placeholder="Anything we should know? (optional)"
+      ></textarea>
+
+      <!-- ACTION -->
+      <button type="button" id="build-btn" class="btn-primary">
+        Build My Plan
+      </button>
+
     </form>
 
-    <div class="bev-result" id="bev-result" hidden>
-      <div class="bev-result__card">
-        <p class="bev-result__eyebrow">Recommended For You</p>
-        <h3 id="bev-result-title">Your plan</h3>
-        <p class="bev-result__size" id="bev-result-size"></p>
+    <!-- RESULT -->
+    <div id="result" hidden>
 
-        <ul class="bev-result__list" id="bev-result-list"></ul>
-        <ul class="bev-result__summary" id="bev-result-summary"></ul>
+      <h3 id="r-title"></h3>
+      <p id="r-size"></p>
 
-        <div class="bev-result__cta">
-          <button type="button" class="btn-primary" id="bev-add-plan">
-            Add Plan to Cart
-          </button>
-          <button type="button" class="btn-secondary" id="bev-copy-plan">
-            Copy Plan Details
-          </button>
-        </div>
+      <ul id="r-list"></ul>
+      <ul id="r-summary"></ul>
+      <ul id="r-warnings"></ul>
 
-        <p class="bev-result__note">
-          You’ll be able to review and adjust your plan before checkout.
-        </p>
-      </div>
+      <div id="r-ingredients"></div>
+
+      <!-- FINAL CTA -->
+      <button id="checkout-btn" class="btn-primary">
+        Start Checkout
+      </button>
+
     </div>
+
   </div>
 </section>
 
 <script type="module">
-  import { buildBeveragePlan } from "../lib/beveragePlanner.js";
-  import {
-    addItem,
-    openCart,
-  } from "../lib/cart.js";
+import { buildBeveragePlan } from "../lib/beveragePlanner.js";
 
-  const form = document.getElementById("beverage-questionnaire");
-  const buildBtn = document.getElementById("bev-quiz-build");
-  const resultEl = document.getElementById("bev-result");
-  const resultTitle = document.getElementById("bev-result-title");
-  const resultSize = document.getElementById("bev-result-size");
-  const resultList = document.getElementById("bev-result-list");
-  const resultSummary = document.getElementById("bev-result-summary");
-  const addPlanBtn = document.getElementById("bev-add-plan");
-  const copyPlanBtn = document.getElementById("bev-copy-plan");
+const form = document.getElementById("bev-form");
+const buildBtn = document.getElementById("build-btn");
 
-  let latestPlan = null;
+const result = document.getElementById("result");
+const rTitle = document.getElementById("r-title");
+const rSize = document.getElementById("r-size");
+const rList = document.getElementById("r-list");
+const rSummary = document.getElementById("r-summary");
+const rWarnings = document.getElementById("r-warnings");
+const rIngredients = document.getElementById("r-ingredients");
 
-  function getCheckedValues(name) {
-    return Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map((el) => el.value);
+const checkoutBtn = document.getElementById("checkout-btn");
+
+let latestPlan = null;
+
+function getValues(name) {
+  return [...form.querySelectorAll(`[name="${name}"]:checked`)].map(i => i.value);
+}
+
+function render(plan) {
+  latestPlan = plan;
+
+  rTitle.textContent = plan.resultHeadline;
+  rSize.textContent = `${plan.size} • ${plan.cadenceLabel}`;
+
+  rList.innerHTML = plan.recommendations.map(r =>
+    `<li><strong>${r.name}</strong><br>${r.note}</li>`
+  ).join("");
+
+  rSummary.innerHTML = plan.summary.map(s => `<li>${s}</li>`).join("");
+
+  rWarnings.innerHTML = (plan.warnings || [])
+    .map(w => `<li>${w}</li>`).join("");
+
+  if (plan.ingredientFocus?.length) {
+    rIngredients.innerHTML =
+      "<strong>Ingredient focus:</strong> " +
+      plan.ingredientFocus.join(", ");
   }
 
-  function renderPlan(plan) {
-    latestPlan = plan;
+  checkoutBtn.textContent = plan.primaryCta;
 
-    resultTitle.textContent = plan.title;
-    resultSize.textContent = `${plan.size} • ${plan.cadenceLabel}`;
+  result.hidden = false;
+  result.scrollIntoView({ behavior: "smooth" });
+}
 
-    resultList.innerHTML = plan.recommendations
-      .map(
-        (item) => `
-          <li class="bev-result__item">
-            <strong>${item.name}</strong>
-            <span>${item.note}</span>
-          </li>
-        `
-      )
-      .join("");
-
-    resultSummary.innerHTML = plan.summary
-      .map((item) => `<li>${item}</li>`)
-      .join("");
-
-    resultEl.hidden = false;
-    resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  buildBtn?.addEventListener("click", () => {
-    const goals = getCheckedValues("goals");
-    const preferences = getCheckedValues("preferences");
-    const cadence =
-      form.querySelector('input[name="cadence"]:checked')?.value || "one_time";
-
-    const plan = buildBeveragePlan({ goals, preferences, cadence });
-    renderPlan(plan);
+buildBtn.onclick = () => {
+  const plan = buildBeveragePlan({
+    goals: getValues("goals"),
+    preferences: getValues("preferences"),
+    cadence: form.cadence.value,
+    notes: form.notes.value
   });
 
-  form?.addEventListener("reset", () => {
-    latestPlan = null;
-    resultEl.hidden = true;
-    resultList.innerHTML = "";
-    resultSummary.innerHTML = "";
-  });
+  render(plan);
+};
 
-  addPlanBtn?.addEventListener("click", () => {
-    if (!latestPlan) return;
+checkoutBtn.onclick = async () => {
+  if (!latestPlan) return;
 
-    const item = {
-      id: latestPlan.square.catalogItemKey,
-      name: latestPlan.title,
-      price: 0,
-      qty: 1,
-      image:
-        "/images/placeholder-beverage-plan.jpg",
-      subscription: latestPlan.square.planKey,
-      modifiers: latestPlan.square.modifierKeys,
-      meta: {
-        size: latestPlan.size,
-        cadence: latestPlan.cadence,
-        cadenceLabel: latestPlan.cadenceLabel,
-        recommendations: latestPlan.recommendations,
-        summary: latestPlan.summary,
+  checkoutBtn.textContent = "Creating checkout...";
+
+  const API_BASE =
+    import.meta.env.PUBLIC_COMMERCE_API_BASE ||
+    "https://smashpro.app/api/v1/routes";
+
+  const APP_SLUG =
+    import.meta.env.PUBLIC_COMMERCE_APP_SLUG ||
+    "deeper-than-skin";
+
+  const res = await fetch(
+    `${API_BASE}/public.commerce.juice-plan-checkout.post.php?app_slug=${APP_SLUG}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
       },
-    };
-
-    try {
-      addItem(item);
-      openCart?.();
-    } catch (err) {
-      console.error("Unable to add custom plan to cart", err);
-      alert("Your plan was created, but we could not add it to the cart yet.");
+      body: JSON.stringify({
+        cart: [],
+        plan: {
+          cadence: latestPlan.cadence,
+          goals: latestPlan.goals,
+          preferences: latestPlan.preferences,
+          notes: latestPlan.notes,
+          recommendations: latestPlan.recommendations
+        }
+      })
     }
-  });
+  );
 
-  copyPlanBtn?.addEventListener("click", async () => {
-    if (!latestPlan) return;
+  const data = await res.json();
 
-    const text = [
-      latestPlan.title,
-      `${latestPlan.size} • ${latestPlan.cadenceLabel}`,
-      "",
-      "Recommended blends:",
-      ...latestPlan.recommendations.map((r) => `- ${r.name}: ${r.note}`),
-      "",
-      ...latestPlan.summary.map((s) => `- ${s}`),
-    ].join("\n");
-
-    try {
-      await navigator.clipboard.writeText(text);
-      copyPlanBtn.textContent = "Copied";
-      setTimeout(() => {
-        copyPlanBtn.textContent = "Copy Plan Details";
-      }, 1500);
-    } catch {
-      console.warn("Clipboard write failed");
-    }
-  });
+  if (data?.checkout_url) {
+    window.location.href = data.checkout_url;
+  } else {
+    checkoutBtn.textContent = "Try Again";
+    console.error(data);
+  }
+};
 </script>
-
-<style>
-  .bev-quiz {
-    margin: 2rem 0 0;
-  }
-
-  .bev-quiz__shell {
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 24px;
-    padding: 1.25rem;
-    background:
-      linear-gradient(180deg, rgba(10,22,18,.88), rgba(6,14,12,.94));
-    box-shadow: 0 12px 40px rgba(0,0,0,.22);
-  }
-
-  .bev-quiz__intro {
-    margin-bottom: 1.25rem;
-  }
-
-  .bev-quiz__eyebrow,
-  .bev-result__eyebrow {
-    margin: 0 0 .4rem;
-    text-transform: uppercase;
-    letter-spacing: .14em;
-    font-size: .72rem;
-    opacity: .72;
-  }
-
-  .bev-quiz h2,
-  .bev-result h3 {
-    margin: 0 0 .5rem;
-    line-height: 1.08;
-  }
-
-  .bev-quiz__copy,
-  .bev-quiz__fineprint,
-  .bev-result__note,
-  .bev-result__size {
-    opacity: .85;
-  }
-
-  .bev-quiz__fineprint,
-  .bev-result__note {
-    font-size: .92rem;
-  }
-
-  .bev-quiz__form {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .bev-quiz__group {
-    border: 1px solid rgba(255,255,255,.1);
-    border-radius: 18px;
-    padding: 1rem;
-    min-inline-size: 0;
-  }
-
-  .bev-quiz__group legend {
-    padding: 0 .35rem;
-    font-weight: 700;
-  }
-
-  .bev-quiz__options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .75rem;
-    margin-top: .4rem;
-  }
-
-  .chip {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 999px;
-    padding: .75rem 1rem;
-    cursor: pointer;
-    background: rgba(255,255,255,.04);
-    transition: transform .16s ease, border-color .16s ease, background .16s ease;
-  }
-
-  .chip:hover {
-    transform: translateY(-1px);
-    border-color: rgba(214, 184, 105, .65);
-  }
-
-  .chip input {
-    accent-color: #d6b869;
-  }
-
-  .bev-quiz__actions,
-  .bev-result__cta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .75rem;
-    margin-top: .25rem;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    border-radius: 999px;
-    padding: .82rem 1.1rem;
-    font-weight: 700;
-    cursor: pointer;
-    border: 1px solid transparent;
-  }
-
-  .btn-primary {
-    background: #d6b869;
-    color: #111;
-  }
-
-  .btn-secondary {
-    background: transparent;
-    color: inherit;
-    border-color: rgba(255,255,255,.16);
-  }
-
-  .bev-result {
-    margin-top: 1rem;
-  }
-
-  .bev-result__card {
-    border: 1px solid rgba(214, 184, 105, .25);
-    border-radius: 20px;
-    padding: 1rem;
-    background: rgba(255,255,255,.03);
-  }
-
-  .bev-result__list,
-  .bev-result__summary {
-    margin: 1rem 0 0;
-    padding-left: 1.1rem;
-  }
-
-  .bev-result__item {
-    margin-bottom: .7rem;
-  }
-
-  .bev-result__item span {
-    display: block;
-    margin-top: .22rem;
-    opacity: .82;
-  }
-
-  @media (max-width: 720px) {
-    .bev-quiz__shell {
-      padding: 1rem;
-      border-radius: 18px;
-    }
-
-    .chip {
-      width: 100%;
-      justify-content: flex-start;
-      border-radius: 16px;
-    }
-
-    .btn-primary,
-    .btn-secondary {
-      width: 100%;
-    }
-  }
-</style>

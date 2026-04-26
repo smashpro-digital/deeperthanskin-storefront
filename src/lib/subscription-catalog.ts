@@ -2,6 +2,16 @@
 
 export type Money = { amount: number; currency: string };
 
+export type PurchaseType = "product" | "subscription" | "service" | "appointment";
+
+export type ServiceBookingConfig = {
+  enabled: boolean;
+  purchase_type: "service" | "appointment";
+  cta_label?: string;
+  booking_url: string;
+  booking_summary?: string;
+};
+
 export type SubscriptionOption = {
   id: string;
   label: string;
@@ -24,17 +34,17 @@ export type ProductSubscriptionConfig = {
   shipping_summary?: string;
 };
 
-type CatalogMap = Record<string, ProductSubscriptionConfig>;
+type SubscriptionCatalogMap = Record<string, ProductSubscriptionConfig>;
+type ServiceCatalogMap = Record<string, ServiceBookingConfig>;
 
 function money(amount: number, currency = "USD"): Money {
   return { amount, currency };
 }
 
 /**
- * Map this by PRODUCT ID from your commerce API.
- * Replace the sample product id below with your real product ids.
+ * Map subscriptions by PRODUCT ID from your commerce API.
  */
-export const SUBSCRIPTION_CATALOG: CatalogMap = {
+export const SUBSCRIPTION_CATALOG: SubscriptionCatalogMap = {
   "3LATECLIFLHDKBII35Z6UZV2": {
     enabled: true,
     headline: "Subscribe & save",
@@ -82,8 +92,45 @@ export const SUBSCRIPTION_CATALOG: CatalogMap = {
   },
 };
 
-export function getSubscriptionConfig(productId: string | number | null | undefined): ProductSubscriptionConfig | null {
+/**
+ * Map service / appointment products by PRODUCT ID from your commerce API.
+ *
+ * Ionic Foot Detox product id from your URL/screenshot:
+ * BSRNUARXBO7IYS7GDGUJYRP4
+ */
+export const SERVICE_BOOKING_CATALOG: ServiceCatalogMap = {
+  BSRNUARXBO7IYS7GDGUJYRP4: {
+    enabled: true,
+    purchase_type: "appointment",
+    cta_label: "Book appointment",
+    booking_url: "REPLACE_WITH_SQUARE_APPOINTMENTS_BOOKING_URL",
+    booking_summary:
+      "This is a scheduled service. You’ll choose your time in Square Appointments.",
+  },
+};
+
+export function getSubscriptionConfig(
+  productId: string | number | null | undefined
+): ProductSubscriptionConfig | null {
   const key = String(productId || "").trim();
   if (!key) return null;
-  return SUBSCRIPTION_CATALOG[key] || null;
+
+  const config = SUBSCRIPTION_CATALOG[key];
+  return config?.enabled ? config : null;
+}
+
+export function getServiceBookingConfig(
+  productId: string | number | null | undefined
+): ServiceBookingConfig | null {
+  const key = String(productId || "").trim();
+  if (!key) return null;
+
+  const config = SERVICE_BOOKING_CATALOG[key];
+  return config?.enabled ? config : null;
+}
+
+export function isServiceBookingProduct(
+  productId: string | number | null | undefined
+): boolean {
+  return !!getServiceBookingConfig(productId);
 }

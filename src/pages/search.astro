@@ -14,7 +14,7 @@ const ROUTES = {
 ---
 
 <BaseLayout title="Search | Deeper Than Skin">
-  <main class="search-page">
+  <main class="search-page" data-base={base}>
     <section class="hero">
       <p class="eyebrow">Search</p>
       <h1>Find your ritual.</h1>
@@ -54,7 +54,18 @@ const ROUTES = {
   </main>
 
   <script>
-    const SEARCH_ITEMS = [
+    type SearchItem = {
+      title: string;
+      description: string;
+      url: string;
+      tags: string[];
+    };
+
+    type ScoredSearchItem = SearchItem & {
+      score: number;
+    };
+
+    const SEARCH_ITEMS: SearchItem[] = [
       {
         title: "Shop",
         description: "Browse all Deeper Than Skin products.",
@@ -87,34 +98,37 @@ const ROUTES = {
       },
     ];
 
-    const form = document.getElementById("searchForm");
-    const input = document.getElementById("searchInput");
-    const results = document.getElementById("results");
-    const resultCount = document.getElementById("resultCount");
-    const emptyState = document.getElementById("emptyState");
+    const form = document.getElementById("searchForm") as HTMLFormElement | null;
+    const input = document.getElementById("searchInput") as HTMLInputElement | null;
+    const results = document.getElementById("results") as HTMLDivElement | null;
+    const resultCount = document.getElementById("resultCount") as HTMLParagraphElement | null;
+    const emptyState = document.getElementById("emptyState") as HTMLDivElement | null;
 
     const params = new URLSearchParams(window.location.search);
     const initialQuery = params.get("q") || "";
 
-    if (input) {
-      input.value = initialQuery;
-    }
-
-    function normalize(value) {
+    function normalize(value: unknown): string {
       return String(value || "").toLowerCase().trim();
     }
 
-    function getBasePath() {
-      const baseTag = document.querySelector("main.search-page");
-      return "/";
+    function getBasePath(): string {
+      const page = document.querySelector("main.search-page") as HTMLElement | null;
+      return page?.dataset.base || "/";
     }
 
-    function scoreItem(item, query) {
-      const haystack = [
-        item.title,
-        item.description,
-        ...(item.tags || []),
-      ]
+    function withBasePath(url: string): string {
+      if (/^https?:\/\//i.test(url)) return url;
+
+      const basePath = getBasePath();
+      const cleanBase = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+      const cleanUrl = url.startsWith("/") ? url : `/${url}`;
+
+      if (!cleanBase) return cleanUrl;
+      return `${cleanBase}${cleanUrl}`;
+    }
+
+    function scoreItem(item: SearchItem, query: string): number {
+      const haystack = [item.title, item.description, ...item.tags]
         .join(" ")
         .toLowerCase();
 
@@ -125,14 +139,16 @@ const ROUTES = {
       if (normalize(item.title).includes(query)) score += 10;
       if (haystack.includes(query)) score += 5;
 
-      query.split(/\s+/).forEach((word) => {
+      query.split(/\s+/).forEach((word: string) => {
         if (word && haystack.includes(word)) score += 2;
       });
 
       return score;
     }
 
-    function render(query) {
+    function render(query: string): void {
+      if (!results || !resultCount || !emptyState) return;
+
       const q = normalize(query);
 
       results.innerHTML = "";
@@ -143,10 +159,10 @@ const ROUTES = {
         return;
       }
 
-      const matches = SEARCH_ITEMS
-        .map((item) => ({ ...item, score: scoreItem(item, q) }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score);
+      const matches: ScoredSearchItem[] = SEARCH_ITEMS
+        .map((item: SearchItem) => ({ ...item, score: scoreItem(item, q) }))
+        .filter((item: ScoredSearchItem) => item.score > 0)
+        .sort((a: ScoredSearchItem, b: ScoredSearchItem) => b.score - a.score);
 
       resultCount.textContent =
         matches.length === 1
@@ -155,38 +171,44 @@ const ROUTES = {
 
       emptyState.hidden = matches.length > 0;
 
-      matches.forEach((item) => {
+      matches.forEach((item: ScoredSearchItem) => {
         const card = document.createElement("a");
         card.className = "result-card";
-        card.href = item.url;
+        card.href = withBasePath(item.url);
 
-        card.innerHTML = `
-          <span>${item.title}</span>
-          <p>${item.description}</p>
-        `;
+        const title = document.createElement("span");
+        title.textContent = item.title;
 
+        const description = document.createElement("p");
+        description.textContent = item.description;
+
+        card.append(title, description);
         results.appendChild(card);
       });
     }
 
-    input?.addEventListener("input", () => {
-      const q = input.value || "";
-      const url = new URL(window.location.href);
+    if (input) {
+      input.value = initialQuery;
 
-      if (q.trim()) {
-        url.searchParams.set("q", q.trim());
-      } else {
-        url.searchParams.delete("q");
-      }
+      input.addEventListener("input", () => {
+        const q = input.value || "";
+        const url = new URL(window.location.href);
 
-      window.history.replaceState({}, "", url);
-      render(q);
-    });
+        if (q.trim()) {
+          url.searchParams.set("q", q.trim());
+        } else {
+          url.searchParams.delete("q");
+        }
 
-    form?.addEventListener("submit", (event) => {
+        window.history.replaceState({}, "", url);
+        render(q);
+      });
+    }
+
+    form?.addEventListener("submit", (event: SubmitEvent) => {
       event.preventDefault();
 
-      const q = input?.value?.trim() || "";
+      const q = input?.value.trim() || "";
 
       if (!q) {
         render("");
