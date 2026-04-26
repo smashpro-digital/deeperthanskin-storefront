@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import BeverageQuestionnaire from "../../components/BeverageQuestionnaire.astro";
 
 export const prerender = true;
 
@@ -168,46 +169,10 @@ const ROUTES = {
       </section>
 
       {isBeveragesPage && (
-        <section class="planner" id="beverage-planner">
-          <div>
-            <div class="kicker kicker--light">Custom Juice Plan</div>
-            <h2 class="planner-title">Build Your Custom Juice Plan</h2>
-            <p class="planner-copy">
-              Tell us your rhythm, goals, and delivery preference. We’ll shape the next step around your wellness routine.
-            </p>
-          </div>
-
-          <form class="planner-form">
-            <label>
-              Wellness focus
-              <select>
-                <option>Gut support</option>
-                <option>Energy</option>
-                <option>Detox reset</option>
-                <option>Kidney support</option>
-                <option>Blood pressure support</option>
-                <option>Custom blend guidance</option>
-              </select>
-            </label>
-
-            <label>
-              Order style
-              <select>
-                <option>One-time trial</option>
-                <option>Weekly recurring plan</option>
-                <option>Bi-weekly recurring plan</option>
-                <option>Consultation first</option>
-              </select>
-            </label>
-
-            <label>
-              Notes
-              <textarea rows="4" placeholder="Share ingredients to avoid, health goals, or preferred flavors."></textarea>
-            </label>
-
-            <a class="btn btn-primary" href={ROUTES.shop}>Start with available juices</a>
-          </form>
-        </section>
+        <BeverageQuestionnaire
+          title="Build Your Custom Juice Plan"
+          categorySlug={pageSlug}
+        />
       )}
 
       <section class="panel" style="margin-top:18px">
@@ -242,9 +207,7 @@ const ROUTES = {
         <div id="empty" class="empty" hidden>
           <div class="kicker">Notice</div>
           <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
-          <p class="p">
-            This ritual is available, but it doesn’t have visible products yet.
-          </p>
+          <p class="p">This ritual is available, but it doesn’t have visible products yet.</p>
           <div class="hero-actions" style="margin-top:14px">
             <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
             <a class="btn btn-ghost" href={ROUTES.featured}>View Featured</a>
@@ -622,52 +585,6 @@ const ROUTES = {
       flex-wrap: wrap;
     }
 
-    .planner {
-      margin-top: 18px;
-      border-radius: 26px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.16);
-      padding: 18px;
-      display: grid;
-      grid-template-columns: .9fr 1.1fr;
-      gap: 18px;
-    }
-
-    .planner-title {
-      font-family: var(--font-display);
-      font-size: clamp(26px, 3vw, 38px);
-      margin: 8px 0;
-    }
-
-    .planner-copy {
-      opacity: .86;
-      line-height: 1.55;
-      margin: 0;
-    }
-
-    .planner-form {
-      display: grid;
-      gap: 12px;
-    }
-
-    .planner-form label {
-      display: grid;
-      gap: 7px;
-      font-size: 13px;
-      opacity: .9;
-    }
-
-    .planner-form select,
-    .planner-form textarea {
-      width: 100%;
-      border-radius: 16px;
-      padding: 11px 12px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.22);
-      color: rgba(255,255,255,.92);
-      outline: none;
-    }
-
     .panel {
       border-radius: 26px;
       border: 1px solid rgba(255,255,255,.12);
@@ -812,7 +729,6 @@ const ROUTES = {
 
     @media (max-width: 920px) {
       .card { grid-column: span 6; }
-      .planner { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 560px) {
