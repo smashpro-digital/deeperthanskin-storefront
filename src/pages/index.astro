@@ -32,15 +32,14 @@ const WAITLIST_ENDPOINT = apiUrl("public/waitlist");
 const ROUTES = {
   home: u("/"),
   shop: u("/shop"),
+  trial: u("/trial"),
   skincare: u("/category/skincare"),
   wellness: u("/category/wellness"),
+  market: u("/category/market"),
   product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
   category: (slug: string) => u(`/category/${encodeURIComponent(slug)}`),
 };
 
-const LINKS = {
-  community: "https://returntothegarden.co",
-};
 const EXT = { target: "_blank", rel: "noopener noreferrer" };
 
 /* ================
@@ -159,7 +158,7 @@ function formatMoney(pm?: Money | null) {
 
 function imageFallbackForCategory(slugOrName: string): string {
   const s = normalizeText(slugOrName);
-  if (s.includes("juice") || s.includes("beverage")) return CAT_JUICES;
+  if (s.includes("juice") || s.includes("beverage") || s.includes("lemonade") || s.includes("market")) return CAT_JUICES;
   if (s.includes("moss")) return CAT_SEAMOSS;
   if (s.includes("kit") || s.includes("cleanse") || s.includes("detox") || s.includes("bundle")) return CAT_KITS;
   if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("gumm")) return CAT_HERBS;
@@ -226,19 +225,11 @@ async function fetchProducts(): Promise<{ items: ApiItem[]; mode: string; error:
       const active = raw.filter(productIsActive);
 
       if (json?.ok && active.length) {
-        return {
-          items: active,
-          mode: attempt.path,
-          error: "",
-        };
+        return { items: active, mode: attempt.path, error: "" };
       }
 
       if (json?.ok && raw.length) {
-        return {
-          items: raw,
-          mode: attempt.path,
-          error: "",
-        };
+        return { items: raw, mode: attempt.path, error: "" };
       }
 
       if (json?.error) lastError = json.error;
@@ -251,21 +242,16 @@ async function fetchProducts(): Promise<{ items: ApiItem[]; mode: string; error:
 }
 
 /* ================
-   FETCH SQUARE DATA
+   FETCH DATA
 ================ */
 let categories: DbCategory[] = [];
-let categoryError = "";
 
 try {
   const json = (await fetchJson("public/commerce/categories")) as CategoriesResponse;
   if (json?.ok && Array.isArray(json.categories)) {
     categories = json.categories;
-  } else {
-    categoryError = json?.error || "Categories unavailable";
   }
-} catch (e: any) {
-  categoryError = e?.message || "Categories unavailable";
-}
+} catch {}
 
 const productsResult = await fetchProducts();
 const allProducts = productsResult.items;
@@ -275,6 +261,7 @@ const activeProducts = allProducts.filter(productIsActive);
    DERIVE LIVE COLLECTIONS
 ================ */
 const categoryMap = new Map<string, DbCategory>();
+
 for (const category of categories) {
   if (category.id) categoryMap.set(`id:${category.id}`, category);
   if (category.slug) categoryMap.set(`slug:${normalizeText(category.slug)}`, category);
@@ -316,13 +303,8 @@ const liveCollections: CollectionCard[] = categories
     const slug = normalizeText(category.slug);
     const name = normalizeText(category.name);
 
-    if (EXCLUDED_COLLECTION_SLUGS.has(slug) || EXCLUDED_COLLECTION_SLUGS.has(name)) {
-      return false;
-    }
-
-    if (category.is_top_level) {
-      return false;
-    }
+    if (EXCLUDED_COLLECTION_SLUGS.has(slug) || EXCLUDED_COLLECTION_SLUGS.has(name)) return false;
+    if (category.is_top_level) return false;
 
     return true;
   })
@@ -351,6 +333,9 @@ const liveCollections: CollectionCard[] = categories
    CURATED PRODUCT STRIP
 ================ */
 const heroProductKeywords = [
+  "juice",
+  "lemonade",
+  "market",
   "sea moss",
   "detox",
   "tea",
@@ -377,23 +362,26 @@ const rankedProducts = [...activeProducts].sort((a, b) => {
 
 const launchProducts: ProductCard[] = rankedProducts.slice(0, 4).map((p, idx) => {
   const price = formatMoney(p.price_money || null);
+  const name = normalizeText(p.name);
 
   return {
     id: p.id,
     name: p.name,
     description:
-      (p.description || "").trim() || "A launch-ready ritual essential from the live catalog.",
+      (p.description || "").trim() || "A small-batch ritual essential from the live catalog.",
     href: ROUTES.product(p.id),
     img: p.image_url || imageFallbackForProduct(p.name),
     price: price || "View details",
     badge:
       idx === 0
-        ? "Launch Pick"
-        : normalizeText(p.name).includes("detox")
+        ? "Market Pick"
+        : name.includes("juice") || name.includes("lemonade")
+        ? "Fresh Pour"
+        : name.includes("detox")
         ? "Reset Ritual"
-        : normalizeText(p.name).includes("moss")
+        : name.includes("moss")
         ? "Mineral Favorite"
-        : normalizeText(p.name).includes("tea")
+        : name.includes("tea")
         ? "Calm Ritual"
         : "Now Shopping",
   };
@@ -401,220 +389,272 @@ const launchProducts: ProductCard[] = rankedProducts.slice(0, 4).map((p, idx) =>
 
 const collectionCount = liveCollections.length;
 const productCount = activeProducts.length;
-const hasLiveCatalog = collectionCount > 0 && productCount > 0;
-const shopSummary =
-  hasLiveCatalog
-    ? `Live Square catalog with ${collectionCount} active collection${collectionCount === 1 ? "" : "s"} and ${productCount} active product${productCount === 1 ? "" : "s"}.`
-    : "Catalog is connected, but no live collection data was found yet.";
 ---
 
-<BaseLayout title="Deeper Than Skin — Storefront">
+<BaseLayout title="Deeper Than Skin — Small-Batch Wellness Goods">
   <main>
     {/* HERO */}
     <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
-  <div class="hero-overlay"></div>
+      <div class="hero-overlay"></div>
 
-  <div class="hero-content hero-content--top" data-aos="fade-up">
-    <div class="hero-brand">
-      <span class="hero-wordmark">Deeper Than Skin</span>
-      <span class="hero-divider"></span>
-      <span class="hero-tagline">Wellness Rooted in Ritual</span>
-    </div>
-
-    <h1 class="hero-title">Daily rituals for body, balance, and renewal.</h1>
-
-    <p class="hero-lead">
-      Explore botanical essentials crafted to support your everyday flow, from hydration and body care
-      to mineral-rich wellness staples designed to fit naturally into your routine.
-    </p>
-
-    <div class="hero-meta">
-      <span class="hero-chip">Botanical wellness</span>
-      <span class="hero-chip">Curated collections</span>
-      <span class="hero-chip">Early access + key drops</span>
-    </div>
-
-    <div class="btns hero-ctas">
-      <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
-      <a class="btn btn-ghost" href="#discover-live">Browse Collections</a>
-    </div>
-  </div>
-
-  <div class="hero-bottom-fade" aria-hidden="true"></div>
-</section>
-
-    {/* LAUNCH STRIP */}
-    <section class="section section--tight launch-strip">
-  <div class="container launch-strip__inner" data-aos="fade-up">
-    
-    <div class="launch-stat">
-      <span class="launch-stat__label">Now Available</span>
-      <strong>Shop the current collection</strong>
-    </div>
-
-    <div class="launch-stat">
-      <span class="launch-stat__label">Curated Drops</span>
-      <strong>{collectionCount} collections to explore</strong>
-    </div>
-
-    <div class="launch-stat">
-      <span class="launch-stat__label">In Rotation</span>
-      <strong>{productCount} essentials ready now</strong>
-    </div>
-
-    <div class="launch-stat launch-stat--wide">
-      <span class="launch-stat__label">Stay Close</span>
-      <strong>
-        New rituals, restocks, and featured drops land here first.
-      </strong>
-    </div>
-
-  </div>
-</section>
-
-    {/* DISCOVER LIVE COLLECTIONS */}
-   <section class="section section--light discover-live" id="discover-live">
-  <div class="container" data-aos="fade-up">
-    <div class="kicker kicker--dark">Discover</div>
-    <h2 class="h2 h2--dark">Shop by Collection</h2>
-    <p class="p p--dark discover-copy">
-      Explore curated rituals for hydration, body care, and everyday wellness.
-      Start with the collection that fits your routine.
-    </p>
-  </div>
-
-  <div class="container">
-    {liveCollections.length ? (
-      <>
-        <div class="collection-grid" data-aos="fade-up" data-aos-delay="80">
-          {liveCollections.map((c) => (
-            <a class="collection-card" href={c.href} aria-label={`Explore ${c.name}`}>
-              <div class="collection-media">
-                <img src={c.img} alt={c.name} loading="lazy" />
-                <span class="collection-count">
-                  {c.productCount} {c.productCount === 1 ? "item" : "items"}
-                </span>
-              </div>
-
-              <div class="collection-body">
-                <h3>{c.name}</h3>
-                <p>{c.subtitle}</p>
-                <span class="collection-cta">Explore Collection</span>
-              </div>
-            </a>
-          ))}
+      <div class="hero-content hero-content--top" data-aos="fade-up">
+        <div class="hero-brand">
+          <span class="hero-wordmark">Deeper Than Skin</span>
+          <span class="hero-divider"></span>
+          <span class="hero-tagline">Wellness Rooted in Ritual</span>
         </div>
 
-        <div class="btns center-cta">
-          <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
-        </div>
-      </>
-    ) : (
-      <div class="callout callout--light">
-        <div>
-          <div class="kicker kicker--dark">Discover</div>
-          <h3 class="callout-title callout-title--dark">More collections are on the way</h3>
-          <p class="p p--dark">
-            We’re still building out the full storefront. Browse the shop to explore what’s available now.
-          </p>
+        <h1 class="hero-title">Small-batch juices, herbal drinks, and wellness rituals made in South Carolina.</h1>
+
+        <p class="hero-lead">
+          Deeper Than Skin crafts fresh wellness beverages, herbal lemonades, sea moss blends, body care,
+          and market-ready ritual goods in small batches for Columbia, Blythewood, and local South Carolina markets.
+        </p>
+
+        <div class="hero-meta">
+          <span class="hero-chip">Small-batch made</span>
+          <span class="hero-chip">Columbia & Blythewood, SC</span>
+          <span class="hero-chip">Market-ready wellness</span>
         </div>
 
-        <div class="btns">
-          <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
+        <div class="btns hero-ctas">
+          <a class="btn btn-primary" href={ROUTES.trial}>Start Your Ritual</a>
+          <a class="btn btn-ghost" href={ROUTES.shop}>Shop All</a>
         </div>
+
+        <p class="hero-micro">Fresh. Local. Crafted with care.</p>
       </div>
-    )}
-  </div>
-</section>
 
-    {/* NOW SHOPPING */}
-<section class="section" id="now-shopping">
-  <div class="container featured-head" data-aos="fade-up">
-    <div class="kicker">Featured</div>
-    <h2 class="h2">Shop the Current Ritual</h2>
-    <p class="p">
-      A curated selection of essentials available now, chosen to make discovery simple and shopping feel effortless.
-    </p>
-  </div>
+      <div class="hero-bottom-fade" aria-hidden="true"></div>
+    </section>
 
-  <div class="container featured-wrap">
-    {launchProducts.length ? (
-      <div class="product-grid product-grid--featured" data-aos="fade-up">
-        {launchProducts.map((p) => (
-          <a class="product-card product-card--lux" href={p.href} aria-label={`View ${p.name}`}>
-            <div class="product-media">
-              <img src={p.img} alt={p.name} loading="lazy" />
-            </div>
-
-            <div class="product-body">
-              <div class="product-badge">{p.badge}</div>
-              <h3 class="product-title">{p.name}</h3>
-              <p class="product-desc">{p.description}</p>
-
-              <div class="product-row">
-                <div class="product-price">
-                  {p.price !== "View details" ? p.price : <span class="product-price--muted">View details</span>}
-                </div>
-                <span class="btn-lux" aria-hidden="true">Shop</span>
-              </div>
-            </div>
-          </a>
-        ))}
-      </div>
-    ) : (
-      <div class="callout callout--featured">
-        <div>
-          <div class="kicker">Featured</div>
-          <h3 class="callout-title">Fresh selections are on the way</h3>
-          <p class="p">
-            Browse the full shop to explore what’s available now while new featured picks are being refreshed.
-          </p>
-        </div>
-
-        <div class="btns callout__btns">
-          <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
-        </div>
-      </div>
-    )}
-  </div>
-</section>
-
-    {/* SHOP PATHS */}
-   <section class="section section--tight-top">
-  <div class="container" data-aos="fade-up">
-    <div class="callout">
-      <div class="kicker">Explore</div>
-      <h2 class="h2">Find your rhythm</h2>
-      <p class="p">
-        Move through skincare, wellness, or the full collection and build a routine that fits your flow.
-      </p>
-
-      <div class="btns">
-        <a class="btn btn-primary" href={ROUTES.skincare}>Shop Skincare</a>
-        <a class="btn btn-ghost" href={ROUTES.wellness}>Shop Wellness</a>
-        <a class="btn btn-ghost" href={ROUTES.shop}>View All</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-    {/* PHILOSOPHY */}
-    <!-- <section class="section">
+    {/* FUNNEL ENTRY */}
+    <section class="section section--funnel">
       <div class="container" data-aos="fade-up">
-        <div class="callout">
-          <div class="kicker">Philosophy</div>
-          <h2 class="h2">The Deeper Than Skin Philosophy</h2>
+        <div class="callout callout--primary">
+          <div class="funnel-eyebrow">
+            <span class="funnel-dot"></span>
+            Start Here
+          </div>
+
+          <h2 class="h2">Find your rhythm</h2>
+
           <p class="p">
-            True wellness begins beneath the surface. Explore the community home for the Seed Bearer pledge,
-            education, governance pages, and the deeper layer of the brand story.
+            Not sure where to begin? We’ll help shape your first wellness ritual around your goals,
+            preferences, and lifestyle.
           </p>
+
+          <div class="funnel-steps">
+            <div class="funnel-step">
+              <span>01</span>
+              <strong>Share your goals</strong>
+              <p>Choose what you want support with most.</p>
+            </div>
+
+            <div class="funnel-step">
+              <span>02</span>
+              <strong>Get matched</strong>
+              <p>We suggest a starter ritual from the live collection.</p>
+            </div>
+
+            <div class="funnel-step">
+              <span>03</span>
+              <strong>Start simple</strong>
+              <p>Begin with a trial kit, market favorite, or everyday essential.</p>
+            </div>
+          </div>
 
           <div class="btns">
-            <a class="btn btn-primary" href={LINKS.community} {...EXT}>Visit ReturnToTheGarden.co</a>
+            <a class="btn btn-primary" href={ROUTES.trial}>Start Your Ritual</a>
+            <a class="btn btn-ghost" href={ROUTES.shop}>Browse Instead</a>
+          </div>
+
+          <p class="micro">
+            The quiz may recommend juices, teas, sea moss, body care, or a blended starter kit.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {/* MARKET PROOF */}
+    <section class="section section--tight market-proof">
+      <div class="container market-proof__inner" data-aos="fade-up">
+        <div>
+          <div class="kicker">Local Market Ready</div>
+          <h2 class="h2">Crafted for Saturday market mornings.</h2>
+          <p class="p">
+            Our lineup is built around fresh juices, herbal lemonades, wellness shots, sea moss,
+            body care, and family-friendly market drinks prepared in small batches by Deeper Than Skin.
+          </p>
+        </div>
+
+        <div class="market-proof__card">
+          <strong>Producer-only fit</strong>
+          <p>
+            Made by us, bottled by us, served by us. No resale shelf clutter, just fresh ritual goods
+            crafted for local customers.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {/* PROOF STRIP */}
+    <section class="section section--tight launch-strip">
+      <div class="container launch-strip__inner" data-aos="fade-up">
+        <div class="launch-stat">
+          <span class="launch-stat__label">Guided Entry</span>
+          <strong>Start with a ritual built around your goals</strong>
+        </div>
+
+        <div class="launch-stat">
+          <span class="launch-stat__label">Curated Drops</span>
+          <strong>{collectionCount} collections to explore</strong>
+        </div>
+
+        <div class="launch-stat">
+          <span class="launch-stat__label">In Rotation</span>
+          <strong>{productCount} essentials ready now</strong>
+        </div>
+
+        <div class="launch-stat launch-stat--wide">
+          <span class="launch-stat__label">Local Focus</span>
+          <strong>Small-batch wellness goods for Columbia, Blythewood, and nearby markets.</strong>
+        </div>
+      </div>
+    </section>
+
+    {/* DISCOVER LIVE COLLECTIONS */}
+    <section class="section section--light discover-live" id="discover-live">
+      <div class="container" data-aos="fade-up">
+        <div class="kicker kicker--dark">Browse After The Match</div>
+        <h2 class="h2 h2--dark">Shop by Collection</h2>
+        <p class="p p--dark discover-copy">
+          Already know what you want? Explore the live collections directly. Still deciding?
+          Start with the guided ritual builder.
+        </p>
+
+        <div class="btns discover-actions">
+          <a class="btn btn-primary" href={ROUTES.trial}>Take The Quiz</a>
+          <a class="btn btn-ghost btn-ghost--dark" href={ROUTES.shop}>Browse Full Shop</a>
+        </div>
+      </div>
+
+      <div class="container">
+        {liveCollections.length ? (
+          <>
+            <div class="collection-grid" data-aos="fade-up" data-aos-delay="80">
+              {liveCollections.map((c) => (
+                <article class="collection-card">
+                  <a class="collection-media" href={c.href} aria-label={`Explore ${c.name}`}>
+                    <img src={c.img} alt={c.name} loading="lazy" />
+                    <span class="collection-count">
+                      {c.productCount} {c.productCount === 1 ? "item" : "items"}
+                    </span>
+                  </a>
+
+                  <div class="collection-body">
+                    <h3>{c.name}</h3>
+                    <p>{c.subtitle}</p>
+
+                    <div class="collection-actions">
+                      <a class="collection-cta" href={c.href}>Shop Collection</a>
+                      <a class="collection-subcta" href={ROUTES.trial}>Not sure? Take the quiz</a>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div class="callout callout--light">
+            <div>
+              <div class="kicker kicker--dark">Discover</div>
+              <h3 class="callout-title callout-title--dark">More collections are on the way</h3>
+              <p class="p p--dark">
+                We’re still building out the full storefront. Start with the guided ritual builder or browse the shop.
+              </p>
+            </div>
+
+            <div class="btns">
+              <a class="btn btn-primary" href={ROUTES.trial}>Start Your Ritual</a>
+              <a class="btn btn-ghost btn-ghost--dark" href={ROUTES.shop}>Browse Full Shop</a>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+
+    {/* NOW SHOPPING */}
+    <section class="section" id="now-shopping">
+      <div class="container featured-head" data-aos="fade-up">
+        <div class="kicker">Featured</div>
+        <h2 class="h2">Shop the Current Ritual</h2>
+        <p class="p">
+          A curated selection of essentials available now for customers who want to browse without the quiz.
+        </p>
+      </div>
+
+      <div class="container featured-wrap">
+        {launchProducts.length ? (
+          <div class="product-grid product-grid--featured" data-aos="fade-up">
+            {launchProducts.map((p) => (
+              <a class="product-card product-card--lux" href={p.href} aria-label={`View ${p.name}`}>
+                <div class="product-media">
+                  <img src={p.img} alt={p.name} loading="lazy" />
+                </div>
+
+                <div class="product-body">
+                  <div class="product-badge">{p.badge}</div>
+                  <h3 class="product-title">{p.name}</h3>
+                  <p class="product-desc">{p.description}</p>
+
+                  <div class="product-row">
+                    <div class="product-price">
+                      {p.price !== "View details" ? p.price : <span class="product-price--muted">View details</span>}
+                    </div>
+                    <span class="btn-lux" aria-hidden="true">Shop</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div class="callout callout--featured">
+            <div>
+              <div class="kicker">Featured</div>
+              <h3 class="callout-title">Fresh selections are on the way</h3>
+              <p class="p">
+                Browse the full shop to explore what’s available now while new featured picks are being refreshed.
+              </p>
+            </div>
+
+            <div class="btns callout__btns">
+              <a class="btn btn-primary" href={ROUTES.shop}>Browse Full Shop</a>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+
+    {/* SECONDARY FUNNEL NUDGE */}
+    <section class="section section--tight-top">
+      <div class="container" data-aos="fade-up">
+        <div class="callout callout--secondary">
+          <div>
+            <div class="kicker">Still Exploring?</div>
+            <h2 class="h2">Let us build the first kit for you.</h2>
+            <p class="p">
+              Your starter ritual can include beverages, mineral support, herbal tea, body care, or a mix of essentials.
+            </p>
+          </div>
+
+          <div class="btns">
+            <a class="btn btn-primary" href={ROUTES.trial}>Start The 60-Second Quiz</a>
+            <a class="btn btn-ghost" href={ROUTES.shop}>View All Products</a>
           </div>
         </div>
       </div>
-    </section> -->
+    </section>
 
     {/* FOOTER WAITLIST */}
     <section class="section footer-waitlist-section">
@@ -622,9 +662,9 @@ const shopSummary =
         <div class="footer-waitlist">
           <div class="footer-waitlist__copy">
             <div class="kicker">Stay Close</div>
-            <h2 class="h2">Stay close for relaunch access, restocks, and key drops</h2>
+            <h2 class="h2">Stay close for market drops, restocks, and relaunch access</h2>
             <p class="p">
-              Join the list for relaunch updates, early access, restocks, and the next drop in your ritual.
+              Join the list for early access, local market updates, restocks, and the next drop in your ritual.
             </p>
           </div>
 
@@ -655,7 +695,7 @@ const shopSummary =
             <input type="hidden" name="consent" value="1" />
 
             <p class="footer-waitlist__note">
-              We’ll only email you about the relaunch, early access, restocks, and key drops.
+              We’ll only email you about local market updates, relaunch access, restocks, and key drops.
             </p>
 
             <div class="footer-waitlist__status" id="waitlist-status" aria-live="polite"></div>
@@ -765,6 +805,14 @@ const shopSummary =
     padding-top: 32px;
   }
 
+  .section--funnel {
+    padding-top: clamp(34px, 5vw, 64px);
+    padding-bottom: clamp(34px, 5vw, 64px);
+    background:
+      radial-gradient(circle at 16% 0%, rgba(212, 178, 89, 0.12), transparent 30%),
+      linear-gradient(180deg, #071611 0%, #092018 100%);
+  }
+
   .kicker--dark {
     color: #6e5530;
   }
@@ -776,7 +824,7 @@ const shopSummary =
 
   .hero-title {
     margin: 0 0 14px;
-    max-width: 900px;
+    max-width: 980px;
     font-size: clamp(2.2rem, 5vw, 4.4rem);
     line-height: 0.98;
     letter-spacing: -0.03em;
@@ -802,6 +850,133 @@ const shopSummary =
     font-size: 0.88rem;
     font-weight: 600;
     backdrop-filter: blur(6px);
+  }
+
+  .hero-micro {
+    margin: 12px 0 0;
+    color: rgba(255, 248, 239, 0.74);
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  .callout--primary {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(224, 191, 105, 0.22);
+    background:
+      radial-gradient(circle at top right, rgba(212, 178, 89, 0.16), transparent 34%),
+      linear-gradient(145deg, rgba(255, 248, 239, 0.06), rgba(255, 248, 239, 0.025));
+    box-shadow:
+      0 26px 70px rgba(0, 0, 0, 0.26),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  }
+
+  .callout--primary::before {
+    content: "";
+    position: absolute;
+    inset: 16px;
+    border-radius: inherit;
+    border: 1px solid rgba(224, 191, 105, 0.08);
+    pointer-events: none;
+  }
+
+  .funnel-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    color: #e3c06b;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .funnel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #d4b259;
+    box-shadow: 0 0 0 8px rgba(212, 178, 89, 0.08);
+  }
+
+  .funnel-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin: 24px 0;
+  }
+
+  .funnel-step {
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid rgba(224, 191, 105, 0.14);
+    background: rgba(255, 248, 239, 0.045);
+  }
+
+  .funnel-step span {
+    display: block;
+    margin-bottom: 10px;
+    color: rgba(227, 192, 107, 0.78);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+
+  .funnel-step strong {
+    display: block;
+    color: #fff8ef;
+    font-size: 1.02rem;
+    line-height: 1.2;
+  }
+
+  .funnel-step p {
+    margin: 8px 0 0;
+    color: rgba(255, 248, 239, 0.68);
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+
+  .micro {
+    margin: 14px 0 0;
+    color: rgba(255, 248, 239, 0.62);
+    font-size: 0.94rem;
+    line-height: 1.5;
+  }
+
+  .market-proof {
+    background:
+      radial-gradient(circle at top left, rgba(212, 178, 89, 0.12), transparent 30%),
+      linear-gradient(180deg, #092018 0%, #071611 100%);
+    border-top: 1px solid rgba(196, 158, 74, 0.12);
+    border-bottom: 1px solid rgba(196, 158, 74, 0.12);
+  }
+
+  .market-proof__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+    gap: 22px;
+    align-items: stretch;
+  }
+
+  .market-proof__card {
+    padding: 24px;
+    border-radius: 26px;
+    border: 1px solid rgba(224, 191, 105, 0.18);
+    background: rgba(255, 248, 239, 0.045);
+  }
+
+  .market-proof__card strong {
+    display: block;
+    color: #fff8ef;
+    font-size: 1.25rem;
+    margin-bottom: 10px;
+  }
+
+  .market-proof__card p {
+    margin: 0;
+    color: rgba(255, 248, 239, 0.72);
+    line-height: 1.55;
   }
 
   .launch-strip {
@@ -850,6 +1025,16 @@ const shopSummary =
     max-width: 780px;
   }
 
+  .discover-actions {
+    margin-top: 20px;
+  }
+
+  .btn-ghost--dark {
+    color: #1f1e1b;
+    border-color: rgba(80, 61, 24, 0.18);
+    background: rgba(255, 252, 247, 0.45);
+  }
+
   .collection-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -866,7 +1051,6 @@ const shopSummary =
     background: rgba(255, 252, 247, 0.92);
     border: 1px solid rgba(80, 61, 24, 0.12);
     box-shadow: 0 18px 40px rgba(31, 24, 12, 0.08);
-    text-decoration: none;
     color: inherit;
     transition: transform 0.22s ease, box-shadow 0.22s ease;
   }
@@ -878,9 +1062,11 @@ const shopSummary =
 
   .collection-media {
     position: relative;
+    display: block;
     aspect-ratio: 1.14 / 1;
     background: #ede1d1;
     overflow: hidden;
+    text-decoration: none;
   }
 
   .collection-media img {
@@ -929,23 +1115,36 @@ const shopSummary =
     min-height: 3.2em;
   }
 
-  .collection-cta {
+  .collection-actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .collection-cta,
+  .collection-subcta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-top: 8px;
-    padding: 0.92rem 1.15rem;
     width: 100%;
+    text-decoration: none;
     border-radius: 999px;
-    background: linear-gradient(135deg, #564621 0%, #153a2d 100%);
-    color: #fff6e6;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.02em;
   }
 
-  .center-cta {
-    justify-content: center;
-    margin-top: 24px;
+  .collection-cta {
+    padding: 0.92rem 1.15rem;
+    background: linear-gradient(135deg, #564621 0%, #153a2d 100%);
+    color: #fff6e6;
+  }
+
+  .collection-subcta {
+    padding: 0.74rem 1rem;
+    border: 1px solid rgba(80, 61, 24, 0.12);
+    color: #4d3f22;
+    background: rgba(246, 240, 230, 0.72);
+    font-size: 0.92rem;
   }
 
   .product-badge {
@@ -974,6 +1173,17 @@ const shopSummary =
     background: rgba(255, 252, 247, 0.88);
     border: 1px solid rgba(80, 61, 24, 0.12);
     box-shadow: 0 18px 40px rgba(31, 24, 12, 0.08);
+  }
+
+  .callout--secondary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 26px;
+    border: 1px solid rgba(224, 191, 105, 0.18);
+    background:
+      radial-gradient(circle at top left, rgba(212, 178, 89, 0.12), transparent 34%),
+      rgba(255, 248, 239, 0.035);
   }
 
   .callout-title {
@@ -1114,7 +1324,7 @@ const shopSummary =
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    color: rgba(31,255,255,0.82);
+    color: rgba(31, 30, 27, 0.82);
     font-size: 0.98rem;
     font-weight: 600;
   }
@@ -1142,11 +1352,19 @@ const shopSummary =
     .collection-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .funnel-steps {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 720px) {
     .hero-title {
       font-size: clamp(1.95rem, 10vw, 3rem);
+    }
+
+    .market-proof__inner {
+      grid-template-columns: 1fr;
     }
 
     .launch-strip__inner {
@@ -1166,10 +1384,15 @@ const shopSummary =
       padding: 18px;
     }
 
-    .callout--light {
+    .callout--light,
+    .callout--secondary {
       flex-direction: column;
       align-items: flex-start;
       border-radius: 22px;
+    }
+
+    .funnel-step {
+      padding: 16px;
     }
 
     .footer-waitlist {

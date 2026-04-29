@@ -1,0 +1,678 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+export const prerender = true;
+
+const baseRaw = import.meta.env.BASE_URL || "/";
+const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
+
+/**
+ * Replace these with your real Square payment/booking links.
+ * Page renders safely even while links are blank.
+ */
+const PAY_LINKS = {
+  single: "",
+  weekly: "",
+  total: "",
+  elite: "",
+};
+
+const fallbackLink = `${base}category/wellness`;
+const safeLink = (url: string) => String(url || "").trim() || fallbackLink;
+
+const HERO_IMAGE = `${base}images/ionic-foot-detox-experience.jpg`;
+
+const tiers = [
+  {
+    id: "single",
+    eyebrow: "Single Session",
+    name: "Reset Session",
+    price: "$45",
+    cadence: "per session",
+    note: "Perfect for an occasional reset or first visit.",
+    savings: "",
+    badge: "",
+    cta: "Book Single Session",
+    href: safeLink(PAY_LINKS.single),
+    features: [
+      "1 Ionic Foot Detox session",
+      "30-minute grounding wellness ritual",
+      "Ideal for first-time clients",
+    ],
+  },
+  {
+    id: "weekly",
+    eyebrow: "Weekly Renewal",
+    name: "Maintenance Membership",
+    price: "$149",
+    cadence: "per month",
+    note: "Designed for consistent balance and weekly restoration.",
+    savings: "Save about $31/month",
+    badge: "",
+    cta: "Start Weekly Renewal",
+    href: safeLink(PAY_LINKS.weekly),
+    features: [
+      "1 session per week",
+      "Priority booking",
+      "10% off products",
+      "Early access to services and drops",
+    ],
+  },
+  {
+    id: "total",
+    eyebrow: "Total Reset",
+    name: "Best Value Membership",
+    price: "$269",
+    cadence: "per month",
+    note: "For deeper consistency, restoration, and accelerated rhythm.",
+    savings: "Save about $91/month",
+    badge: "Best Value",
+    cta: "Start Total Reset",
+    href: safeLink(PAY_LINKS.total),
+    features: [
+      "Up to 2 sessions per week",
+      "Priority booking",
+      "15% off products",
+      "Early access to everything",
+      "VIP status perks",
+    ],
+  },
+];
+
+const eliteHref = safeLink(PAY_LINKS.elite);
+---
+
+<BaseLayout title="Ionic Foot Detox Experience | Deeper Than Skin">
+  <main class="detox-page">
+    <section class="detox-hero">
+      <div class="hero-bg" style={`background-image:url('${HERO_IMAGE}')`} aria-hidden="true"></div>
+      <div class="hero-veil" aria-hidden="true"></div>
+
+      <div class="container hero-inner">
+        <a class="crumb" href={`${base}category/wellness`}>← Back to Wellness</a>
+
+        <div class="hero-copy">
+          <div class="kicker">Deeper Than Skin</div>
+          <h1>Ionic Foot Detox Experience</h1>
+          <p>
+            A grounding wellness ritual designed for reset, consistency, and full-body renewal.
+            Choose a single session or step into a monthly rhythm.
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#plans">Choose Your Plan</a>
+            <a class="btn btn-ghost" href="#how-it-works">How It Works</a>
+          </div>
+
+          <div class="hero-note">Mobile services available</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="intro section-slim">
+      <div class="container intro-grid">
+        <div>
+          <div class="kicker">Why Consistency Matters</div>
+          <h2>Wellness works best when it has a rhythm.</h2>
+        </div>
+        <p>
+          Single sessions are perfect for trying the experience. Memberships are designed for clients
+          who want consistent support, priority access, and better monthly value.
+        </p>
+      </div>
+    </section>
+
+    <section id="plans" class="plans section-slim">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="kicker">Choose Your Reset</div>
+            <h2>Simple pricing. Deeper commitment.</h2>
+          </div>
+          <p>Most clients serious about consistency choose the Total Reset membership.</p>
+        </div>
+
+        <div class="tier-grid">
+          {tiers.map((tier) => (
+            <article class={`tier ${tier.id === "total" ? "tier-featured" : ""}`}>
+              {tier.badge && <div class="badge">{tier.badge}</div>}
+
+              <div class="tier-top">
+                <div class="tier-icon" aria-hidden="true">
+                  {tier.id === "single" ? "✦" : tier.id === "weekly" ? "🌿" : "👑"}
+                </div>
+                <div>
+                  <p class="tier-eyebrow">{tier.eyebrow}</p>
+                  <h3>{tier.name}</h3>
+                </div>
+              </div>
+
+              <div class="price-row">
+                <span class="price">{tier.price}</span>
+                <span class="cadence">/{tier.cadence}</span>
+              </div>
+
+              {tier.savings && <div class="savings">{tier.savings}</div>}
+
+              <p class="tier-note">{tier.note}</p>
+
+              <ul>
+                {tier.features.map((feature) => (
+                  <li>{feature}</li>
+                ))}
+              </ul>
+
+              <a class={`btn ${tier.id === "total" ? "btn-primary" : "btn-soft"}`} href={tier.href}>
+                {tier.cta}
+              </a>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="section-slim">
+      <div class="container how">
+        <div class="how-card">
+          <span>01</span>
+          <h3>Choose your rhythm</h3>
+          <p>Select a single reset, weekly maintenance, or the Total Reset membership.</p>
+        </div>
+        <div class="how-card">
+          <span>02</span>
+          <h3>Book your session</h3>
+          <p>Reserve your time and settle into a calm, grounding wellness experience.</p>
+        </div>
+        <div class="how-card">
+          <span>03</span>
+          <h3>Stay consistent</h3>
+          <p>Memberships help turn wellness into a repeatable ritual, not an occasional thought.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="elite section-slim">
+      <div class="container elite-box">
+        <div>
+          <div class="kicker">Optional High-End Upgrade</div>
+          <h2>Elite Inner Circle</h2>
+          <p>
+            For clients who want the deepest level of access: 2 sessions per week, 1 guest pass per month,
+            free add-on, free product shipping, and elevated VIP perks.
+          </p>
+        </div>
+        <div class="elite-price">
+          <strong>$299</strong>
+          <span>/month</span>
+          <a class="btn btn-ghost" href={eliteHref}>Ask About Elite</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="container final-box">
+        <div>
+          <div class="kicker">Most Popular</div>
+          <h2>Total Reset is the best value for consistent care.</h2>
+          <p>Twice weekly sessions, stronger savings, and VIP-level support.</p>
+        </div>
+        <a class="btn btn-primary" href={safeLink(PAY_LINKS.total)}>Start Total Reset</a>
+      </div>
+    </section>
+  </main>
+
+  <script is:inline>
+    document.documentElement.style.scrollBehavior = "smooth";
+
+    if (window.location.hash === "#plans") {
+      const el = document.getElementById("plans");
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 80);
+      }
+    }
+  </script>
+
+  <style>
+    .detox-page {
+      color: rgba(255,255,255,.92);
+      background:
+        radial-gradient(900px 520px at 50% 0%, rgba(200,162,74,.12), transparent 64%),
+        linear-gradient(180deg, #07120d, #06100c 42%, #030806);
+      min-height: 100vh;
+    }
+
+    #plans,
+    #how-it-works {
+      scroll-margin-top: 90px;
+    }
+
+    .detox-hero {
+      position: relative;
+      min-height: clamp(620px, 82vh, 820px);
+      display: grid;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      transform: scale(1.04);
+      opacity: .76;
+    }
+
+    .hero-veil {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(720px 420px at 58% 42%, rgba(200,162,74,.22), transparent 64%),
+        linear-gradient(90deg, rgba(3,8,6,.96), rgba(3,8,6,.70), rgba(3,8,6,.28)),
+        linear-gradient(180deg, rgba(3,8,6,.18), #06100c 96%);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 2;
+      padding-top: 28px;
+      padding-bottom: 52px;
+    }
+
+    .crumb {
+      display: inline-flex;
+      color: rgba(233,206,143,.9);
+      text-decoration: none;
+      font-size: 13px;
+      margin-bottom: clamp(54px, 9vw, 90px);
+    }
+
+    .hero-copy {
+      max-width: 760px;
+    }
+
+    .kicker {
+      color: rgba(233,206,143,.92);
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(52px, 8vw, 112px);
+      line-height: .94;
+      letter-spacing: -.045em;
+      max-width: 900px;
+    }
+
+    h2 {
+      font-size: clamp(34px, 5vw, 68px);
+      line-height: 1;
+      letter-spacing: -.035em;
+    }
+
+    h3 {
+      font-size: 24px;
+      line-height: 1.05;
+    }
+
+    p {
+      line-height: 1.65;
+      color: rgba(255,255,255,.76);
+    }
+
+    .hero-copy p {
+      font-size: clamp(17px, 2vw, 22px);
+      max-width: 660px;
+      margin: 22px 0 0;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .hero-note {
+      width: fit-content;
+      margin-top: 18px;
+      border-radius: 999px;
+      padding: 9px 13px;
+      color: rgba(233,206,143,.96);
+      background: rgba(3,8,6,.42);
+      border: 1px solid rgba(233,206,143,.28);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .btn {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 12px 18px;
+      text-decoration: none;
+      font-weight: 850;
+      border: 1px solid rgba(255,255,255,.14);
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background:
+        radial-gradient(120px 80px at 28% 12%, rgba(255,255,255,.28), transparent 72%),
+        linear-gradient(135deg, rgba(233,206,143,.98), rgba(200,162,74,.92));
+      color: #07120d;
+      border-color: rgba(233,206,143,.56);
+      box-shadow: 0 18px 42px rgba(200,162,74,.18);
+    }
+
+    .btn-ghost,
+    .btn-soft {
+      color: rgba(255,255,255,.92);
+      background: rgba(255,255,255,.07);
+      border-color: rgba(255,255,255,.14);
+    }
+
+    .section-slim {
+      padding: clamp(52px, 7vw, 96px) 0;
+    }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: clamp(24px, 5vw, 70px);
+      align-items: end;
+    }
+
+    .intro-grid p {
+      font-size: 18px;
+      margin: 0;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .section-head p {
+      max-width: 430px;
+      margin: 0;
+    }
+
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .tier {
+      position: relative;
+      border-radius: 30px;
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,.13);
+      background:
+        radial-gradient(420px 240px at 50% 0%, rgba(255,255,255,.07), transparent 64%),
+        rgba(255,255,255,.045);
+      box-shadow: 0 24px 70px rgba(0,0,0,.25);
+    }
+
+    .tier-featured {
+      border-color: rgba(233,206,143,.58);
+      background:
+        radial-gradient(460px 260px at 50% 0%, rgba(200,162,74,.22), transparent 64%),
+        rgba(255,255,255,.065);
+      transform: translateY(-10px);
+    }
+
+    .badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      border-radius: 999px;
+      padding: 8px 11px;
+      background: rgba(233,206,143,.96);
+      color: #07120d;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .tier-top {
+      display: flex;
+      gap: 13px;
+      align-items: center;
+      padding-right: 90px;
+    }
+
+    .tier-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(200,162,74,.12);
+      border: 1px solid rgba(200,162,74,.35);
+    }
+
+    .tier-eyebrow {
+      margin: 0 0 4px;
+      font-size: 12px;
+      color: rgba(233,206,143,.88);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      line-height: 1.2;
+    }
+
+    .price-row {
+      margin-top: 26px;
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+    }
+
+    .price {
+      font-family: var(--font-display);
+      font-size: clamp(56px, 6vw, 78px);
+      line-height: .9;
+      letter-spacing: -.06em;
+    }
+
+    .cadence {
+      color: rgba(255,255,255,.66);
+      font-weight: 700;
+    }
+
+    .savings {
+      display: inline-flex;
+      margin-top: 14px;
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: rgba(233,206,143,.98);
+      background: rgba(200,162,74,.1);
+      border: 1px solid rgba(200,162,74,.28);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .tier-note {
+      min-height: 54px;
+      margin: 16px 0 0;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 18px 0 22px;
+      display: grid;
+      gap: 10px;
+    }
+
+    li {
+      color: rgba(255,255,255,.82);
+      font-size: 14px;
+      line-height: 1.45;
+      position: relative;
+      padding-left: 24px;
+    }
+
+    li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: rgba(233,206,143,.95);
+      font-weight: 900;
+    }
+
+    .tier .btn {
+      width: 100%;
+    }
+
+    .how {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .how-card {
+      border-radius: 26px;
+      padding: 22px;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .how-card span {
+      color: rgba(233,206,143,.92);
+      font-weight: 900;
+      letter-spacing: .12em;
+      font-size: 12px;
+    }
+
+    .how-card h3 {
+      margin-top: 18px;
+    }
+
+    .how-card p {
+      margin-bottom: 0;
+    }
+
+    .elite-box,
+    .final-box {
+      border-radius: 34px;
+      padding: clamp(24px, 5vw, 42px);
+      border: 1px solid rgba(233,206,143,.28);
+      background:
+        radial-gradient(600px 320px at 80% 0%, rgba(200,162,74,.18), transparent 66%),
+        rgba(255,255,255,.05);
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      box-shadow: 0 24px 80px rgba(0,0,0,.28);
+    }
+
+    .elite-box p,
+    .final-box p {
+      max-width: 760px;
+      margin-bottom: 0;
+    }
+
+    .elite-price {
+      min-width: 190px;
+      text-align: right;
+    }
+
+    .elite-price strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 64px;
+      line-height: .9;
+    }
+
+    .elite-price span {
+      display: block;
+      margin-bottom: 16px;
+      color: rgba(255,255,255,.68);
+    }
+
+    .final-cta {
+      padding: clamp(52px, 7vw, 90px) 0 clamp(80px, 10vw, 120px);
+    }
+
+    .final-box h2 {
+      max-width: 850px;
+    }
+
+    @media (max-width: 920px) {
+      .intro-grid,
+      .tier-grid,
+      .how {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head,
+      .elite-box,
+      .final-box {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .tier-featured {
+        transform: none;
+      }
+
+      .elite-price {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .detox-hero {
+        min-height: 680px;
+      }
+
+      .hero-bg {
+        background-position: 62% center;
+      }
+
+      .tier {
+        padding: 18px;
+      }
+
+      .tier-top {
+        padding-right: 0;
+      }
+
+      .badge {
+        position: static;
+        width: fit-content;
+        margin-bottom: 14px;
+      }
+
+      .hero-actions .btn,
+      .final-box .btn,
+      .elite-price .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</BaseLayout>

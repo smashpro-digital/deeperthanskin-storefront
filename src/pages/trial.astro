@@ -1,0 +1,657 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const base = import.meta.env.BASE_URL || "/";
+
+const u = (path: string) => {
+  const b = base.endsWith("/") ? base.slice(0, -1) : base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
+};
+
+const ROUTES = {
+  home: u("/"),
+};
+---
+
+<BaseLayout title="Build My Starter Kit | Deeper Than Skin">
+  <main class="trial-page">
+    <section class="trial-section">
+      <div class="container trial-container">
+        <a class="back-link" href={ROUTES.home}>← Back Home</a>
+
+        <form class="quiz-card" id="ritual-quiz" novalidate>
+          <div class="quiz-intake" id="quiz-intake">
+            <div class="quiz-head">
+              <div>
+                <div class="kicker">60-Second Ritual Builder</div>
+                <h1>Find your rhythm</h1>
+                <p class="intro">
+                  Choose what fits. We’ll shape your first starter kit from juices, teas,
+                  sea moss, body care, or blended essentials.
+                </p>
+              </div>
+
+              <div class="quiz-pill">Starter Kit</div>
+            </div>
+
+            <div class="quiz-block">
+              <h2>What support are you looking for?</h2>
+              <div class="option-grid">
+                <label><input type="checkbox" name="goals" value="energy" /> <span>Energy</span></label>
+                <label><input type="checkbox" name="goals" value="hydration" /> <span>Hydration</span></label>
+                <label><input type="checkbox" name="goals" value="digestion" /> <span>Digestion</span></label>
+                <label><input type="checkbox" name="goals" value="calm" /> <span>Calm / Stress</span></label>
+                <label><input type="checkbox" name="goals" value="skin" /> <span>Skin Glow</span></label>
+                <label><input type="checkbox" name="goals" value="reset" /> <span>Full Reset</span></label>
+              </div>
+            </div>
+
+            <div class="quiz-block">
+              <h2>What do you usually reach for?</h2>
+              <div class="option-grid">
+                <label><input type="checkbox" name="prefs" value="juice" /> <span>Cold-Pressed Juice</span></label>
+                <label><input type="checkbox" name="prefs" value="lemonade" /> <span>Herbal Lemonade</span></label>
+                <label><input type="checkbox" name="prefs" value="tea" /> <span>Tea Rituals</span></label>
+                <label><input type="checkbox" name="prefs" value="sea-moss" /> <span>Sea Moss</span></label>
+                <label><input type="checkbox" name="prefs" value="body-care" /> <span>Body Care</span></label>
+                <label><input type="checkbox" name="prefs" value="not-sure" /> <span>Not Sure Yet</span></label>
+              </div>
+            </div>
+
+            <div class="quiz-block">
+              <h2>Any preferences or considerations?</h2>
+              <div class="option-grid">
+                <label><input type="checkbox" name="notes" value="low-sugar" /> <span>Low Sugar</span></label>
+                <label><input type="checkbox" name="notes" value="fruit-forward" /> <span>Fruit Forward</span></label>
+                <label><input type="checkbox" name="notes" value="green-forward" /> <span>Green Forward</span></label>
+                <label><input type="checkbox" name="notes" value="caffeine-free" /> <span>Caffeine-Free</span></label>
+                <label><input type="checkbox" name="notes" value="sensitive" /> <span>Ingredient Sensitive</span></label>
+                <label><input type="checkbox" name="notes" value="review" /> <span>Owner Review First</span></label>
+              </div>
+            </div>
+
+            <div class="quiz-block">
+              <h2>How should we contact you?</h2>
+
+              <div class="contact-grid">
+                <input name="name" placeholder="Name" autocomplete="name" />
+                <input name="phone" placeholder="Phone" autocomplete="tel" />
+                <input name="email" placeholder="Email" type="email" autocomplete="email" />
+              </div>
+
+              <textarea
+                name="message"
+                placeholder="Anything you want us to know? Allergies, avoidances, preferred flavors, pickup timing..."
+              ></textarea>
+
+              <p class="note">
+                This is a wellness intake, not medical advice. Deeper Than Skin does not diagnose,
+                treat, or cure medical conditions.
+              </p>
+            </div>
+
+            <div class="sticky-submit" id="sticky-submit">
+              <button type="submit" class="submit-btn">Build My Starter Kit</button>
+            </div>
+          </div>
+
+          <div class="result-card" id="result-card" hidden>
+            <div class="result-shell">
+              <div class="result-overline">
+                <span></span>
+                Your Starter Direction
+              </div>
+
+              <h1 class="result-title" id="result-title">Your Ritual Kit</h1>
+              <p class="result-copy" id="result-copy"></p>
+
+              <div class="boost-note" id="boost-note"></div>
+
+              <div class="conversion-box">
+                <strong>Your first ritual is ready.</strong>
+                <p>
+                  Start with this trial kit today. You can add an optional boost at checkout, then we’ll help refine your rhythm after your first experience.
+                </p>
+              </div>
+
+              <div class="pay-panel">
+                <a
+                  class="pay-button"
+                  id="trial-checkout-link"
+                  href="https://square.link/u/Xahltphb"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span class="pay-button__eyebrow">Secure Square Checkout</span>
+                  <span class="pay-button__main" id="trial-checkout-label">Begin My Starter Kit</span>
+                  <span class="pay-button__sub">No subscription required • Optional boosts available</span>
+                </a>
+
+                <button class="adjust-button" type="button" id="reset-quiz">
+                  Adjust my answers
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+
+<script is:inline>
+  (() => {
+    const DEFAULT_PAY_LINK = "https://square.link/u/Xahltphb";
+
+    const PAY_LINK_MAP = {
+      "balanced-starter-kit": DEFAULT_PAY_LINK,
+      "hydration-energy-starter-kit": DEFAULT_PAY_LINK,
+      "calm-ritual-starter-kit": DEFAULT_PAY_LINK,
+      "skin-body-ritual-kit": DEFAULT_PAY_LINK,
+      "reset-mineral-support-kit": DEFAULT_PAY_LINK,
+      "owner-reviewed-starter-kit": DEFAULT_PAY_LINK,
+    };
+
+    const form = document.getElementById("ritual-quiz");
+    const intake = document.getElementById("quiz-intake");
+    const resultCard = document.getElementById("result-card");
+    const resultTitle = document.getElementById("result-title");
+    const resultCopy = document.getElementById("result-copy");
+    const boostNote = document.getElementById("boost-note");
+    const resetBtn = document.getElementById("reset-quiz");
+    const checkoutLink = document.getElementById("trial-checkout-link");
+    const checkoutLabel = document.getElementById("trial-checkout-label");
+
+    if (!form || !intake || !resultCard || !resultTitle || !resultCopy) return;
+
+    const getValues = (name) =>
+      [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((el) => el.value);
+
+    const hasAny = (items, options) => items.some((item) => options.includes(item));
+
+    const setCheckout = ({ kitSlug, title, reviewRequired }) => {
+      if (!checkoutLink) return;
+
+      const link = PAY_LINK_MAP[kitSlug] || DEFAULT_PAY_LINK;
+
+      checkoutLink.href = link;
+      checkoutLink.target = link.startsWith("http") ? "_blank" : "_self";
+      checkoutLink.rel = link.startsWith("http") ? "noopener noreferrer" : "";
+
+      if (checkoutLabel) {
+        checkoutLabel.textContent = reviewRequired
+          ? "Begin Owner-Reviewed Kit"
+          : `Begin My ${title.replace(/^The\s+/i, "")}`;
+      }
+    };
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const goals = getValues("goals");
+      const prefs = getValues("prefs");
+      const notes = getValues("notes");
+
+      let title = "The Balanced Starter Kit";
+      let copy =
+        "A flexible first ritual with a mix of hydration, daily support, and gentle wellness essentials. This is a good fit if you want a simple starting point without overthinking it.";
+      let kitSlug = "balanced-starter-kit";
+      let boost = "Optional boost: Herbal Tea Pack for a simple daily rhythm.";
+
+      if (hasAny(goals, ["hydration", "energy"]) || hasAny(prefs, ["juice", "lemonade"])) {
+        title = "The Hydration + Energy Starter Kit";
+        copy =
+          "A beverage-forward starter built around cold-pressed juices, herbal lemonade, and bright daily support. Ideal for customers who want something refreshing, simple, and easy to repeat.";
+        kitSlug = "hydration-energy-starter-kit";
+        boost = "Recommended boost: Herbal Tea Pack for steady daily rhythm support.";
+      }
+
+      if (hasAny(goals, ["calm"]) || hasAny(prefs, ["tea"])) {
+        title = "The Calm Ritual Starter Kit";
+        copy =
+          "A slower, grounding starter with tea rituals, gentle botanicals, and optional body care. Best for evening routines, stress support, and softer daily rhythm.";
+        kitSlug = "calm-ritual-starter-kit";
+        boost = "Recommended boost: Herbal Tea Pack for a softer evening ritual.";
+      }
+
+      if (hasAny(goals, ["skin"]) || hasAny(prefs, ["body-care"])) {
+        title = "The Skin + Body Ritual Kit";
+        copy =
+          "A body-centered starter with nourishing skincare, body butter, oils, and optional internal wellness support. Best for customers who want glow, softness, and ritual.";
+        kitSlug = "skin-body-ritual-kit";
+        boost = "Recommended boost: Sea Moss Gel for mineral-rich daily support.";
+      }
+
+      if (hasAny(goals, ["reset", "digestion"]) || hasAny(prefs, ["sea-moss"])) {
+        title = "The Reset + Mineral Support Kit";
+        copy =
+          "A wellness-focused starter with mineral-rich support, sea moss, teas, and optional beverages. Best for customers who want a deeper reset-style starting point.";
+        kitSlug = "reset-mineral-support-kit";
+        boost = "Recommended boost: Sea Moss Gel for mineral support, or Detox Add-On for a deeper reset.";
+      }
+
+      const reviewRequired = notes.includes("review") || notes.includes("sensitive");
+
+      if (reviewRequired) {
+        title = "Owner-Reviewed Starter Kit";
+        copy =
+          "Your answers suggest a more personalized review before recommending products. We’ll use your notes to shape a safe, simple starting ritual and follow up before finalizing.";
+        kitSlug = "owner-reviewed-starter-kit";
+        boost = "We recommend starting simple. You can skip boosts at checkout until your kit is reviewed.";
+      }
+
+      resultTitle.textContent = title;
+      resultCopy.textContent = copy;
+
+      if (boostNote) boostNote.textContent = boost;
+
+      intake.hidden = true;
+      resultCard.hidden = false;
+
+      setCheckout({ kitSlug, title, reviewRequired });
+
+      resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    resetBtn?.addEventListener("click", () => {
+      resultCard.hidden = true;
+      intake.hidden = false;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  })();
+</script>
+
+<style>
+  .trial-page {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 18% 0%, rgba(212, 178, 89, 0.13), transparent 34%),
+      radial-gradient(circle at 90% 10%, rgba(255, 248, 239, 0.05), transparent 32%),
+      linear-gradient(180deg, #071611 0%, #0b2119 100%);
+  }
+
+  .trial-section {
+    padding: clamp(30px, 5vw, 74px) 0 clamp(90px, 10vw, 120px);
+  }
+
+  .trial-container {
+    max-width: 1160px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    margin-bottom: 20px;
+    color: rgba(255, 248, 239, 0.78);
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  .quiz-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 34px;
+    border: 1px solid rgba(224, 191, 105, 0.22);
+    background:
+      radial-gradient(circle at top right, rgba(212, 178, 89, 0.15), transparent 34%),
+      rgba(255, 248, 239, 0.045);
+    padding: clamp(22px, 4vw, 46px);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  }
+
+  .quiz-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 22px;
+    margin-bottom: clamp(26px, 4vw, 44px);
+  }
+
+  .kicker,
+  .result-overline {
+    color: #e3c06b;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-weight: 900;
+    font-size: 0.78rem;
+    margin-bottom: 14px;
+  }
+
+  .kicker::after,
+  .result-overline::after {
+    content: "";
+    display: block;
+    width: 144px;
+    height: 1px;
+    margin-top: 12px;
+    background: rgba(227, 192, 107, 0.58);
+  }
+
+  .result-overline {
+    display: inline-block;
+  }
+
+  h1,
+  h2 {
+    color: #fff8ef;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2.7rem, 8vw, 5.6rem);
+    line-height: 0.92;
+    letter-spacing: -0.055em;
+  }
+
+  h2 {
+    font-size: clamp(1.4rem, 3vw, 2.35rem);
+    line-height: 1.02;
+    margin-bottom: 18px;
+  }
+
+  .intro {
+    max-width: 820px;
+    margin: 22px 0 0;
+    color: rgba(255, 248, 239, 0.76);
+    font-size: clamp(1.02rem, 2vw, 1.2rem);
+    line-height: 1.7;
+  }
+
+  .quiz-pill {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.72rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(224, 191, 105, 0.22);
+    background: rgba(255, 248, 239, 0.06);
+    color: #f8ebcf;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .quiz-block {
+    margin-top: clamp(28px, 4vw, 46px);
+  }
+
+  .option-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 74px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(224, 191, 105, 0.15);
+    color: #fff8ef;
+    background: rgba(255, 248, 239, 0.052);
+    font-weight: 850;
+    cursor: pointer;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 17px;
+    height: 17px;
+    accent-color: #d4b259;
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .contact-grid input,
+  textarea {
+    width: 100%;
+    border-radius: 20px;
+    border: 1px solid rgba(224, 191, 105, 0.16);
+    background: rgba(255, 248, 239, 0.93);
+    color: #1f1e1b;
+    font-size: 1rem;
+    outline: none;
+  }
+
+  .contact-grid input {
+    min-height: 62px;
+    padding: 0 18px;
+  }
+
+  textarea {
+    min-height: 120px;
+    margin-top: 14px;
+    padding: 18px;
+    resize: vertical;
+    font-family: inherit;
+  }
+
+  .note {
+    max-width: 820px;
+    margin: 16px 0 0;
+    color: rgba(255, 248, 239, 0.58);
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+
+  .result-card {
+    min-height: 62vh;
+    padding: clamp(26px, 5vw, 60px);
+    border-radius: 34px;
+    border: 1px solid rgba(224, 191, 105, 0.28);
+    background:
+      radial-gradient(circle at 10% 0%, rgba(227, 192, 107, 0.16), transparent 34%),
+      radial-gradient(circle at 90% 18%, rgba(255, 248, 239, 0.07), transparent 32%),
+      linear-gradient(145deg, rgba(255, 248, 239, 0.08), rgba(255, 248, 239, 0.035));
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+  }
+
+  .result-shell {
+    max-width: 920px;
+    margin: 0 auto;
+  }
+
+  .result-title {
+    font-size: clamp(2.35rem, 6vw, 5rem);
+    line-height: 0.95;
+    letter-spacing: -0.055em;
+  }
+
+  .result-copy {
+    max-width: 820px;
+    margin: 22px 0 0;
+    color: rgba(255, 248, 239, 0.78);
+    font-size: clamp(1.05rem, 2vw, 1.22rem);
+    line-height: 1.68;
+  }
+
+  .boost-note {
+    margin-top: 24px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(227, 192, 107, 0.26);
+    background: rgba(227, 192, 107, 0.1);
+    color: #fff8ef;
+    font-weight: 850;
+    line-height: 1.5;
+  }
+
+  .conversion-box {
+    margin-top: 22px;
+    padding: 22px;
+    border-radius: 24px;
+    border: 1px solid rgba(224, 191, 105, 0.18);
+    background: rgba(255, 248, 239, 0.05);
+  }
+
+  .conversion-box strong {
+    display: block;
+    color: #fff8ef;
+    font-size: 1.22rem;
+    margin-bottom: 8px;
+  }
+
+  .conversion-box p {
+    margin: 0;
+    color: rgba(255, 248, 239, 0.68);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .pay-panel {
+    margin-top: 28px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .pay-button {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 98px;
+    padding: 20px 26px;
+    overflow: hidden;
+    border-radius: 999px;
+    text-decoration: none;
+    color: #fff6e6;
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 248, 239, 0.24), transparent 26%),
+      linear-gradient(135deg, #8a6b26 0%, #173f2f 58%, #071611 100%);
+    border: 1px solid rgba(255, 232, 170, 0.52);
+    box-shadow:
+      0 28px 72px rgba(0, 0, 0, 0.42),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .pay-button::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    border: 1px solid rgba(255, 248, 239, 0.08);
+    pointer-events: none;
+  }
+
+  .pay-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 34px 86px rgba(0, 0, 0, 0.5);
+  }
+
+  .pay-button__eyebrow {
+    color: rgba(255, 248, 239, 0.68);
+    font-size: 0.74rem;
+    font-weight: 950;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .pay-button__main {
+    margin-top: 6px;
+    font-size: clamp(1.12rem, 2.4vw, 1.45rem);
+    font-weight: 950;
+    line-height: 1.15;
+    text-align: center;
+  }
+
+  .pay-button__sub {
+    margin-top: 8px;
+    color: rgba(255, 248, 239, 0.7);
+    font-size: 0.88rem;
+    font-weight: 750;
+    line-height: 1.25;
+    text-align: center;
+  }
+
+  .adjust-button {
+    justify-self: center;
+    width: fit-content;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(224, 191, 105, 0.16);
+    background: rgba(255, 248, 239, 0.04);
+    color: rgba(255, 248, 239, 0.78);
+    font-weight: 850;
+    cursor: pointer;
+  }
+
+  .sticky-submit {
+    position: sticky;
+    bottom: 14px;
+    z-index: 4;
+    margin-top: 34px;
+    padding: 12px;
+    border-radius: 999px;
+    background: rgba(7, 22, 17, 0.78);
+    border: 1px solid rgba(224, 191, 105, 0.16);
+    backdrop-filter: blur(14px);
+  }
+
+  .submit-btn {
+    width: 100%;
+    min-height: 66px;
+    border: 0;
+    border-radius: 999px;
+    color: #fff6e6;
+    font-weight: 950;
+    font-size: 1.08rem;
+    background: linear-gradient(135deg, #604e24 0%, #153a2d 100%);
+    cursor: pointer;
+  }
+
+  @media (max-width: 900px) {
+    .option-grid,
+    .contact-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .quiz-head {
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .trial-section {
+      padding-top: 24px;
+    }
+
+    .quiz-card {
+      border-radius: 26px;
+      padding: 20px;
+    }
+
+    .option-grid,
+    .contact-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    label {
+      min-height: 62px;
+      border-radius: 18px;
+      padding: 14px 16px;
+    }
+
+    .quiz-pill {
+      display: none;
+    }
+
+    .pay-button {
+      border-radius: 28px;
+      min-height: 92px;
+    }
+
+    .result-card {
+      border-radius: 26px;
+      padding: 24px;
+    }
+  }
+</style>

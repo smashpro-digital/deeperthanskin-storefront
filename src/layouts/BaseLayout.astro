@@ -8,7 +8,7 @@ type Props = {
 
 const {
   title = "Deeper Than Skin — Storefront",
-  description = "Luxury skincare + wellness essentials. Browse in-house, checkout on Square when you’re ready.",
+  description = "Small-batch wellness goods, fresh market drinks, skincare, and ritual essentials crafted for Columbia, Blythewood, and local South Carolina markets.",
 } = Astro.props as Props;
 
 const base: string = import.meta.env.BASE_URL || "/";
@@ -159,6 +159,7 @@ const canonical = (() => {
             <div class="nav-drawer-group-title">Categories</div>
             <a class={isActive(ROUTES.category("skincare")) ? "is-active" : ""} href={ROUTES.category("skincare")}>Skincare</a>
             <a class={isActive(ROUTES.category("wellness")) ? "is-active" : ""} href={ROUTES.category("wellness")}>Wellness</a>
+            <a class={isActive(ROUTES.category("market")) ? "is-active" : ""} href={ROUTES.category("market")}>Market Menu</a>
             <a class={isActive(ROUTES.category("juices")) ? "is-active" : ""} href={ROUTES.category("juices")}>Cold-Pressed Juices</a>
             <a class={isActive(ROUTES.category("seamoss")) ? "is-active" : ""} href={ROUTES.category("seamoss")}>Sea Moss Gel</a>
             <a class={isActive(ROUTES.category("kits")) ? "is-active" : ""} href={ROUTES.category("kits")}>Detox Cleanse Kits</a>
@@ -170,134 +171,170 @@ const canonical = (() => {
             <a class="btn btn-ghost" href={LINKS.book} {...EXT}>Book Appointment</a>
           </div>
 
-          <p class="nav-drawer-note">
-            Checkout and bookings are handled securely by Square.
-          </p>
+          <p class="nav-drawer-note">Checkout and bookings are handled securely by Square.</p>
         </nav>
       </div>
     </div>
 
     <slot />
 
-    <footer class="footer">
-      <div class="container">
-        © {new Date().getFullYear()} Deeper Than Skin. All rights reserved.
-      </div>
-      <div style="display:flex;justify-content:flex-end;">
-        <a href="https://dashboard.smashpro.app" title="Powered by SmashPro Digital" target="_blank" rel="noopener noreferrer">
-          <img src={`${base}images/smashpro-bot.png`} alt="SmashPro Digital" width="24" height="24" loading="lazy" />
-        </a>.
+    <footer class="site-footer">
+      <div class="container site-footer__inner">
+        <div class="site-footer__top">
+          <div class="site-footer__brand">
+            <a class="site-footer__logo" href={ROUTES.home}>Deeper Than Skin</a>
+            <p>
+              Small-batch wellness goods, fresh market drinks, skincare, and ritual essentials
+              crafted for Columbia, Blythewood, and local South Carolina markets.
+            </p>
+          </div>
+
+          <div class="site-footer__cta">
+            <span class="site-footer__eyebrow">Local market ready</span>
+            <strong>Fresh pours, botanical rituals, and small-batch care.</strong>
+            <a href={ROUTES.shop}>Explore the shop</a>
+          </div>
+        </div>
+
+        <div class="site-footer__links">
+          <nav class="site-footer__nav" aria-label="Footer shop links">
+            <a href={ROUTES.shop}>Shop</a>
+            <a href={ROUTES.featured}>Featured</a>
+            <a href={ROUTES.category("market")}>Market Menu</a>
+            <a href={ROUTES.category("wellness")}>Wellness</a>
+            <a href={ROUTES.category("skincare")}>Skincare</a>
+          </nav>
+
+          <nav class="site-footer__nav site-footer__nav--secondary" aria-label="Footer action links">
+            <a href={ROUTES.search}>Search</a>
+            <a href={ROUTES.cart}>Cart</a>
+            <a href={LINKS.book} {...EXT}>Book Appointment</a>
+            <a href={LINKS.squareShop} {...EXT}>Shop on Square</a>
+          </nav>
+        </div>
+
+        <div class="site-footer__meta">
+          <span>© {new Date().getFullYear()} Deeper Than Skin. All rights reserved.</span>
+
+          <a
+            class="site-footer__powered"
+            href="https://dashboard.smashpro.app"
+            title="Powered by SmashPro Digital"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span>Powered by SmashPro Digital</span>
+            <img src={`${base}images/smashpro-bot.png`} alt="SmashPro Digital" width="24" height="24" loading="lazy" />
+          </a>
+        </div>
       </div>
     </footer>
 
-   <script is:inline>
-  (() => {
-    const getParts = () => ({
-      header: document.querySelector("[data-nav]"),
-      burger: document.querySelector("[data-burger]"),
-      drawer: document.querySelector("[data-drawer]"),
-      closeBtn: document.querySelector("[data-drawer-close]"),
-      backdrop: document.querySelector("[data-drawer-backdrop]"),
-    });
+    <script is:inline>
+      (() => {
+        const getParts = () => ({
+          header: document.querySelector("[data-nav]"),
+          burger: document.querySelector("[data-burger]"),
+          drawer: document.querySelector("[data-drawer]"),
+          backdrop: document.querySelector("[data-drawer-backdrop]"),
+        });
 
-    const forceShow = (drawer, backdrop) => {
-      backdrop.style.cssText = `
-        position: fixed !important;
-        inset: 0 !important;
-        display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
-        background: rgba(0,0,0,.55) !important;
-        backdrop-filter: blur(8px) !important;
-        -webkit-backdrop-filter: blur(8px) !important;
-        z-index: 2147483646 !important;
-      `;
+        const forceShow = (drawer, backdrop) => {
+          backdrop.style.cssText = `
+            position: fixed !important;
+            inset: 0 !important;
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            background: rgba(0,0,0,.55) !important;
+            backdrop-filter: blur(8px) !important;
+            -webkit-backdrop-filter: blur(8px) !important;
+            z-index: 2147483646 !important;
+          `;
 
-      drawer.style.cssText = `
-        position: fixed !important;
-        top: 88px !important;
-        left: 12px !important;
-        right: 12px !important;
-        display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
-        transform: none !important;
-        z-index: 2147483647 !important;
-      `;
-    };
+          drawer.style.cssText = `
+            position: fixed !important;
+            top: 88px !important;
+            left: 12px !important;
+            right: 12px !important;
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            transform: none !important;
+            z-index: 2147483647 !important;
+          `;
+        };
 
-    const forceHide = (drawer, backdrop) => {
-      drawer.removeAttribute("style");
-      backdrop.removeAttribute("style");
-    };
+        const forceHide = (drawer, backdrop) => {
+          drawer.removeAttribute("style");
+          backdrop.removeAttribute("style");
+        };
 
-    const openDrawer = () => {
-      const { header, burger, drawer, backdrop } = getParts();
-      if (!header || !burger || !drawer || !backdrop) return;
+        const openDrawer = () => {
+          const { header, burger, drawer, backdrop } = getParts();
+          if (!header || !burger || !drawer || !backdrop) return;
 
-      header.classList.add("nav-is-open");
-      drawer.classList.add("is-open");
-      backdrop.classList.add("is-open");
+          header.classList.add("nav-is-open");
+          drawer.classList.add("is-open");
+          backdrop.classList.add("is-open");
 
-      drawer.setAttribute("aria-hidden", "false");
-      backdrop.setAttribute("aria-hidden", "false");
-      burger.setAttribute("aria-expanded", "true");
-      burger.setAttribute("aria-label", "Close menu");
+          drawer.setAttribute("aria-hidden", "false");
+          backdrop.setAttribute("aria-hidden", "false");
+          burger.setAttribute("aria-expanded", "true");
+          burger.setAttribute("aria-label", "Close menu");
 
-      document.documentElement.classList.add("no-scroll");
-      document.body.classList.add("no-scroll", "menu-open");
+          document.documentElement.classList.add("no-scroll");
+          document.body.classList.add("no-scroll", "menu-open");
 
-      forceShow(drawer, backdrop);
-    };
+          forceShow(drawer, backdrop);
+        };
 
-    const closeDrawer = () => {
-      const { header, burger, drawer, backdrop } = getParts();
-      if (!header || !burger || !drawer || !backdrop) return;
+        const closeDrawer = () => {
+          const { header, burger, drawer, backdrop } = getParts();
+          if (!header || !burger || !drawer || !backdrop) return;
 
-      header.classList.remove("nav-is-open");
-      drawer.classList.remove("is-open");
-      backdrop.classList.remove("is-open");
+          header.classList.remove("nav-is-open");
+          drawer.classList.remove("is-open");
+          backdrop.classList.remove("is-open");
 
-      drawer.setAttribute("aria-hidden", "true");
-      backdrop.setAttribute("aria-hidden", "true");
-      burger.setAttribute("aria-expanded", "false");
-      burger.setAttribute("aria-label", "Open menu");
+          drawer.setAttribute("aria-hidden", "true");
+          backdrop.setAttribute("aria-hidden", "true");
+          burger.setAttribute("aria-expanded", "false");
+          burger.setAttribute("aria-label", "Open menu");
 
-      document.documentElement.classList.remove("no-scroll");
-      document.body.classList.remove("no-scroll", "menu-open");
+          document.documentElement.classList.remove("no-scroll");
+          document.body.classList.remove("no-scroll", "menu-open");
 
-      forceHide(drawer, backdrop);
-    };
+          forceHide(drawer, backdrop);
+        };
 
-    document.addEventListener("click", (event) => {
-      const burger = event.target.closest("[data-burger]");
-      const closeBtn = event.target.closest("[data-drawer-close]");
-      const backdrop = event.target.closest("[data-drawer-backdrop]");
-      const drawerLink = event.target.closest("[data-drawer] a");
+        document.addEventListener("click", (event) => {
+          const burger = event.target.closest("[data-burger]");
+          const closeBtn = event.target.closest("[data-drawer-close]");
+          const backdrop = event.target.closest("[data-drawer-backdrop]");
+          const drawerLink = event.target.closest("[data-drawer] a");
 
-      if (burger) {
-        event.preventDefault();
-        event.stopPropagation();
+          if (burger) {
+            event.preventDefault();
+            event.stopPropagation();
 
-        const { drawer } = getParts();
-        if (drawer?.classList.contains("is-open")) closeDrawer();
-        else openDrawer();
+            const { drawer } = getParts();
+            if (drawer?.classList.contains("is-open")) closeDrawer();
+            else openDrawer();
 
-        return;
-      }
+            return;
+          }
 
-      if (closeBtn || backdrop || drawerLink) {
-        closeDrawer();
-      }
-    }, true);
+          if (closeBtn || backdrop || drawerLink) closeDrawer();
+        }, true);
 
-    window.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeDrawer();
-    });
-  })();
-</script>
+        window.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeDrawer();
+        });
+      })();
+    </script>
 
     <script is:inline>
       (() => {
@@ -309,7 +346,7 @@ const canonical = (() => {
 
           const last = parseInt(localStorage.getItem(TS_KEY) || "0", 10);
           const SIX_HOURS = 6 * 60 * 60 * 1000;
-          if (last && (Date.now() - last) < SIX_HOURS) return;
+          if (last && Date.now() - last < SIX_HOURS) return;
 
           localStorage.setItem(TS_KEY, String(Date.now()));
 
@@ -330,8 +367,12 @@ const canonical = (() => {
               if (!r.ok) throw new Error("HTTP " + r.status);
               const text = await r.text();
               if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
+
               let j = null;
-              try { j = JSON.parse(text); } catch {}
+              try {
+                j = JSON.parse(text);
+              } catch {}
+
               if (j && j.ok === false) throw new Error("API ok=false");
               localStorage.setItem(KEY, "1");
             })
@@ -515,7 +556,6 @@ const canonical = (() => {
         color: rgba(0, 0, 0, .84);
         border: 1px solid rgba(0, 0, 0, .08);
         background: rgba(255, 255, 255, .56);
-        transition: transform .16s ease, background .16s ease, border-color .16s ease;
       }
 
       .nav-drawer-links a:hover {
@@ -558,6 +598,147 @@ const canonical = (() => {
         line-height: 1.45;
       }
 
+      .site-footer {
+        position: relative;
+        z-index: 1;
+        border-top: 1px solid rgba(224, 191, 105, 0.14);
+        background:
+          radial-gradient(circle at top left, rgba(212, 178, 89, 0.1), transparent 28%),
+          linear-gradient(180deg, #071611 0%, #030907 100%);
+        color: rgba(255, 248, 239, 0.78);
+        padding: clamp(34px, 5vw, 58px) 0;
+      }
+
+      .site-footer__inner {
+        display: grid;
+        gap: 28px;
+      }
+
+      .site-footer__top {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.55fr);
+        gap: 24px;
+        align-items: stretch;
+      }
+
+      .site-footer__brand {
+        max-width: 760px;
+      }
+
+      .site-footer__logo {
+        display: inline-flex;
+        color: #fff8ef;
+        font-family: var(--font-display);
+        font-size: clamp(1.75rem, 3vw, 2.6rem);
+        line-height: 1;
+        text-decoration: none;
+        margin-bottom: 14px;
+        letter-spacing: -0.02em;
+      }
+
+      .site-footer__brand p {
+        margin: 0;
+        max-width: 700px;
+        color: rgba(255, 248, 239, 0.7);
+        line-height: 1.65;
+        font-size: 1rem;
+      }
+
+      .site-footer__cta {
+        display: grid;
+        align-content: center;
+        gap: 10px;
+        padding: 22px;
+        border-radius: 26px;
+        border: 1px solid rgba(224, 191, 105, 0.16);
+        background:
+          radial-gradient(circle at top right, rgba(212, 178, 89, 0.14), transparent 36%),
+          rgba(255, 248, 239, 0.04);
+      }
+
+      .site-footer__eyebrow {
+        color: #e3c06b;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .site-footer__cta strong {
+        color: #fff8ef;
+        font-size: clamp(1.12rem, 1.7vw, 1.35rem);
+        line-height: 1.25;
+      }
+
+      .site-footer__cta a {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0.72rem 1rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #564621 0%, #153a2d 100%);
+        color: #fff6e6;
+        text-decoration: none;
+        font-weight: 800;
+      }
+
+      .site-footer__links {
+        display: grid;
+        gap: 12px;
+      }
+
+      .site-footer__nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .site-footer__nav a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        border: 1px solid rgba(224, 191, 105, 0.16);
+        background: rgba(255, 248, 239, 0.04);
+        color: #fff8ef;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .site-footer__nav--secondary a {
+        color: rgba(255, 248, 239, 0.74);
+        background: rgba(255, 248, 239, 0.025);
+      }
+
+      .site-footer__meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(224, 191, 105, 0.12);
+        font-size: 0.92rem;
+        color: rgba(255, 248, 239, 0.56);
+      }
+
+      .site-footer__powered {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: rgba(255, 248, 239, 0.68);
+        text-decoration: none;
+      }
+
+      .site-footer__powered img {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+      }
+
       @media (max-width: 820px) {
         .nav-left {
           display: none !important;
@@ -565,6 +746,22 @@ const canonical = (() => {
 
         .nav-burger {
           display: inline-flex !important;
+        }
+
+        .site-footer__top {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .site-footer__meta {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .site-footer__nav a,
+        .site-footer__cta a {
+          width: 100%;
         }
       }
 
@@ -581,7 +778,7 @@ const canonical = (() => {
         }
 
         .nav-drawer-links a {
-          padding: 14px 14px;
+          padding: 14px;
         }
       }
 
@@ -596,20 +793,21 @@ const canonical = (() => {
           transition: none !important;
         }
       }
-      body.menu-open .nav-drawer {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  transform: translateY(0) scale(1) !important;
-  z-index: 999999 !important;
-}
 
-body.menu-open .nav-drawer-backdrop {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  z-index: 999998 !important;
-}
+      body.menu-open .nav-drawer {
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: translateY(0) scale(1) !important;
+        z-index: 999999 !important;
+      }
+
+      body.menu-open .nav-drawer-backdrop {
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        z-index: 999998 !important;
+      }
     </style>
   </body>
 </html>
