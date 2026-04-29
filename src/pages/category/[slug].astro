@@ -133,6 +133,7 @@ const ROUTES = {
   featured: `${base}featured`,
   productBase: `${base}product/`,
   cart: `${base}cart`,
+  detoxExperience: `${base}detox-experience`,
 };
 ---
 
@@ -179,7 +180,7 @@ const ROUTES = {
         <div class="panel-head">
           <div>
             <h2 class="panel-title">Products</h2>
-            <p class="panel-sub">Tap a card for details, or add straight to your cart.</p>
+            <p class="panel-sub">Tap a card for details, or start a guided experience.</p>
           </div>
           <input id="q" class="search" type="search" placeholder="Search this category…" />
         </div>
@@ -191,6 +192,7 @@ const ROUTES = {
           data-fallback={fallbackImg}
           data-base={base}
           data-product-base={ROUTES.productBase}
+          data-detox-experience={ROUTES.detoxExperience}
         >
           {Array.from({ length: 8 }).map(() => (
             <div class="card skel-card" aria-hidden="true">
@@ -272,6 +274,7 @@ const ROUTES = {
     const fallback = grid.getAttribute("data-fallback") || "";
     const base = grid.getAttribute("data-base") || "/";
     const productBase = grid.getAttribute("data-product-base") || base + "product/";
+    const detoxExperienceUrl = grid.getAttribute("data-detox-experience") || base + "detox-experience";
 
     const escapeHtml = (s) =>
       String(s || "")
@@ -304,6 +307,26 @@ const ROUTES = {
 
     function normalizeSlug(s) {
       return String(s || "").trim().toLowerCase().replace(/[_\s]+/g, "-");
+    }
+
+    function isDetoxExperienceItem(it) {
+      const haystack = [
+        it?.name,
+        it?.title,
+        it?.slug,
+        it?.category,
+        it?.category_slug,
+        it?.description,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        haystack.includes("ionic foot detox") ||
+        haystack.includes("foot detox") ||
+        haystack.includes("detox experience")
+      );
     }
 
     async function fetchJson(url) {
@@ -378,37 +401,69 @@ const ROUTES = {
 
     let ALL = [];
 
-    const cardHtml = (it) => {
-      const id = String(it?.id || it?.product_id || "");
-      const title = escapeHtml(it?.name || it?.title || "Product");
-      const descRaw = String(it?.description || "");
-      const desc = escapeHtml(descRaw.length > 120 ? descRaw.slice(0, 117) + "…" : descRaw);
-      const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
-      const price = money(it?.price_money);
+  const cardHtml = (it) => {
+  const id = String(it?.id || it?.product_id || "");
+  const rawTitle = String(it?.name || it?.title || "Product");
+  const title = escapeHtml(rawTitle);
+  const isDetox = isDetoxExperienceItem(it);
 
-      return `
-        <article class="card" data-id="${escapeHtml(id)}">
-          <a class="card-link" href="${productBase}${encodeURIComponent(id)}" aria-label="View ${title}">
-            <div class="media">
-              <img src="${escapeHtml(img)}" alt="${title}" loading="lazy"
-                onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';" />
-              <div class="shine" aria-hidden="true"></div>
+  const productUrl = `${productBase}${encodeURIComponent(id)}`;
+  const detoxUrl = detoxExperienceUrl;
+  const detoxPlansUrl = `${detoxExperienceUrl}#plans`;
+
+  const defaultDesc = isDetox
+    ? "A guided reset experience. Choose a single session or step into a membership for deeper consistency."
+    : "Tap to view details.";
+
+  const descRaw = String(it?.description || defaultDesc);
+  const desc = escapeHtml(descRaw.length > 126 ? descRaw.slice(0, 123) + "…" : descRaw);
+
+  const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
+  const price = money(it?.price_money);
+
+  return `
+    <article class="card ${isDetox ? "card--experience" : ""}" data-id="${escapeHtml(id)}">
+      <a
+        class="card-link"
+        href="${isDetox ? detoxUrl : productUrl}"
+        aria-label="${isDetox ? "Start " : "View "}${title}"
+      >
+        <div class="media">
+          <img
+            src="${escapeHtml(img)}"
+            alt="${title}"
+            loading="lazy"
+            onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';"
+          />
+          ${isDetox ? `<div class="badge badge--experience">Signature Experience</div>` : ""}
+          <div class="shine" aria-hidden="true"></div>
+        </div>
+
+        <div class="body">
+          <div class="row">
+            <h3 class="title">${title}</h3>
+            <div class="price">
+              ${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}
             </div>
-            <div class="body">
-              <div class="row">
-                <h3 class="title">${title}</h3>
-                <div class="price">${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}</div>
-              </div>
-              <p class="desc">${desc || "Tap to view details."}</p>
-            </div>
-          </a>
-          <div class="actions">
-            <button class="btn btn-primary add" type="button">Add to cart</button>
-            <a class="btn btn-ghost" href="${productBase}${encodeURIComponent(id)}">View</a>
           </div>
-        </article>
-      `;
-    };
+          <p class="desc">${desc}</p>
+        </div>
+      </a>
+
+      <div class="actions">
+        ${
+          isDetox
+            ? `<a class="btn btn-primary btn-reset" href="${detoxPlansUrl}">Start Your Reset</a>`
+            : `<button class="btn btn-primary add" type="button">Add to cart</button>`
+        }
+
+        <a class="btn btn-ghost" href="${isDetox ? detoxUrl : productUrl}">
+          ${isDetox ? "View Plans" : "View"}
+        </a>
+      </div>
+    </article>
+  `;
+};
 
     const render = (items) => {
       ALL = Array.isArray(items) ? items : [];
@@ -638,6 +693,13 @@ const ROUTES = {
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
     }
 
+    .card--experience {
+      border-color: rgba(200,162,74,.42);
+      box-shadow:
+        0 22px 60px rgba(0,0,0,.28),
+        0 0 0 1px rgba(200,162,74,.12) inset;
+    }
+
     .card-link {
       display: block;
       text-decoration: none;
@@ -662,6 +724,30 @@ const ROUTES = {
       inset: 0;
       background: radial-gradient(800px 260px at 50% 18%, transparent, rgba(0,0,0,.38));
       pointer-events: none;
+    }
+
+    .badge {
+      position: absolute;
+      z-index: 3;
+      top: 10px;
+      left: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255,255,255,.25);
+      box-shadow: 0 12px 24px rgba(0,0,0,.28);
+    }
+
+    .badge--experience {
+      color: #08130e;
+      background: linear-gradient(135deg, rgba(233,206,143,.98), rgba(200,162,74,.94));
     }
 
     .body { padding: 12px 12px 10px; }
@@ -699,6 +785,15 @@ const ROUTES = {
     }
 
     .actions .btn { flex: 1; }
+
+    .btn-reset {
+      background:
+        radial-gradient(120px 80px at 30% 10%, rgba(255,255,255,.22), transparent 70%),
+        linear-gradient(135deg, rgba(233,206,143,.98), rgba(200,162,74,.92));
+      color: #07120d;
+      border-color: rgba(233,206,143,.55);
+      box-shadow: 0 12px 28px rgba(200,162,74,.18);
+    }
 
     .empty {
       margin-top: 14px;
