@@ -1,5 +1,4 @@
 ---
-// /src/pages/index.astro
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const base = import.meta.env.BASE_URL || "/";
@@ -36,12 +35,9 @@ const ROUTES = {
   trial: u("/trial"),
   skincare: u("/category/skincare"),
   wellness: u("/category/wellness"),
+  market: u("/category/market"),
   product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
   category: (slug: string) => u(`/category/${encodeURIComponent(slug)}`),
-};
-
-const LINKS = {
-  community: "https://returntothegarden.co",
 };
 
 const EXT = { target: "_blank", rel: "noopener noreferrer" };
@@ -162,7 +158,7 @@ function formatMoney(pm?: Money | null) {
 
 function imageFallbackForCategory(slugOrName: string): string {
   const s = normalizeText(slugOrName);
-  if (s.includes("juice") || s.includes("beverage")) return CAT_JUICES;
+  if (s.includes("juice") || s.includes("beverage") || s.includes("lemonade") || s.includes("market")) return CAT_JUICES;
   if (s.includes("moss")) return CAT_SEAMOSS;
   if (s.includes("kit") || s.includes("cleanse") || s.includes("detox") || s.includes("bundle")) return CAT_KITS;
   if (s.includes("tea") || s.includes("herb") || s.includes("oil") || s.includes("gumm")) return CAT_HERBS;
@@ -337,6 +333,9 @@ const liveCollections: CollectionCard[] = categories
    CURATED PRODUCT STRIP
 ================ */
 const heroProductKeywords = [
+  "juice",
+  "lemonade",
+  "market",
   "sea moss",
   "detox",
   "tea",
@@ -347,8 +346,6 @@ const heroProductKeywords = [
   "herbal",
   "wellness",
   "skincare",
-  "juice",
-  "lemonade",
 ];
 
 const rankedProducts = [...activeProducts].sort((a, b) => {
@@ -365,36 +362,36 @@ const rankedProducts = [...activeProducts].sort((a, b) => {
 
 const launchProducts: ProductCard[] = rankedProducts.slice(0, 4).map((p, idx) => {
   const price = formatMoney(p.price_money || null);
+  const name = normalizeText(p.name);
 
   return {
     id: p.id,
     name: p.name,
     description:
-      (p.description || "").trim() || "A launch-ready ritual essential from the live catalog.",
+      (p.description || "").trim() || "A small-batch ritual essential from the live catalog.",
     href: ROUTES.product(p.id),
     img: p.image_url || imageFallbackForProduct(p.name),
     price: price || "View details",
     badge:
       idx === 0
-        ? "Launch Pick"
-        : normalizeText(p.name).includes("detox")
+        ? "Market Pick"
+        : name.includes("juice") || name.includes("lemonade")
+        ? "Fresh Pour"
+        : name.includes("detox")
         ? "Reset Ritual"
-        : normalizeText(p.name).includes("moss")
+        : name.includes("moss")
         ? "Mineral Favorite"
-        : normalizeText(p.name).includes("tea")
+        : name.includes("tea")
         ? "Calm Ritual"
-        : normalizeText(p.name).includes("juice")
-        ? "Hydration Ritual"
         : "Now Shopping",
   };
 });
 
 const collectionCount = liveCollections.length;
 const productCount = activeProducts.length;
-const hasLiveCatalog = collectionCount > 0 && productCount > 0;
 ---
 
-<BaseLayout title="Deeper Than Skin — Storefront">
+<BaseLayout title="Deeper Than Skin — Small-Batch Wellness Goods">
   <main>
     {/* HERO */}
     <section class="hero-banner" style={`background-image:url('${HERO_IMAGE}');`}>
@@ -407,17 +404,17 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
           <span class="hero-tagline">Wellness Rooted in Ritual</span>
         </div>
 
-        <h1 class="hero-title">Daily rituals for body, balance, and renewal.</h1>
+        <h1 class="hero-title">Small-batch juices, herbal drinks, and wellness rituals made in South Carolina.</h1>
 
         <p class="hero-lead">
-          Explore botanical essentials crafted to support your everyday flow, from hydration and body care
-          to mineral-rich wellness staples designed to fit naturally into your routine.
+          Deeper Than Skin crafts fresh wellness beverages, herbal lemonades, sea moss blends, body care,
+          and market-ready ritual goods in small batches for Columbia, Blythewood, and local South Carolina markets.
         </p>
 
         <div class="hero-meta">
-          <span class="hero-chip">Botanical wellness</span>
-          <span class="hero-chip">Guided starter kits</span>
-          <span class="hero-chip">Curated ritual drops</span>
+          <span class="hero-chip">Small-batch made</span>
+          <span class="hero-chip">Columbia & Blythewood, SC</span>
+          <span class="hero-chip">Market-ready wellness</span>
         </div>
 
         <div class="btns hero-ctas">
@@ -425,7 +422,7 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
           <a class="btn btn-ghost" href={ROUTES.shop}>Shop All</a>
         </div>
 
-        <p class="hero-micro">Personalized. Simple. No commitment.</p>
+        <p class="hero-micro">Fresh. Local. Crafted with care.</p>
       </div>
 
       <div class="hero-bottom-fade" aria-hidden="true"></div>
@@ -443,7 +440,7 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
           <h2 class="h2">Find your rhythm</h2>
 
           <p class="p">
-            Not sure where to begin? We’ll build your first personalized wellness ritual based on your goals,
+            Not sure where to begin? We’ll help shape your first wellness ritual around your goals,
             preferences, and lifestyle.
           </p>
 
@@ -463,7 +460,7 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
             <div class="funnel-step">
               <span>03</span>
               <strong>Start simple</strong>
-              <p>Begin with a trial kit, then adjust from there.</p>
+              <p>Begin with a trial kit, market favorite, or everyday essential.</p>
             </div>
           </div>
 
@@ -474,6 +471,28 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
 
           <p class="micro">
             The quiz may recommend juices, teas, sea moss, body care, or a blended starter kit.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {/* MARKET PROOF */}
+    <section class="section section--tight market-proof">
+      <div class="container market-proof__inner" data-aos="fade-up">
+        <div>
+          <div class="kicker">Local Market Ready</div>
+          <h2 class="h2">Crafted for Saturday market mornings.</h2>
+          <p class="p">
+            Our lineup is built around fresh juices, herbal lemonades, wellness shots, sea moss,
+            body care, and family-friendly market drinks prepared in small batches by Deeper Than Skin.
+          </p>
+        </div>
+
+        <div class="market-proof__card">
+          <strong>Producer-only fit</strong>
+          <p>
+            Made by us, bottled by us, served by us. No resale shelf clutter, just fresh ritual goods
+            crafted for local customers.
           </p>
         </div>
       </div>
@@ -498,8 +517,8 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
         </div>
 
         <div class="launch-stat launch-stat--wide">
-          <span class="launch-stat__label">Stay Close</span>
-          <strong>New rituals, restocks, and featured drops land here first.</strong>
+          <span class="launch-stat__label">Local Focus</span>
+          <strong>Small-batch wellness goods for Columbia, Blythewood, and nearby markets.</strong>
         </div>
       </div>
     </section>
@@ -643,9 +662,9 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
         <div class="footer-waitlist">
           <div class="footer-waitlist__copy">
             <div class="kicker">Stay Close</div>
-            <h2 class="h2">Stay close for relaunch access, restocks, and key drops</h2>
+            <h2 class="h2">Stay close for market drops, restocks, and relaunch access</h2>
             <p class="p">
-              Join the list for relaunch updates, early access, restocks, and the next drop in your ritual.
+              Join the list for early access, local market updates, restocks, and the next drop in your ritual.
             </p>
           </div>
 
@@ -676,7 +695,7 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
             <input type="hidden" name="consent" value="1" />
 
             <p class="footer-waitlist__note">
-              We’ll only email you about the relaunch, early access, restocks, and key drops.
+              We’ll only email you about local market updates, relaunch access, restocks, and key drops.
             </p>
 
             <div class="footer-waitlist__status" id="waitlist-status" aria-live="polite"></div>
@@ -805,7 +824,7 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
 
   .hero-title {
     margin: 0 0 14px;
-    max-width: 900px;
+    max-width: 980px;
     font-size: clamp(2.2rem, 5vw, 4.4rem);
     line-height: 0.98;
     letter-spacing: -0.03em;
@@ -923,6 +942,41 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
     color: rgba(255, 248, 239, 0.62);
     font-size: 0.94rem;
     line-height: 1.5;
+  }
+
+  .market-proof {
+    background:
+      radial-gradient(circle at top left, rgba(212, 178, 89, 0.12), transparent 30%),
+      linear-gradient(180deg, #092018 0%, #071611 100%);
+    border-top: 1px solid rgba(196, 158, 74, 0.12);
+    border-bottom: 1px solid rgba(196, 158, 74, 0.12);
+  }
+
+  .market-proof__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+    gap: 22px;
+    align-items: stretch;
+  }
+
+  .market-proof__card {
+    padding: 24px;
+    border-radius: 26px;
+    border: 1px solid rgba(224, 191, 105, 0.18);
+    background: rgba(255, 248, 239, 0.045);
+  }
+
+  .market-proof__card strong {
+    display: block;
+    color: #fff8ef;
+    font-size: 1.25rem;
+    margin-bottom: 10px;
+  }
+
+  .market-proof__card p {
+    margin: 0;
+    color: rgba(255, 248, 239, 0.72);
+    line-height: 1.55;
   }
 
   .launch-strip {
@@ -1270,7 +1324,7 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    color: rgba(31,255,255,0.82);
+    color: rgba(31, 30, 27, 0.82);
     font-size: 0.98rem;
     font-weight: 600;
   }
@@ -1307,6 +1361,10 @@ const hasLiveCatalog = collectionCount > 0 && productCount > 0;
   @media (max-width: 720px) {
     .hero-title {
       font-size: clamp(1.95rem, 10vw, 3rem);
+    }
+
+    .market-proof__inner {
+      grid-template-columns: 1fr;
     }
 
     .launch-strip__inner {

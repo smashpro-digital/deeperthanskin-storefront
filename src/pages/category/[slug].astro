@@ -19,6 +19,8 @@ const { slug: slugParam } = Astro.params;
 const rawSlug = String(slugParam || "").trim().toLowerCase();
 
 const SLUG_ALIASES: Record<string, string> = {
+  market: "market",
+  "lake-carolina-market": "market",
   seamoss: "sea-moss-gel",
   "sea-moss": "sea-moss-gel",
   "sea-moss-gel": "sea-moss-gel",
@@ -37,9 +39,12 @@ const SLUG_ALIASES: Record<string, string> = {
 const apiSlug = SLUG_ALIASES[rawSlug] || rawSlug;
 const pageSlug = apiSlug;
 const isBeveragesPage = pageSlug === "beverages";
+const isMarketPage = pageSlug === "market";
 
 export async function getStaticPaths() {
   const slugs = [
+    "market",
+    "lake-carolina-market",
     "skincare",
     "wellness",
     "beverages",
@@ -91,6 +96,7 @@ const prettyTitleFromSlug = (s: string) =>
     .replace(/\b\w/g, (m) => m.toUpperCase());
 
 const TITLE_MAP: Record<string, string> = {
+  market: "Fresh Market",
   skincare: "Skincare",
   wellness: "Wellness",
   beverages: "Daily Hydration Elixirs",
@@ -107,6 +113,8 @@ const TITLE_MAP: Record<string, string> = {
 };
 
 const SUBTITLE_MAP: Record<string, string> = {
+  market:
+    "Preview the fresh pours, botanical lemonades, kids treats, and small-batch wellness goods coming to our local market table.",
   skincare: "Curated ritual-grade skincare for glow, softness, and restoration.",
   wellness: "Daily support for balance, vitality, and intentional living.",
   beverages: "Cold-pressed botanical beverages crafted for renewal.",
@@ -122,9 +130,17 @@ const SUBTITLE_MAP: Record<string, string> = {
   "skincare-bundles": "Layered essentials for a complete skin ritual.",
 };
 
+const KICKER_MAP: Record<string, string> = {
+  market: "Local Market Preview",
+  skincare: "Botanical Ritual",
+  wellness: "Botanical Ritual",
+  beverages: "Fresh Botanical Pour",
+};
+
 const pageTitle = TITLE_MAP[pageSlug] || prettyTitleFromSlug(pageSlug) || "Category";
 const pageSubtitle =
   SUBTITLE_MAP[pageSlug] || "Browse curated essentials. Add to cart, then checkout when ready.";
+const pageKicker = KICKER_MAP[pageSlug] || "Botanical Ritual";
 
 const fallbackImg = `${base}images/product-fallback.jpg`;
 
@@ -138,20 +154,24 @@ const ROUTES = {
 ---
 
 <BaseLayout title={`${pageTitle} | Deeper Than Skin`}>
-  <main class="section category-page">
+  <main class={`section category-page ${isMarketPage ? "market-page" : ""}`}>
     <div class="container">
       <div class="toprow">
-        <a class="crumb" href={ROUTES.shop}>← Back to Shop</a>
+        <a class="crumb" href={isMarketPage ? ROUTES.featured : ROUTES.shop}>
+          ← {isMarketPage ? "Back to Featured" : "Back to Shop"}
+        </a>
 
-        <button id="cartPill" class="cartpill" type="button" aria-label="View cart">
-          <span class="cartpill-dot" aria-hidden="true"></span>
-          <span>Cart</span>
-          <span id="cartCount" class="cartpill-count">0</span>
-        </button>
+        {!isMarketPage && (
+          <button id="cartPill" class="cartpill" type="button" aria-label="View cart">
+            <span class="cartpill-dot" aria-hidden="true"></span>
+            <span>Cart</span>
+            <span id="cartCount" class="cartpill-count">0</span>
+          </button>
+        )}
       </div>
 
       <section
-        class="hero"
+        class={`hero ${isMarketPage ? "hero--market" : ""}`}
         style={`--hero:url('${fallbackImg}');`}
         data-cat-slug={apiSlug}
         data-categories-endpoint={categoriesEndpoint}
@@ -159,30 +179,63 @@ const ROUTES = {
       >
         <div class="hero-bg" aria-hidden="true"></div>
         <div class="hero-inner">
-          <div class="kicker kicker--light">Botanical Ritual</div>
+          <div class="kicker kicker--light">{pageKicker}</div>
           <h1 class="hero-title">{pageTitle}</h1>
           <p class="hero-sub">{pageSubtitle}</p>
+
           <div class="hero-actions">
-            <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
-            <a class="btn btn-ghost" href={ROUTES.cart}>View Cart</a>
+            {isMarketPage ? (
+              <>
+                <a class="btn btn-primary" href="#market-menu">Preview Menu</a>
+                <a class="btn btn-ghost" href={ROUTES.featured}>Explore Featured</a>
+              </>
+            ) : (
+              <>
+                <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
+                <a class="btn btn-ghost" href={ROUTES.cart}>View Cart</a>
+              </>
+            )}
           </div>
         </div>
       </section>
 
-      {isBeveragesPage && (
-        <BeverageQuestionnaire
-          title="Build Your Custom Juice Plan"
-          categorySlug={pageSlug}
-        />
+      {isMarketPage && (
+        <section class="market-note" aria-label="Market information">
+          <div>
+            <p class="kicker">How this works</p>
+            <h2>Preview here. Purchase at the market.</h2>
+            <p>
+              Use this page to explore what may be available at our table. Tap an item for
+              details, but market preview cards do not add items to website checkout.
+            </p>
+          </div>
+          <div class="market-note-card">
+            <strong>Market Day Focus</strong>
+            <span>Fresh pours, bundles, seasonal specials, and limited small-batch goods.</span>
+          </div>
+        </section>
       )}
 
-      <section class="panel" style="margin-top:18px">
+      {isBeveragesPage && (
+        <BeverageQuestionnaire title="Build Your Custom Juice Plan" categorySlug={pageSlug} />
+      )}
+
+      <section id="market-menu" class="panel" style="margin-top:18px">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Products</h2>
-            <p class="panel-sub">Tap a card for details, or start a guided experience.</p>
+            <h2 class="panel-title">{isMarketPage ? "Market Preview" : "Products"}</h2>
+            <p class="panel-sub">
+              {isMarketPage
+                ? "Tap any item to view details. Purchase happens in person at the market."
+                : "Tap a card for details, or start a guided experience."}
+            </p>
           </div>
-          <input id="q" class="search" type="search" placeholder="Search this category…" />
+          <input
+            id="q"
+            class="search"
+            type="search"
+            placeholder={isMarketPage ? "Search the market menu…" : "Search this category…"}
+          />
         </div>
 
         <div
@@ -193,6 +246,7 @@ const ROUTES = {
           data-base={base}
           data-product-base={ROUTES.productBase}
           data-detox-experience={ROUTES.detoxExperience}
+          data-market-mode={isMarketPage ? "education" : "shop"}
         >
           {Array.from({ length: 8 }).map(() => (
             <div class="card skel-card" aria-hidden="true">
@@ -208,11 +262,17 @@ const ROUTES = {
 
         <div id="empty" class="empty" hidden>
           <div class="kicker">Notice</div>
-          <h3 class="h2" style="margin:6px 0 8px">No products found</h3>
-          <p class="p">This ritual is available, but it doesn’t have visible products yet.</p>
+          <h3 class="h2" style="margin:6px 0 8px">
+            {isMarketPage ? "Market menu is being prepared" : "No products found"}
+          </h3>
+          <p class="p">
+            {isMarketPage
+              ? "This preview is ready, but visible market items have not loaded yet."
+              : "This ritual is available, but it doesn’t have visible products yet."}
+          </p>
           <div class="hero-actions" style="margin-top:14px">
-            <a class="btn btn-primary" href={ROUTES.shop}>Shop All</a>
-            <a class="btn btn-ghost" href={ROUTES.featured}>View Featured</a>
+            <a class="btn btn-primary" href={ROUTES.featured}>View Featured</a>
+            <a class="btn btn-ghost" href={ROUTES.shop}>Shop All</a>
           </div>
         </div>
       </section>
@@ -274,7 +334,10 @@ const ROUTES = {
     const fallback = grid.getAttribute("data-fallback") || "";
     const base = grid.getAttribute("data-base") || "/";
     const productBase = grid.getAttribute("data-product-base") || base + "product/";
-    const detoxExperienceUrl = grid.getAttribute("data-detox-experience") || base + "detox-experience";
+    const detoxExperienceUrl =
+      grid.getAttribute("data-detox-experience") || base + "detox-experience";
+    const marketMode = grid.getAttribute("data-market-mode") || "shop";
+    const isMarketEducation = marketMode === "education";
 
     const escapeHtml = (s) =>
       String(s || "")
@@ -390,7 +453,7 @@ const ROUTES = {
         const first = unwrapItems(data)[0] || null;
         const img = String(first?.image_url || "").trim();
 
-        if (img) {
+        if (img && !isMarketEducation) {
           hero.style.setProperty("--hero", `url('${img}')`);
           return;
         }
@@ -401,69 +464,76 @@ const ROUTES = {
 
     let ALL = [];
 
-  const cardHtml = (it) => {
-  const id = String(it?.id || it?.product_id || "");
-  const rawTitle = String(it?.name || it?.title || "Product");
-  const title = escapeHtml(rawTitle);
-  const isDetox = isDetoxExperienceItem(it);
+    const cardHtml = (it) => {
+      const id = String(it?.id || it?.product_id || "");
+      const rawTitle = String(it?.name || it?.title || "Product");
+      const title = escapeHtml(rawTitle);
+      const isDetox = isDetoxExperienceItem(it);
 
-  const productUrl = `${productBase}${encodeURIComponent(id)}`;
-  const detoxUrl = detoxExperienceUrl;
-  const detoxPlansUrl = `${detoxExperienceUrl}#plans`;
+      const productUrl = `${productBase}${encodeURIComponent(id)}`;
+      const detoxUrl = detoxExperienceUrl;
+      const detoxPlansUrl = `${detoxExperienceUrl}#plans`;
 
-  const defaultDesc = isDetox
-    ? "A guided reset experience. Choose a single session or step into a membership for deeper consistency."
-    : "Tap to view details.";
+      const defaultDesc = isMarketEducation
+        ? "A market-day preview item. Availability may vary by event and season."
+        : isDetox
+          ? "A guided reset experience. Choose a single session or step into a membership for deeper consistency."
+          : "Tap to view details.";
 
-  const descRaw = String(it?.description || defaultDesc);
-  const desc = escapeHtml(descRaw.length > 126 ? descRaw.slice(0, 123) + "…" : descRaw);
+      const descRaw = String(it?.description || defaultDesc);
+      const desc = escapeHtml(descRaw.length > 126 ? descRaw.slice(0, 123) + "…" : descRaw);
 
-  const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
-  const price = money(it?.price_money);
+      const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
+      const price = isMarketEducation ? "Market Item" : money(it?.price_money);
 
-  return `
-    <article class="card ${isDetox ? "card--experience" : ""}" data-id="${escapeHtml(id)}">
-      <a
-        class="card-link"
-        href="${isDetox ? detoxUrl : productUrl}"
-        aria-label="${isDetox ? "Start " : "View "}${title}"
-      >
-        <div class="media">
-          <img
-            src="${escapeHtml(img)}"
-            alt="${title}"
-            loading="lazy"
-            onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';"
-          />
-          ${isDetox ? `<div class="badge badge--experience">Signature Experience</div>` : ""}
-          <div class="shine" aria-hidden="true"></div>
-        </div>
+      const linkHref = isDetox ? detoxUrl : productUrl;
 
-        <div class="body">
-          <div class="row">
-            <h3 class="title">${title}</h3>
-            <div class="price">
-              ${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}
+      return `
+        <article class="card ${isDetox ? "card--experience" : ""} ${isMarketEducation ? "card--market" : ""}" data-id="${escapeHtml(id)}">
+          <a
+            class="card-link"
+            href="${linkHref}"
+            aria-label="${isMarketEducation ? "View details for " : isDetox ? "Start " : "View "}${title}"
+          >
+            <div class="media">
+              <img
+                src="${escapeHtml(img)}"
+                alt="${title}"
+                loading="lazy"
+                onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';"
+              />
+              ${isMarketEducation ? `<div class="badge badge--experience">At Market</div>` : ""}
+              ${isDetox ? `<div class="badge badge--experience">Signature Experience</div>` : ""}
+              <div class="shine" aria-hidden="true"></div>
             </div>
+
+            <div class="body">
+              <div class="row">
+                <h3 class="title">${title}</h3>
+                <div class="price">
+                  ${price ? escapeHtml(price) : "<span style='opacity:.7'>Details</span>"}
+                </div>
+              </div>
+              <p class="desc">${desc}</p>
+            </div>
+          </a>
+
+          <div class="actions">
+            ${
+              isMarketEducation
+                ? `<span class="btn btn-primary btn-reset btn-static" aria-label="Available at market only">Available at Market</span>`
+                : isDetox
+                  ? `<a class="btn btn-primary btn-reset" href="${detoxPlansUrl}">Start Your Reset</a>`
+                  : `<button class="btn btn-primary add" type="button">Add to cart</button>`
+            }
+
+            <a class="btn btn-ghost" href="${linkHref}">
+              ${isMarketEducation ? "View Details" : isDetox ? "View Plans" : "View"}
+            </a>
           </div>
-          <p class="desc">${desc}</p>
-        </div>
-      </a>
-
-      <div class="actions">
-        ${
-          isDetox
-            ? `<a class="btn btn-primary btn-reset" href="${detoxPlansUrl}">Start Your Reset</a>`
-            : `<button class="btn btn-primary add" type="button">Add to cart</button>`
-        }
-
-        <a class="btn btn-ghost" href="${isDetox ? detoxUrl : productUrl}">
-          ${isDetox ? "View Plans" : "View"}
-        </a>
-      </div>
-    </article>
-  `;
-};
+        </article>
+      `;
+    };
 
     const render = (items) => {
       ALL = Array.isArray(items) ? items : [];
@@ -485,6 +555,8 @@ const ROUTES = {
 
       if (empty) empty.hidden = true;
       grid.innerHTML = filtered.map(cardHtml).join("");
+
+      if (isMarketEducation) return;
 
       grid.querySelectorAll(".card").forEach((card) => {
         const id = card.getAttribute("data-id");
@@ -527,8 +599,8 @@ const ROUTES = {
 
         grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
           <div class="kicker">Error</div>
-          <h3 class="h2" style="margin:6px 0 8px">Couldn’t load products</h3>
-          <p class="p">The storefront loaded, but the product API rejected the request.</p>
+          <h3 class="h2" style="margin:6px 0 8px">Couldn’t load items</h3>
+          <p class="p">The page loaded, but the catalog API rejected the request.</p>
         </div>`;
       }
     }
@@ -590,6 +662,11 @@ const ROUTES = {
       min-height: 300px;
     }
 
+    .hero--market {
+      min-height: 340px;
+      border-color: rgba(200,162,74,.28);
+    }
+
     .hero-bg {
       position: absolute;
       inset: 0;
@@ -606,6 +683,12 @@ const ROUTES = {
       background:
         radial-gradient(900px 520px at 50% 28%, rgba(200,162,74,.20), transparent 60%),
         linear-gradient(180deg, rgba(6,12,9,.20), rgba(6,12,9,.84));
+    }
+
+    .hero--market .hero-bg::after {
+      background:
+        linear-gradient(90deg, rgba(6,12,9,.88), rgba(6,12,9,.45), rgba(6,12,9,.74)),
+        linear-gradient(180deg, rgba(6,12,9,.18), rgba(6,12,9,.86));
     }
 
     .hero-inner {
@@ -638,6 +721,55 @@ const ROUTES = {
       gap: 10px;
       margin-top: 14px;
       flex-wrap: wrap;
+    }
+
+    .market-note {
+      display: grid;
+      grid-template-columns: 1fr minmax(220px, 340px);
+      gap: 16px;
+      align-items: stretch;
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 26px;
+      border: 1px solid rgba(200,162,74,.22);
+      background:
+        radial-gradient(520px 220px at 18% 0%, rgba(200,162,74,.12), transparent 65%),
+        rgba(0,0,0,.16);
+    }
+
+    .market-note h2 {
+      margin: 4px 0 8px;
+      font-family: var(--font-display);
+      font-size: clamp(22px, 3vw, 34px);
+      line-height: 1;
+    }
+
+    .market-note p {
+      margin: 0;
+      max-width: 72ch;
+      opacity: .84;
+      line-height: 1.55;
+    }
+
+    .market-note-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      padding: 16px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.045);
+    }
+
+    .market-note-card strong {
+      color: rgba(233,206,143,.98);
+    }
+
+    .market-note-card span {
+      opacity: .78;
+      line-height: 1.45;
+      font-size: 13px;
     }
 
     .panel {
@@ -693,6 +825,12 @@ const ROUTES = {
       box-shadow: 0 18px 46px rgba(0,0,0,.22);
     }
 
+    .card--market {
+      border-color: rgba(200,162,74,.24);
+      background: rgba(255,255,255,.93);
+      color: #11170f;
+    }
+
     .card--experience {
       border-color: rgba(200,162,74,.42);
       box-shadow:
@@ -724,6 +862,10 @@ const ROUTES = {
       inset: 0;
       background: radial-gradient(800px 260px at 50% 18%, transparent, rgba(0,0,0,.38));
       pointer-events: none;
+    }
+
+    .card--market .shine {
+      background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.20));
     }
 
     .badge {
@@ -768,6 +910,14 @@ const ROUTES = {
     .price {
       white-space: nowrap;
       font-weight: 750;
+      font-size: 12px;
+      color: rgba(200,162,74,.98);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .card--market .price {
+      color: #7b5d18;
     }
 
     .desc {
@@ -793,6 +943,11 @@ const ROUTES = {
       color: #07120d;
       border-color: rgba(233,206,143,.55);
       box-shadow: 0 12px 28px rgba(200,162,74,.18);
+    }
+
+    .btn-static {
+      cursor: default;
+      pointer-events: none;
     }
 
     .empty {
@@ -824,6 +979,7 @@ const ROUTES = {
 
     @media (max-width: 920px) {
       .card { grid-column: span 6; }
+      .market-note { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 560px) {

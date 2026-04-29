@@ -18,6 +18,7 @@ const ROUTES = {
   shop: `${base}shop`,
   featured: `${base}featured`,
   wellness: `${base}category/wellness`,
+  market: `${base}category/market#market-menu`,
   cart: `${base}cart`,
 };
 
@@ -34,6 +35,16 @@ type ProductListItem = {
   brand?: string;
   slug?: string;
   gallery?: string[];
+  category_id?: string;
+  category_ids?: string[];
+  category_slug?: string;
+  category_slugs?: string[];
+  categories?: Array<{
+    id?: string;
+    slug?: string;
+    name?: string;
+    parent_id?: string | null;
+  }>;
   one_time?: {
     enabled?: boolean;
     variation_id?: string;
@@ -42,20 +53,7 @@ type ProductListItem = {
   };
   subscription?: {
     enabled?: boolean;
-    headline?: string;
-    subheadline?: string;
-    cancellation_summary?: string;
-    shipping_summary?: string;
-    options?: Array<{
-      id: string;
-      label?: string;
-      badge?: string;
-      description?: string;
-      enabled?: boolean;
-      discount_percent?: number;
-      subscriber_price_money?: { amount: number; currency?: string };
-      compare_at_price_money?: { amount: number; currency?: string };
-    }>;
+    options?: Array<any>;
   };
   policies?: {
     checkout_summary?: string;
@@ -77,6 +75,20 @@ function extractItems(payload: any): ProductListItem[] {
             : [];
 }
 
+function publicApiUrl(path: string, params: Record<string, string | number | boolean> = {}) {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value) !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
 export async function getStaticPaths() {
   const apiRoot =
     (import.meta.env.PUBLIC_COMMERCE_API_ROOT as string | undefined) ||
@@ -86,7 +98,6 @@ export async function getStaticPaths() {
     (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
     "deeper-than-skin";
 
-  // 👇 INLINE everything (no external helpers)
   const url = new URL(apiRoot);
   url.searchParams.set("path", "public/commerce/products");
   url.searchParams.set("app_slug", appSlug);
@@ -99,32 +110,30 @@ export async function getStaticPaths() {
 
     const text = await res.text();
 
-    if (!res.ok) {
-      console.error("[product/[id]] getStaticPaths HTTP error:", res.status, text.slice(0, 300));
-      return [];
-    }
-
-    if (text.trim().startsWith("<")) {
-      console.error("[product/[id]] getStaticPaths received HTML instead of JSON");
+    if (!res.ok || text.trim().startsWith("<")) {
+      console.error(
+        "[product/[id]] getStaticPaths failed response:",
+        res.status,
+        text.slice(0, 300)
+      );
       return [];
     }
 
     const data = JSON.parse(text);
 
-    // 👇 INLINE extractItems logic
     const items: ProductListItem[] = (
-  Array.isArray(data?.items)
-    ? data.items
-    : Array.isArray(data?.products)
-      ? data.products
-      : Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray(data?.results)
-          ? data.results
-          : Array.isArray(data)
-            ? data
-            : []
-) as ProductListItem[];
+      Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.products)
+          ? data.products
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.results)
+              ? data.results
+              : Array.isArray(data)
+                ? data
+                : []
+    ) as ProductListItem[];
 
     return items
       .map((item) => {
@@ -139,6 +148,9 @@ export async function getStaticPaths() {
               name: item?.name || item?.title || "Product",
               image_url: item?.image_url || item?.image || "",
               slug: item?.slug || "",
+              category_slug: item?.category_slug || "",
+              category_slugs: item?.category_slugs || [],
+              categories: item?.categories || [],
             },
           },
         };
@@ -148,19 +160,6 @@ export async function getStaticPaths() {
     console.error("[product/[id]] getStaticPaths failed:", error);
     return [];
   }
-}
-function publicApiUrl(path: string, params: Record<string, string | number | boolean> = {}) {
-  const url = new URL(API_ROOT);
-  url.searchParams.set("path", path);
-  url.searchParams.set("app_slug", APP_SLUG);
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && String(value) !== "") {
-      url.searchParams.set(key, String(value));
-    }
-  });
-
-  return url.toString();
 }
 
 const { id } = Astro.params;
@@ -266,12 +265,6 @@ const pageTitle = productSeed?.name
       }
     })();
 
-    /** @type {{
-     *   mode: "one-time" | "subscription";
-     *   selectedSubscriptionOptionId: string;
-     *   pdp: any;
-     *   qty: number;
-     * }} */
     const state = {
       mode: "one-time",
       selectedSubscriptionOptionId: "",
@@ -306,6 +299,7 @@ const pageTitle = productSeed?.name
           ...(options.headers || {}),
         },
       });
+
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 180)}`);
       if (text.trim().startsWith("<")) throw new Error("Non-JSON response");
@@ -344,6 +338,8 @@ const pageTitle = productSeed?.name
       if (/glow|radiant|luminous/.test(text)) push("Healthy glow");
       if (/daily|ritual|everyday/.test(text)) push("Daily ritual care");
       if (/calm|soothe|comfort/.test(text)) push("Comforting care");
+      if (/juice|lemonade|fresh|pressed|pour/.test(text)) push("Fresh market pour");
+      if (/market|bundle|special/.test(text)) push("Market-day favorite");
 
       if (!picks.length) {
         push("Daily ritual care");
@@ -352,6 +348,19 @@ const pageTitle = productSeed?.name
       }
 
       return picks.slice(0, 4);
+    }
+
+    function isMarketOnlyProduct(product) {
+      const primarySlug = String(product?.category_slug || "").toLowerCase();
+
+      if (primarySlug === "market" || primarySlug === "lake-carolina-market") {
+        return true;
+      }
+
+      const categories = Array.isArray(product?.categories) ? product.categories : [];
+      const primaryCategory = categories[0]?.slug ? String(categories[0].slug).toLowerCase() : "";
+
+      return primaryCategory === "market" || primaryCategory === "lake-carolina-market";
     }
 
     function extractItems(payload) {
@@ -376,21 +385,33 @@ const pageTitle = productSeed?.name
     }
 
     function normalizePdpResponse(product) {
+      const marketOnly = isMarketOnlyProduct(product);
+
       const oneTime =
         product?.one_time || {
-          enabled: !!(product?.variation_id || product?.variationId || product?.price_money),
+          enabled: !marketOnly && !!(product?.variation_id || product?.variationId || product?.price_money),
           variation_id: product?.one_time?.variation_id || product?.variation_id || product?.variationId || "",
           has_price: !!(product?.one_time?.price_money || product?.price_money),
           price_money: product?.one_time?.price_money || product?.price_money || null,
         };
 
-      const subscription = product?.subscription || {
-        enabled: false,
-        options: [],
-      };
+      if (marketOnly) {
+        oneTime.enabled = false;
+      }
+
+      const subscription = marketOnly
+        ? { enabled: false, options: [] }
+        : product?.subscription || {
+            enabled: false,
+            options: [],
+          };
 
       return {
         ok: true,
+        availability: {
+          market_only: marketOnly,
+          label: marketOnly ? "Available at Market" : "Available online",
+        },
         product: {
           id: product?.id || product?.product_id || wantedId,
           name: product?.name || product?.title || seed?.name || "Product",
@@ -398,6 +419,9 @@ const pageTitle = productSeed?.name
           image_url: product?.image_url || product?.image || seed?.image_url || "",
           brand: product?.brand || "Deeper Than Skin",
           gallery: Array.isArray(product?.gallery) ? product.gallery : [],
+          category_slug: product?.category_slug || "",
+          category_slugs: Array.isArray(product?.category_slugs) ? product.category_slugs : [],
+          categories: Array.isArray(product?.categories) ? product.categories : [],
         },
         one_time: oneTime,
         subscription,
@@ -412,6 +436,17 @@ const pageTitle = productSeed?.name
     }
 
     function renderPriceBlock() {
+      if (state.pdp?.availability?.market_only) {
+        return `
+          <div class="price-stack market-price-stack">
+            <div class="price market-price">${escapeHtml(state.pdp.availability.label)}</div>
+            <div class="price-subrow">
+              <span class="save-badge">In-person purchase</span>
+            </div>
+          </div>
+        `;
+      }
+
       const oneTime = state.pdp?.one_time;
       const selected = getSelectedOption();
 
@@ -500,6 +535,10 @@ const pageTitle = productSeed?.name
     }
 
     function renderPurchaseModes(pdp) {
+      if (pdp?.availability?.market_only) {
+        return "";
+      }
+
       const hasOneTime = !!pdp?.one_time?.enabled;
       const hasSub = !!pdp?.subscription?.enabled;
 
@@ -535,6 +574,22 @@ const pageTitle = productSeed?.name
     }
 
     function renderCtas(pdp) {
+      if (pdp?.availability?.market_only) {
+        return `
+          <div class="market-only-card">
+            <div class="kicker">Market item</div>
+            <h3>Available at the market table</h3>
+            <p>
+              This item is listed for education and preview only. Purchase happens in person at the market.
+            </p>
+            <div class="btns btns-col">
+              <a class="btn btn-primary btn-wide" href="${escapeHtml(routes.market || `${base}category/market#market-menu`)}">Back to Market Preview</a>
+              <a class="btn btn-ghost btn-wide" href="${escapeHtml(routes.featured || `${base}featured`)}">Explore Featured</a>
+            </div>
+          </div>
+        `;
+      }
+
       const oneTime = pdp?.one_time;
       const hasCart = !!oneTime?.enabled;
       const hasSubscription = !!pdp?.subscription?.enabled;
@@ -594,9 +649,13 @@ const pageTitle = productSeed?.name
       `;
     }
 
-    function renderAccordions(desc, benefits) {
+    function renderAccordions(desc, benefits, pdp) {
       const cleanDesc = normalizeDesc(desc);
       const benefitList = benefits.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
+
+      const howToUse = pdp?.availability?.market_only
+        ? "Visit the market table, ask what is fresh that day, and choose your pour or bundle in person."
+        : "Warm a small amount between palms and massage into clean, dry or slightly damp skin as part of your daily ritual.";
 
       return `
         <section class="details-block">
@@ -617,7 +676,7 @@ const pageTitle = productSeed?.name
           <details class="detail-item">
             <summary>How to use</summary>
             <div class="detail-copy">
-              <p>Warm a small amount between palms and massage into clean, dry or slightly damp skin as part of your daily ritual.</p>
+              <p>${escapeHtml(howToUse)}</p>
             </div>
           </details>
         </section>
@@ -625,6 +684,20 @@ const pageTitle = productSeed?.name
     }
 
     function bindEvents(pdp) {
+      if (pdp?.availability?.market_only) {
+        root.querySelectorAll("[data-gallery]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const src = btn.getAttribute("data-gallery") || "";
+            const main = root.querySelector(".media img");
+            if (main && src) main.src = src;
+
+            root.querySelectorAll("[data-gallery]").forEach((x) => x.classList.remove("is-active"));
+            btn.classList.add("is-active");
+          });
+        });
+        return;
+      }
+
       const showErr = (msg) => {
         const el = root.querySelector("#err");
         if (!el) return;
@@ -809,7 +882,7 @@ const pageTitle = productSeed?.name
         </div>
 
         <div class="prod-right">
-          <div class="pill">${escapeHtml(pdp?.product?.brand || "Deeper Than Skin")}</div>
+          <div class="pill">${escapeHtml(pdp?.availability?.label || pdp?.product?.brand || "Deeper Than Skin")}</div>
 
           <h1 class="title">${name}</h1>
 
@@ -821,12 +894,12 @@ const pageTitle = productSeed?.name
             ${benefits.map((b) => `<span>${escapeHtml(b)}</span>`).join("")}
           </div>
 
-          <div class="buy-card">
+          <div class="buy-card ${pdp?.availability?.market_only ? "buy-card--market" : ""}">
             ${renderPurchaseModes(pdp)}
             ${renderCtas(pdp)}
           </div>
 
-          ${renderAccordions(rawDesc, benefits)}
+          ${renderAccordions(rawDesc, benefits, pdp)}
         </div>
       `;
 
@@ -966,6 +1039,7 @@ const pageTitle = productSeed?.name
       border:1px solid var(--line-2);
       background:rgba(255,255,255,.02);
       padding:0;
+      cursor:pointer;
     }
 
     .thumb img{
@@ -1023,6 +1097,12 @@ const pageTitle = productSeed?.name
       letter-spacing:-.02em;
     }
 
+    .market-price{
+      color:var(--gold-2);
+      font-size:1.35rem;
+      letter-spacing:.02em;
+    }
+
     .price-subrow{
       display:flex;
       align-items:center;
@@ -1073,6 +1153,28 @@ const pageTitle = productSeed?.name
       border:1px solid var(--line);
       background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
       box-shadow:var(--shadow);
+    }
+
+    .buy-card--market{
+      border-color:rgba(204,181,108,.28);
+      background:
+        radial-gradient(420px 180px at 18% 0%, rgba(204,181,108,.16), transparent 65%),
+        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+    }
+
+    .market-only-card{
+      padding:4px;
+    }
+
+    .market-only-card h3{
+      margin:8px 0 8px;
+      font-size:1.25rem;
+    }
+
+    .market-only-card p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.6;
     }
 
     .buy-card-head{
@@ -1292,7 +1394,7 @@ const pageTitle = productSeed?.name
       display:grid;
       grid-template-columns:1fr;
       gap:10px;
-      margin-top:0;
+      margin-top:16px;
     }
 
     .btn{
