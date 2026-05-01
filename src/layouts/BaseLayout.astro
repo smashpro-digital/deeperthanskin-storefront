@@ -35,6 +35,7 @@ const ROUTES = {
   cart: u("/cart"),
   checkout: u("/checkout"),
   search: u("/search"),
+  signup: u("/signup"),
   category: (slug: string) => u(`/category/${encodeURIComponent(slug)}`),
   product: (id: string) => u(`/product/${encodeURIComponent(id)}`),
 };
@@ -210,6 +211,7 @@ const canonical = (() => {
             <a href={ROUTES.cart}>Cart</a>
             <a href={LINKS.book} {...EXT}>Book Appointment</a>
             <a href={LINKS.squareShop} {...EXT}>Shop on Square</a>
+            <a href={ROUTES.signup} {...EXT}>Join Mailing List</a>
           </nav>
         </div>
 
