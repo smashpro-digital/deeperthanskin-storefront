@@ -1,19 +1,5 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-
-const base = import.meta.env.BASE_URL || "/";
-
-const u = (path: string) => {
-  const b = base.endsWith("/") ? base.slice(0, -1) : base;
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return `${b}${p}`;
-};
-
-const ROUTES = {
-  home: u("/"),
-  start: u("/start"),
-  signup: u("/signup"),
-};
 ---
 
 <BaseLayout
@@ -25,8 +11,6 @@ const ROUTES = {
     <section class="trial-section">
       <div class="container trial-container">
         <p class="page-masthead">Deeper Than Skin • Starter Kit Builder</p>
-        <a class="back-link" href={ROUTES.start}>← Back to Start</a>
-
         <form class="quiz-card" id="ritual-quiz" method="post" novalidate>
           <div class="quiz-intake" id="quiz-intake">
             <div class="quiz-head">
@@ -170,7 +154,6 @@ const ROUTES = {
                 </a>
 
                 <div class="secondary-actions">
-                  <a class="secondary-cta" href={ROUTES.signup}>Not ready? Join the Ritual List</a>
                   <button class="adjust-button" type="button" id="reset-quiz">
                     Adjust My Answers
                   </button>
@@ -194,29 +177,10 @@ const ROUTES = {
 </BaseLayout>
 
 <script is:inline>
-  (() => {
+  document.addEventListener("DOMContentLoaded", () => {
     const DEFAULT_PAY_LINK = "https://square.link/u/Xahltphb";
     const QUIZ_LEAD_ENDPOINT =
       "https://smashpro.app/api/v1/index.php?path=public/quiz-lead&app_slug=deeper-than-skin";
-
-    const notifyQuizLead = (payload) => {
-      fetch(QUIZ_LEAD_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain",
-        },
-        body: JSON.stringify(payload),
-        mode: "cors",
-      })
-        .then((response) => {
-          if (!response.ok) {
-            console.warn("[trial] quiz lead notification failed", response.status);
-          }
-        })
-        .catch((error) => {
-          console.warn("[trial] quiz lead notification failed", error);
-        });
-    };
 
     // Create matching Square items/payment links for each kit slug:
     // balanced-starter-kit
@@ -304,6 +268,8 @@ const ROUTES = {
       errorEl.style.display = "none";
     };
 
+    const getFieldValue = (selector) => form.querySelector(selector)?.value.trim() || "";
+
     const getValues = (name) =>
       Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
 
@@ -341,10 +307,6 @@ const ROUTES = {
       const hasPlaceholder = !rawLink || rawLink === "PASTE_SQUARE_LINK_HERE";
       const link = hasPlaceholder ? DEFAULT_PAY_LINK : rawLink;
 
-      if (hasPlaceholder && import.meta.env.DEV) {
-        console.warn(`[trial] Missing Square link for ${kitSlug}; using fallback.`);
-      }
-
       return link;
     };
 
@@ -359,17 +321,17 @@ const ROUTES = {
     };
 
     form.addEventListener("submit", async (event) => {
+      console.log("[trial] submit intercepted");
       event.preventDefault();
       event.stopPropagation();
-      console.log("[trial] submit intercepted");
 
       hideError();
 
-      const name = form.name?.value.trim() || "";
-      const email = form.email?.value.trim() || "";
-      const phone = form.phone?.value.trim() || "";
-      const message = form.querySelector('textarea[name="message"]')?.value.trim() || "";
-      const company = form.querySelector('input[name="company"]')?.value.trim() || "";
+      const name = getFieldValue('input[name="name"]');
+      const email = getFieldValue('input[name="email"]');
+      const phone = getFieldValue('input[name="phone"]');
+      const message = getFieldValue('textarea[name="message"]');
+      const company = getFieldValue('input[name="company"]');
 
       if (!name) {
         showError("Please enter your name.");
@@ -402,7 +364,7 @@ const ROUTES = {
       resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
 
       try {
-        await fetch(QUIZ_LEAD_ENDPOINT, {
+        const response = await fetch(QUIZ_LEAD_ENDPOINT, {
           method: "POST",
           headers: {
             "Content-Type": "text/plain",
@@ -422,6 +384,10 @@ const ROUTES = {
             company,
           }),
         });
+
+        if (!response.ok) {
+          console.warn("[trial] quiz lead notification failed", response.status);
+        }
       } catch (error) {
         console.warn("[trial] quiz lead notification failed", error);
       }
@@ -435,7 +401,7 @@ const ROUTES = {
       intake.hidden = false;
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
-  })();
+  });
 </script>
 
 <style>
