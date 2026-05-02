@@ -2,16 +2,22 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
-<BaseLayout title="Start Your Ritual | Deeper Than Skin">
-  <main class="section">
+<BaseLayout
+  title="Start Your Ritual | Deeper Than Skin"
+  hideNav={true}
+  hideFooter={true}
+>
+  <main class="section start-page">
     <div class="container start-wrap">
+      <p class="masthead">Deeper Than Skin • Market Ritual</p>
 
       <section class="start-hero">
         <p class="eyebrow">Start here</p>
         <h1>Choose your rhythm.</h1>
         <p>
-          Scan, explore, and choose the wellness path that fits today.
-          Start simple or step into a full ritual.
+          You’re at the table, so keep it simple. Pick the path that fits today —
+          start with a fresh pour, explore a guided reset, or step into a flexible
+          monthly ritual.
         </p>
       </section>
 
@@ -55,11 +61,21 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         </a>
       </section>
 
-      <section class="soft-note">
-        <h2>At the table?</h2>
+      <a href="/trial" class="starter-kit-card">
+        <p class="eyebrow">Not sure yet?</p>
+        <h2>Build My Starter Kit</h2>
         <p>
-          Ask us what’s fresh today, what pairs well with your goals, or which
-          ritual path makes the most sense for your lifestyle.
+          Take a 60-second ritual quiz and we’ll point you toward juices, teas,
+          skincare, or reset support based on what you need today.
+        </p>
+        <span class="fake-btn primary">Take the Quiz</span>
+      </a>
+
+      <section class="soft-note">
+        <h2>Need a human touch?</h2>
+        <p>
+          Ask us what’s fresh today, what pairs with your goals, or which ritual
+          path makes the most sense before you tap.
         </p>
       </section>
 
@@ -67,68 +83,117 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   </main>
 
   <style>
+    .start-page {
+      min-height: 100vh;
+      padding: clamp(40px, 6vw, 64px) 0;
+      background:
+        radial-gradient(circle at top, rgba(214, 179, 91, .14), transparent 30%),
+        radial-gradient(circle at 85% 10%, rgba(255, 255, 255, .08), transparent 20%),
+        linear-gradient(180deg, #08150f 0%, #020604 100%);
+    }
+
     .start-wrap {
-      max-width: 980px;
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 0 18px;
+    }
+
+    .masthead {
+      margin: 0 auto 18px;
+      display: inline-flex;
+      font-size: .85rem;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: rgba(255, 248, 239, .72);
+      opacity: .88;
+      border-radius: 999px;
+      padding: 8px 18px;
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid rgba(255, 255, 255, .06);
+      backdrop-filter: blur(10px);
     }
 
     .start-hero {
       text-align: center;
       max-width: 760px;
-      margin: 0 auto 32px;
+      margin: 0 auto 34px;
     }
 
     .start-hero h1 {
       margin: 0;
       font-size: clamp(2.6rem, 8vw, 5.8rem);
-      line-height: .9;
-      letter-spacing: -0.06em;
+      line-height: .92;
+      letter-spacing: -0.05em;
       color: var(--cream, #f8f3e7);
     }
 
     .start-hero p:not(.eyebrow) {
-      max-width: 620px;
+      max-width: 660px;
       margin: 18px auto 0;
-      color: rgba(248, 243, 231, .78);
-      font-size: 1.05rem;
-      line-height: 1.7;
+      color: rgba(248, 243, 231, .82);
+      font-size: 1.04rem;
+      line-height: 1.75;
     }
 
     .path-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
+      gap: 18px;
     }
 
-    .path-card {
+    .path-card,
+    .starter-kit-card {
       position: relative;
       display: flex;
       flex-direction: column;
-      min-height: 245px;
-      padding: 24px;
-      border-radius: 28px;
+      min-height: 250px;
+      padding: 26px;
+      border-radius: 32px;
       text-decoration: none;
       color: var(--cream, #f8f3e7);
       background:
-        radial-gradient(circle at top left, rgba(214, 179, 91, .16), transparent 40%),
+        radial-gradient(circle at top left, rgba(214, 179, 91, .16), transparent 42%),
         rgba(255, 255, 255, .045);
-      border: 1px solid rgba(214, 179, 91, .24);
-      box-shadow: 0 22px 70px rgba(0, 0, 0, .24);
-      transition: transform .2s ease, border-color .2s ease, background .2s ease;
+      border: 1px solid rgba(214, 179, 91, .22);
+      box-shadow: 0 26px 82px rgba(0, 0, 0, .22);
+      transition: transform .22s ease, border-color .22s ease, background .22s ease, box-shadow .22s ease;
     }
 
-    .path-card:hover {
-      transform: translateY(-3px);
-      border-color: rgba(214, 179, 91, .55);
+    .path-card:hover,
+    .starter-kit-card:hover,
+    .path-card:focus-visible,
+    .starter-kit-card:focus-visible {
+      transform: translateY(-4px);
+      border-color: rgba(214, 179, 91, .68);
       background:
-        radial-gradient(circle at top left, rgba(214, 179, 91, .24), transparent 42%),
-        rgba(255, 255, 255, .07);
+        radial-gradient(circle at top left, rgba(214, 179, 91, .28), transparent 44%),
+        rgba(255, 255, 255, .09);
+      box-shadow: 0 40px 120px rgba(0, 0, 0, .24);
+      outline: none;
+    }
+
+    .path-card:focus-visible,
+    .starter-kit-card:focus-visible {
+      box-shadow: 0 0 0 4px rgba(214, 179, 91, .22), 0 40px 120px rgba(0, 0, 0, .24);
     }
 
     .path-card.featured {
       background:
-        linear-gradient(135deg, rgba(214, 179, 91, .24), rgba(255, 255, 255, .055)),
-        rgba(255, 255, 255, .045);
-      border-color: rgba(214, 179, 91, .55);
+        linear-gradient(135deg, rgba(214, 179, 91, .36), rgba(255, 255, 255, .1)),
+        rgba(255, 255, 255, .065);
+      border-color: rgba(214, 179, 91, .8);
+      box-shadow: 0 34px 110px rgba(0, 0, 0, .22);
+    }
+
+    .starter-kit-card {
+      margin-top: 22px;
+      width: 100%;
+      border-style: dashed;
+      background:
+        radial-gradient(circle at top left, rgba(214, 179, 91, .12), transparent 40%),
+        rgba(255, 255, 255, .035);
+      border-color: rgba(214, 179, 91, .34);
+      min-height: 220px;
     }
 
     .tag {
@@ -154,17 +219,18 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       text-transform: uppercase;
     }
 
+    .starter-kit-card h2,
     .path-card h2 {
       margin: 0;
-      max-width: 430px;
       font-size: clamp(1.45rem, 3vw, 2.2rem);
-      line-height: 1;
-      letter-spacing: -0.04em;
+      line-height: 1.02;
+      letter-spacing: -0.03em;
     }
 
-    .path-card p:not(.eyebrow) {
+    .path-card p:not(.eyebrow),
+    .starter-kit-card p:not(.eyebrow) {
       margin: 14px 0 22px;
-      color: rgba(248, 243, 231, .76);
+      color: rgba(248, 243, 231, .78);
       line-height: 1.65;
     }
 
@@ -175,10 +241,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       align-items: center;
       justify-content: center;
       min-height: 42px;
-      padding: 0 16px;
+      padding: 0 18px;
       border-radius: 999px;
       font-weight: 900;
-      font-size: .85rem;
+      font-size: .86rem;
     }
 
     .fake-btn.primary {
@@ -198,11 +264,11 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .soft-note {
-      margin-top: 18px;
-      padding: 24px;
-      border-radius: 28px;
+      margin-top: 24px;
+      padding: 28px;
+      border-radius: 32px;
       text-align: center;
-      background: rgba(255, 255, 255, .035);
+      background: rgba(255, 255, 255, .03);
       border: 1px solid rgba(214, 179, 91, .22);
     }
 
@@ -213,10 +279,16 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .soft-note p {
-      max-width: 640px;
+      max-width: 680px;
       margin: 0 auto;
       color: rgba(248, 243, 231, .72);
-      line-height: 1.7;
+      line-height: 1.75;
+    }
+
+    @media (max-width: 860px) {
+      .start-wrap {
+        padding: 0 16px;
+      }
     }
 
     @media (max-width: 760px) {
@@ -224,8 +296,13 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         grid-template-columns: 1fr;
       }
 
-      .path-card {
-        min-height: 220px;
+      .path-card,
+      .starter-kit-card {
+        min-height: auto;
+      }
+
+      .start-page {
+        padding: clamp(36px, 8vw, 52px) 0;
       }
     }
   </style>
