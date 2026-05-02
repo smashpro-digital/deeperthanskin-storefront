@@ -14,7 +14,11 @@ const heroImage = `${base}images/ionic-foot-detox-experience.jpg`;
 const shopUrl = `${base}shop`;
 ---
 
-<BaseLayout title="Join the Deeper Than Skin List">
+<BaseLayout
+  title="Join the Deeper Than Skin List"
+  hideNav={true}
+  hideFooter={true}
+>
   <main class="market-signup-page">
     <section class="poster">
       <div class="hero">
@@ -134,10 +138,16 @@ const shopUrl = `${base}shop`;
       <footer class="poster-footer">
         <p>Your Wellness. Your Ritual. Your Time. ♡</p>
 
-        <a class="qr-box" href={shopUrl}>
-          <span>Shop</span>
-          <small>Learn More</small>
-        </a>
+        <div class="qr-wrap">
+          <span class="qr-label">Scan to start</span>
+          <a class="qr-box" href="/start">
+            <img
+              src="/images/https_shop_deeperthanskin_store_start_.png"
+              alt="Scan to start your ritual"
+              loading="lazy"
+            />
+          </a>
+        </div>
       </footer>
     </section>
   </main>
@@ -461,26 +471,40 @@ const shopUrl = `${base}shop`;
       font-family: "Brush Script MT", "Segoe Script", cursive;
     }
 
+    .qr-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .qr-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(228, 166, 74, .8);
+    }
+
     .qr-box {
-      width: 92px;
-      height: 92px;
+      width: 110px;
+      height: 110px;
+      padding: 2px;
       display: grid;
       place-items: center;
       border-radius: 12px;
-      background: #fff7ea;
-      color: #1b160f;
+      background: #ffffff;
       text-decoration: none;
-      font-weight: 950;
-      text-align: center;
-      box-shadow: inset 0 0 0 8px rgba(0, 0, 0, 0.06);
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.35),
+        0 0 0 1px rgba(214,179,91,.25);
     }
 
-    .qr-box small {
-      display: block;
-      color: #a8651e;
-      font-size: 0.62rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+    .qr-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
+      transform: scale(1.08);
     }
 
     .hp-field,
