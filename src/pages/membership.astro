@@ -1,0 +1,340 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const SQUARE_MEMBERSHIP_LINK = "#"; // Replace later with Square plan/payment link
+const SQUARE_BOOKING_LINK = "/detox-experience#plans";
+---
+
+<BaseLayout title="Membership | Deeper Than Skin">
+  <main class="section">
+    <div class="container membership-wrap">
+
+      <section class="membership-hero">
+        <p class="eyebrow">Flexible wellness membership</p>
+        <h1>Your monthly ritual, built around you.</h1>
+        <p>
+          A flexible membership designed to support fresh beverages, skincare
+          refills, and ionic foot detox scheduling allowance under one rhythm.
+        </p>
+
+        <div class="hero-actions">
+          <a href={SQUARE_MEMBERSHIP_LINK} class="btn primary">Start Membership</a>
+          <a href="/start" class="btn secondary">Choose Another Path</a>
+        </div>
+      </section>
+
+      <section class="allowance-card">
+        <div>
+          <p class="eyebrow">How it works</p>
+          <h2>One membership. Multiple ways to use it.</h2>
+          <p>
+            Instead of locking you into one product lane, your membership gives
+            you access to a wellness allowance that can support the ritual you
+            need that month.
+          </p>
+        </div>
+
+        <div class="allowance-list">
+          <div>
+            <strong>01</strong>
+            <span>Fresh juices, herbal drinks, teas, or wellness blends</span>
+          </div>
+          <div>
+            <strong>02</strong>
+            <span>Skincare refills like butters, scrubs, oils, and soaps</span>
+          </div>
+          <div>
+            <strong>03</strong>
+            <span>Ionic foot detox scheduling allowance</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="plans-grid">
+        <article class="plan-card">
+          <p class="eyebrow">Starter rhythm</p>
+          <h2>Essential Ritual</h2>
+          <p class="price">$149<span>/month</span></p>
+          <p>
+            A steady monthly rhythm for customers who want light beverage,
+            skincare, or wellness support.
+          </p>
+          <ul>
+            <li>Monthly ritual allowance</li>
+            <li>Use toward eligible products</li>
+            <li>Good for beginners</li>
+          </ul>
+          <a href={SQUARE_MEMBERSHIP_LINK} class="btn secondary">Start Essential</a>
+        </article>
+
+        <article class="plan-card featured">
+          <p class="eyebrow">Best value</p>
+          <h2>Total Reset</h2>
+          <p class="price">$269<span>/month</span></p>
+          <p>
+            The signature membership for consistent care across detox,
+            beverages, and body support.
+          </p>
+          <ul>
+            <li>Higher monthly ritual allowance</li>
+            <li>Detox scheduling support</li>
+            <li>Ideal for weekly wellness rhythm</li>
+          </ul>
+          <a href={SQUARE_MEMBERSHIP_LINK} class="btn primary">Start Total Reset</a>
+        </article>
+
+        <article class="plan-card">
+          <p class="eyebrow">Premium care</p>
+          <h2>Inner Circle</h2>
+          <p class="price">$399<span>/month</span></p>
+          <p>
+            A deeper membership for customers who want premium access,
+            priority support, and fuller monthly coverage.
+          </p>
+          <ul>
+            <li>Premium monthly allowance</li>
+            <li>Priority booking support</li>
+            <li>Exclusive drops and upgrades</li>
+          </ul>
+          <a href={SQUARE_MEMBERSHIP_LINK} class="btn secondary">Start Inner Circle</a>
+        </article>
+      </section>
+
+      <section class="booking-card">
+        <div>
+          <p class="eyebrow">Foot detox scheduling</p>
+          <h2>Your membership can include detox appointment allowance.</h2>
+          <p>
+            Once your membership is active, we help guide which detox rhythm
+            fits your plan and availability.
+          </p>
+        </div>
+        <a href={SQUARE_BOOKING_LINK} class="btn secondary">View Detox Details</a>
+      </section>
+
+      <section class="fine-print">
+        <h2>Good to know</h2>
+        <p>
+          Final membership redemption rules are managed through Square and our
+          customer notes. Square links will be connected after plan setup is
+          finalized.
+        </p>
+      </section>
+
+    </div>
+  </main>
+
+  <style>
+    .membership-wrap {
+      max-width: 1080px;
+    }
+
+    .membership-hero {
+      max-width: 820px;
+      margin: 0 auto 34px;
+      text-align: center;
+    }
+
+    .membership-hero h1 {
+      margin: 0;
+      font-size: clamp(2.7rem, 8vw, 6.4rem);
+      line-height: .88;
+      letter-spacing: -0.07em;
+      color: var(--cream, #f8f3e7);
+    }
+
+    .membership-hero p:not(.eyebrow) {
+      max-width: 700px;
+      margin: 20px auto 0;
+      color: rgba(248, 243, 231, .78);
+      font-size: 1.08rem;
+      line-height: 1.75;
+    }
+
+    .hero-actions {
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #d6b35b;
+      font-size: .72rem;
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .allowance-card,
+    .booking-card,
+    .fine-print {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 24px;
+      align-items: center;
+      padding: 28px;
+      border-radius: 32px;
+      border: 1px solid rgba(214, 179, 91, .25);
+      background:
+        radial-gradient(circle at top left, rgba(214, 179, 91, .16), transparent 42%),
+        rgba(255, 255, 255, .045);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .24);
+    }
+
+    .allowance-card h2,
+    .booking-card h2,
+    .fine-print h2 {
+      margin: 0;
+      color: var(--cream, #f8f3e7);
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: .98;
+      letter-spacing: -0.05em;
+    }
+
+    .allowance-card p:not(.eyebrow),
+    .booking-card p,
+    .fine-print p {
+      color: rgba(248, 243, 231, .76);
+      line-height: 1.7;
+    }
+
+    .allowance-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .allowance-list div {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .055);
+      border: 1px solid rgba(248, 243, 231, .12);
+      color: rgba(248, 243, 231, .82);
+    }
+
+    .allowance-list strong {
+      color: #d6b35b;
+      font-size: .78rem;
+      letter-spacing: .12em;
+    }
+
+    .plans-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .plan-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 470px;
+      padding: 24px;
+      border-radius: 30px;
+      border: 1px solid rgba(214, 179, 91, .24);
+      background: rgba(255, 255, 255, .045);
+      color: var(--cream, #f8f3e7);
+    }
+
+    .plan-card.featured {
+      border-color: rgba(214, 179, 91, .65);
+      background:
+        linear-gradient(135deg, rgba(214, 179, 91, .24), rgba(255, 255, 255, .055)),
+        rgba(255, 255, 255, .045);
+      transform: translateY(-8px);
+    }
+
+    .plan-card h2 {
+      margin: 0;
+      font-size: 2rem;
+      line-height: 1;
+      letter-spacing: -0.05em;
+    }
+
+    .price {
+      margin: 18px 0 10px;
+      font-size: 2.3rem;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      color: #f8f3e7;
+    }
+
+    .price span {
+      font-size: .9rem;
+      font-weight: 700;
+      color: rgba(248, 243, 231, .62);
+      letter-spacing: 0;
+    }
+
+    .plan-card p:not(.eyebrow):not(.price) {
+      color: rgba(248, 243, 231, .72);
+      line-height: 1.65;
+    }
+
+    .plan-card ul {
+      margin: 14px 0 22px;
+      padding-left: 18px;
+      color: rgba(248, 243, 231, .78);
+      line-height: 1.8;
+    }
+
+    .plan-card .btn {
+      margin-top: auto;
+      text-align: center;
+    }
+
+    .booking-card {
+      margin-top: 18px;
+      grid-template-columns: 1fr auto;
+    }
+
+    .fine-print {
+      margin-top: 18px;
+      display: block;
+      text-align: center;
+    }
+
+    .fine-print p {
+      max-width: 720px;
+      margin: 12px auto 0;
+      font-size: .95rem;
+    }
+
+    @media (max-width: 900px) {
+      .plans-grid,
+      .allowance-card,
+      .booking-card {
+        grid-template-columns: 1fr;
+      }
+
+      .plan-card.featured {
+        transform: none;
+      }
+
+      .booking-card .btn {
+        width: fit-content;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .membership-hero {
+        text-align: left;
+      }
+
+      .hero-actions {
+        justify-content: flex-start;
+      }
+
+      .hero-actions .btn,
+      .booking-card .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</BaseLayout>
