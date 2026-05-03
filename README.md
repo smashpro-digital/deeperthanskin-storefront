@@ -72,6 +72,14 @@ This site is deployed via **GitHub Pages** directly from the `main` branch.
 
 Updates go live automatically on commit.
 
+### API Deploy Workflow
+
+- Edit PHP API routes only inside `api/v1/routes/`
+- Saving those files uploads them to `/public_html/smashpro.app/api/v1/routes/`
+- Frontend files do not auto-deploy through FTP
+- Frontend still deploys through normal Git/build flow
+- Keep `.vscode/sftp.json` local only
+
 ---
 
 ## ✨ Built With Intention

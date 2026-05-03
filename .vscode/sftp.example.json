@@ -1,0 +1,28 @@
+{
+  "name": "SmashPro API Routes Only",
+  "host": "ftp.celacom.solutions",
+  "protocol": "ftp",
+  "port": 21,
+  "username": "smashprohq",
+  "password": "REPLACE_WITH_LOCAL_PASSWORD",
+  "secure": true,
+  "passive": true,
+  "remotePath": "/public_html/smashpro.app/api/v1/routes",
+  "context": "api/v1/routes",
+  "uploadOnSave": true,
+  "syncMode": "update",
+  "ignore": [
+    "**/.git/**",
+    "**/.vscode/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/public/**",
+    "**/src/**",
+    "**/*.astro",
+    "**/*.js",
+    "**/*.ts",
+    "**/*.json",
+    "**/*.css",
+    "**/*.md"
+  ]
+}

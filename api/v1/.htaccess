@@ -1,0 +1,28 @@
+Options -MultiViews
+DirectorySlash Off
+
+RewriteEngine On
+RewriteBase /api/v1
+
+<IfModule mod_headers.c>
+  Header always set Access-Control-Allow-Origin "https://shop.deeperthanskin.store" "expr=%{HTTP:Origin} == 'https://shop.deeperthanskin.store'"
+  Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+  Header always set Access-Control-Allow-Headers "Content-Type, Accept, X-Api-Key, X-Correlation-Id, Authorization, X-App-Slug"
+  Header always set Access-Control-Max-Age "86400"
+  Header always merge Vary Origin
+</IfModule>
+
+# CORS preflight must never enter PHP
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^ - [R=204,L]
+
+# Serve real files/folders normally
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# /api/v1 -> /api/v1/index.php
+RewriteRule ^$ index.php [L]
+
+# Everything else -> index.php?path=...
+RewriteRule ^(.+)$ index.php?path=$1 [L,QSA]

@@ -16,9 +16,16 @@ pnpm-debug.log*
 # environment variables
 .env
 .env.production
+tests/api/.env
 
 # macOS-specific files
 .DS_Store
 
 # jetbrains setting folder
 .idea/
+
+# local deployment secrets
+.vscode/sftp.json
+.vscode/settings.json
+api/bootstrap/config.php
+api/v1/routes/_square.config.php
