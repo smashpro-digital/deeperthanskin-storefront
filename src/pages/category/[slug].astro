@@ -621,6 +621,8 @@ const ROUTES = {
     .crumb { text-decoration: none; opacity: .9; font-size: 13px; }
 
     .cartpill {
+      appearance: none;
+      -webkit-appearance: none;
       display: inline-flex;
       align-items: center;
       gap: 10px;
@@ -630,6 +632,18 @@ const ROUTES = {
       background: rgba(0,0,0,.18);
       color: rgba(255,255,255,.92);
       cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .cartpill:hover {
+      transform: translateY(-1px);
+      border-color: rgba(200,162,74,.32);
+      background: rgba(200,162,74,.12);
+    }
+
+    .cartpill:focus-visible {
+      outline: 2px solid rgba(200,162,74,.72);
+      outline-offset: 3px;
     }
 
     .cartpill-dot {
@@ -810,6 +824,15 @@ const ROUTES = {
       outline: none;
     }
 
+    .search::placeholder {
+      color: rgba(255,255,255,.58);
+    }
+
+    .search:focus-visible {
+      border-color: rgba(200,162,74,.52);
+      box-shadow: 0 0 0 3px rgba(200,162,74,.18);
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -934,7 +957,31 @@ const ROUTES = {
       padding: 10px 12px 14px;
     }
 
-    .actions .btn { flex: 1; }
+    .actions .btn {
+      flex: 1;
+      min-height: 44px;
+      line-height: 1.15;
+    }
+
+    .actions .btn:focus-visible {
+      outline: 2px solid rgba(200,162,74,.72);
+      outline-offset: 3px;
+    }
+
+    .actions button.btn {
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    .actions button.btn:disabled {
+      cursor: not-allowed;
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.14);
+      color: rgba(255,255,255,.62);
+      box-shadow: none;
+      transform: none;
+    }
 
     .btn-reset {
       background:
@@ -943,6 +990,13 @@ const ROUTES = {
       color: #07120d;
       border-color: rgba(233,206,143,.55);
       box-shadow: 0 12px 28px rgba(200,162,74,.18);
+    }
+
+    .btn-reset:hover {
+      background:
+        radial-gradient(120px 80px at 30% 10%, rgba(255,255,255,.28), transparent 70%),
+        linear-gradient(135deg, rgba(240,218,164,.98), rgba(212,178,89,.96));
+      color: #07120d;
     }
 
     .btn-static {

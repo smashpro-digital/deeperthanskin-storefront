@@ -1,0 +1,14 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "SmashPro Digital DB",
+      "driver": "MySQL",
+      "server": "countryboycreations.ipowermysql.com",
+      "port": 3306,
+      "database": "smashpro_digital",
+      "username": "smashprohq",
+      "password": "",
+      "connectionTimeout": 30
+    }
+  ]
+}

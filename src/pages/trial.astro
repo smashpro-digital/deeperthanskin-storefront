@@ -1,17 +1,5 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-
-const base = import.meta.env.BASE_URL || "/";
-
-const u = (path: string) => {
-  const b = base.endsWith("/") ? base.slice(0, -1) : base;
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return `${b}${p}`;
-};
-
-const ROUTES = {
-  home: u("/"),
-};
 ---
 
 <BaseLayout
@@ -22,25 +10,47 @@ const ROUTES = {
   <main class="trial-page">
     <section class="trial-section">
       <div class="container trial-container">
-        <a class="back-link" href={ROUTES.home}>← Back Home</a>
-
-        <form class="quiz-card" id="ritual-quiz" novalidate>
+        <p class="page-masthead">Deeper Than Skin • Starter Kit Builder</p>
+        <form class="quiz-card" id="ritual-quiz" method="post" novalidate>
           <div class="quiz-intake" id="quiz-intake">
             <div class="quiz-head">
               <div>
-                <div class="kicker">60-Second Ritual Builder</div>
-                <h1>Find your rhythm</h1>
+                <div class="kicker">Starter Kit Builder</div>
+                <h1>Build your starter kit.</h1>
                 <p class="intro">
-                  Choose what fits. We’ll shape your first starter kit from juices, teas,
-                  sea moss, body care, or blended essentials.
+                  Answer a few quick questions and we’ll point you toward the first ritual that fits your goals,
+                  preferences, and comfort level.
                 </p>
               </div>
 
-              <div class="quiz-pill">Starter Kit</div>
+              <div class="progress-strip" aria-label="Quiz progress">
+                <div class="progress-step active">
+                  <span>1</span>
+                  <strong>Goals</strong>
+                </div>
+                <div class="progress-step">
+                  <span>2</span>
+                  <strong>Preferences</strong>
+                </div>
+                <div class="progress-step">
+                  <span>3</span>
+                  <strong>Considerations</strong>
+                </div>
+                <div class="progress-step">
+                  <span>4</span>
+                  <strong>Contact</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="trust-row">
+              <div>⏱ 60-second quiz</div>
+              <div>🎯 Personalized starter direction</div>
+              <div>🔒 Secure Square checkout</div>
             </div>
 
             <div class="quiz-block">
-              <h2>What support are you looking for?</h2>
+              <h2>Goals</h2>
               <div class="option-grid">
                 <label><input type="checkbox" name="goals" value="energy" /> <span>Energy</span></label>
                 <label><input type="checkbox" name="goals" value="hydration" /> <span>Hydration</span></label>
@@ -52,37 +62,51 @@ const ROUTES = {
             </div>
 
             <div class="quiz-block">
-              <h2>What do you usually reach for?</h2>
+              <h2>Preferences</h2>
               <div class="option-grid">
                 <label><input type="checkbox" name="prefs" value="juice" /> <span>Cold-Pressed Juice</span></label>
                 <label><input type="checkbox" name="prefs" value="lemonade" /> <span>Herbal Lemonade</span></label>
                 <label><input type="checkbox" name="prefs" value="tea" /> <span>Tea Rituals</span></label>
                 <label><input type="checkbox" name="prefs" value="sea-moss" /> <span>Sea Moss</span></label>
                 <label><input type="checkbox" name="prefs" value="body-care" /> <span>Body Care</span></label>
-                <label><input type="checkbox" name="prefs" value="not-sure" /> <span>Not Sure Yet</span></label>
+                <label><input type="checkbox" name="prefs" value="not-sure" /> <span>Not sure yet</span></label>
               </div>
             </div>
 
             <div class="quiz-block">
-              <h2>Any preferences or considerations?</h2>
+              <h2>Considerations</h2>
               <div class="option-grid">
                 <label><input type="checkbox" name="notes" value="low-sugar" /> <span>Low Sugar</span></label>
                 <label><input type="checkbox" name="notes" value="fruit-forward" /> <span>Fruit Forward</span></label>
                 <label><input type="checkbox" name="notes" value="green-forward" /> <span>Green Forward</span></label>
                 <label><input type="checkbox" name="notes" value="caffeine-free" /> <span>Caffeine-Free</span></label>
                 <label><input type="checkbox" name="notes" value="sensitive" /> <span>Ingredient Sensitive</span></label>
-                <label><input type="checkbox" name="notes" value="review" /> <span>Owner Review First</span></label>
+                <label><input type="checkbox" name="notes" value="review" /> <span>Owner review first</span></label>
               </div>
             </div>
 
             <div class="quiz-block">
-              <h2>How should we contact you?</h2>
+              <h2>Where should we send your starter direction?</h2>
+              <p class="contact-copy">
+                We’ll use this to follow up with your personalized kit and next steps.
+              </p>
 
               <div class="contact-grid">
-                <input name="name" placeholder="Name" autocomplete="name" />
-                <input name="phone" placeholder="Phone" autocomplete="tel" />
+                <input name="name" placeholder="Name" autocomplete="name" required />
+                <input name="phone" placeholder="Phone" type="tel" autocomplete="tel" />
                 <input name="email" placeholder="Email" type="email" autocomplete="email" />
               </div>
+
+              <p id="form-error" class="form-error" aria-live="polite"></p>
+
+              <input
+                type="text"
+                name="company"
+                tabindex="-1"
+                autocomplete="off"
+                class="hp-field"
+                aria-hidden="true"
+              />
 
               <textarea
                 name="message"
@@ -96,16 +120,13 @@ const ROUTES = {
             </div>
 
             <div class="sticky-submit" id="sticky-submit">
-              <button type="submit" class="submit-btn">Build My Starter Kit</button>
+              <button type="submit" class="submit-btn">Reveal My Starter Kit</button>
             </div>
           </div>
 
           <div class="result-card" id="result-card" hidden>
             <div class="result-shell">
-              <div class="result-overline">
-                <span></span>
-                Your Starter Direction
-              </div>
+              <div class="result-overline">Your Starter Direction</div>
 
               <h1 class="result-title" id="result-title">Your Ritual Kit</h1>
               <p class="result-copy" id="result-copy"></p>
@@ -115,7 +136,7 @@ const ROUTES = {
               <div class="conversion-box">
                 <strong>Your first ritual is ready.</strong>
                 <p>
-                  Start with this trial kit today. You can add an optional boost at checkout, then we’ll help refine your rhythm after your first experience.
+                  Start with the recommended starter kit, choose optional boosts, and then refine your rhythm after your first experience.
                 </p>
               </div>
 
@@ -132,9 +153,20 @@ const ROUTES = {
                   <span class="pay-button__sub">No subscription required • Optional boosts available</span>
                 </a>
 
-                <button class="adjust-button" type="button" id="reset-quiz">
-                  Adjust my answers
-                </button>
+                <div class="secondary-actions">
+                  <button class="adjust-button" type="button" id="reset-quiz">
+                    Adjust My Answers
+                  </button>
+                </div>
+
+                <div class="next-steps">
+                  <p class="next-title">What happens next</p>
+                  <ul>
+                    <li>Secure checkout through Square</li>
+                    <li>We prepare your starter kit direction</li>
+                    <li>You can refine your rhythm after your first experience</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -145,16 +177,70 @@ const ROUTES = {
 </BaseLayout>
 
 <script is:inline>
-  (() => {
+  document.addEventListener("DOMContentLoaded", () => {
     const DEFAULT_PAY_LINK = "https://square.link/u/Xahltphb";
+    const QUIZ_LEAD_ENDPOINT =
+      "https://smashpro.app/api/v1/index.php?path=public/quiz-lead&app_slug=deeper-than-skin";
 
-    const PAY_LINK_MAP = {
-      "balanced-starter-kit": DEFAULT_PAY_LINK,
-      "hydration-energy-starter-kit": DEFAULT_PAY_LINK,
-      "calm-ritual-starter-kit": DEFAULT_PAY_LINK,
-      "skin-body-ritual-kit": DEFAULT_PAY_LINK,
-      "reset-mineral-support-kit": DEFAULT_PAY_LINK,
-      "owner-reviewed-starter-kit": DEFAULT_PAY_LINK,
+    // Create matching Square items/payment links for each kit slug:
+    // balanced-starter-kit
+    // hydration-energy-starter-kit
+    // calm-ritual-starter-kit
+    // skin-body-ritual-kit
+    // reset-mineral-support-kit
+    // owner-reviewed-starter-kit
+    // Paste each Square payment link into payLink.
+    const KIT_CONFIG = {
+      "balanced-starter-kit": {
+        title: "The Balanced Starter Kit",
+        description:
+          "A flexible first ritual with a mix of hydration, daily support, and gentle wellness essentials. Ideal if you want an easy, grounded starting point.",
+        payLink: "PASTE_SQUARE_LINK_HERE",
+        label: "Begin My Balanced Starter Kit",
+        boost: "Optional boost: Herbal Tea Pack for a simple daily rhythm.",
+      },
+      "hydration-energy-starter-kit": {
+        title: "The Hydration + Energy Starter Kit",
+        description:
+          "A beverage-forward starter built around cold-pressed juices, herbal lemonade, and fresh daily support. Ideal if you want something refreshing, bright, and energizing.",
+        payLink: "PASTE_SQUARE_LINK_HERE",
+        label: "Begin My Hydration + Energy Kit",
+        boost: "Optional boost: Herbal Tea Pack for steady daily rhythm support.",
+      },
+      "calm-ritual-starter-kit": {
+        title: "The Calm Ritual Starter Kit",
+        description:
+          "A grounding starter with tea rituals, gentle botanicals, and soothing ritual support. Best for evening routines, stress relief, and ease.",
+        payLink: "PASTE_SQUARE_LINK_HERE",
+        label: "Begin My Calm Ritual Kit",
+        boost: "Optional boost: Herbal Tea Pack for a softer evening ritual.",
+      },
+      "skin-body-ritual-kit": {
+        title: "The Skin + Body Ritual Kit",
+        description:
+          "A body-centered starter with nourishing skincare, ritual body care, and internal wellness support. Best for glow, softness, and ritual self-care.",
+        payLink: "PASTE_SQUARE_LINK_HERE",
+        label: "Begin My Skin + Body Ritual Kit",
+        boost: "Optional boost: Sea Moss Gel for mineral-rich daily support.",
+      },
+      "reset-mineral-support-kit": {
+        title: "The Reset + Mineral Support Kit",
+        description:
+          "A deeper reset starter with mineral support, sea moss, and mindful ritual essentials. Ideal for customers seeking a more restorative beginning.",
+        payLink: "PASTE_SQUARE_LINK_HERE",
+        label: "Begin My Reset + Mineral Kit",
+        boost:
+          "Optional boost: Sea Moss Gel for mineral support, or a Detox Add-On if you want a deeper reset.",
+      },
+      "owner-reviewed-starter-kit": {
+        title: "Owner-Reviewed Starter Kit",
+        description:
+          "Your answers indicate a more personalized review before checkout. We’ll shape a safe, simple starting ritual and follow up before finalizing.",
+        payLink: "PASTE_SQUARE_LINK_HERE",
+        label: "Begin Owner-Reviewed Kit",
+        boost:
+          "We recommend starting simple. You can skip boosts at checkout until your kit is reviewed.",
+      },
     };
 
     const form = document.getElementById("ritual-quiz");
@@ -166,104 +252,156 @@ const ROUTES = {
     const resetBtn = document.getElementById("reset-quiz");
     const checkoutLink = document.getElementById("trial-checkout-link");
     const checkoutLabel = document.getElementById("trial-checkout-label");
+    const errorEl = document.getElementById("form-error");
 
-    if (!form || !intake || !resultCard || !resultTitle || !resultCopy) return;
+    if (!form || !intake || !resultCard || !resultTitle || !resultCopy || !checkoutLink) return;
+
+    const showError = (msg) => {
+      if (!errorEl) return;
+      errorEl.textContent = msg;
+      errorEl.style.display = "block";
+    };
+
+    const hideError = () => {
+      if (!errorEl) return;
+      errorEl.textContent = "";
+      errorEl.style.display = "none";
+    };
+
+    const getFieldValue = (selector) => form.querySelector(selector)?.value.trim() || "";
 
     const getValues = (name) =>
-      [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((el) => el.value);
+      Array.from(form.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
 
     const hasAny = (items, options) => items.some((item) => options.includes(item));
 
-    const setCheckout = ({ kitSlug, title, reviewRequired }) => {
-      if (!checkoutLink) return;
+    const kitSlugForAnswers = ({ goals, prefs, notes }) => {
+      const reviewRequired = notes.includes("review") || notes.includes("sensitive");
 
-      const link = PAY_LINK_MAP[kitSlug] || DEFAULT_PAY_LINK;
-
-      checkoutLink.href = link;
-      checkoutLink.target = link.startsWith("http") ? "_blank" : "_self";
-      checkoutLink.rel = link.startsWith("http") ? "noopener noreferrer" : "";
-
-      if (checkoutLabel) {
-        checkoutLabel.textContent = reviewRequired
-          ? "Begin Owner-Reviewed Kit"
-          : `Begin My ${title.replace(/^The\s+/i, "")}`;
+      if (reviewRequired) {
+        return "owner-reviewed-starter-kit";
       }
+
+      if (hasAny(goals, ["reset", "digestion"]) || hasAny(prefs, ["sea-moss"])) {
+        return "reset-mineral-support-kit";
+      }
+
+      if (hasAny(goals, ["skin"]) || hasAny(prefs, ["body-care"])) {
+        return "skin-body-ritual-kit";
+      }
+
+      if (hasAny(goals, ["calm"]) || hasAny(prefs, ["tea"])) {
+        return "calm-ritual-starter-kit";
+      }
+
+      if (hasAny(goals, ["hydration", "energy"]) || hasAny(prefs, ["juice", "lemonade"])) {
+        return "hydration-energy-starter-kit";
+      }
+
+      return "balanced-starter-kit";
     };
 
-    form.addEventListener("submit", (event) => {
+    const resolvePayLink = (kitSlug) => {
+      const kit = KIT_CONFIG[kitSlug] || KIT_CONFIG["balanced-starter-kit"];
+      const rawLink = kit.payLink;
+      const hasPlaceholder = !rawLink || rawLink === "PASTE_SQUARE_LINK_HERE";
+      const link = hasPlaceholder ? DEFAULT_PAY_LINK : rawLink;
+
+      return link;
+    };
+
+    const setCheckout = (kitSlug) => {
+      const kit = KIT_CONFIG[kitSlug] || KIT_CONFIG["balanced-starter-kit"];
+      const link = resolvePayLink(kitSlug);
+
+      checkoutLink.href = link;
+      checkoutLink.target = "_blank";
+      checkoutLink.rel = "noopener noreferrer";
+      checkoutLabel.textContent = kit.label;
+    };
+
+    form.addEventListener("submit", async (event) => {
+      console.log("[trial] submit intercepted");
       event.preventDefault();
+      event.stopPropagation();
+
+      hideError();
+
+      const name = getFieldValue('input[name="name"]');
+      const email = getFieldValue('input[name="email"]');
+      const phone = getFieldValue('input[name="phone"]');
+      const message = getFieldValue('textarea[name="message"]');
+      const company = getFieldValue('input[name="company"]');
+
+      if (!name) {
+        showError("Please enter your name.");
+        return;
+      }
+
+      if (!email && !phone) {
+        showError("Please enter your email or phone so we can follow up.");
+        return;
+      }
 
       const goals = getValues("goals");
       const prefs = getValues("prefs");
       const notes = getValues("notes");
 
-      let title = "The Balanced Starter Kit";
-      let copy =
-        "A flexible first ritual with a mix of hydration, daily support, and gentle wellness essentials. This is a good fit if you want a simple starting point without overthinking it.";
-      let kitSlug = "balanced-starter-kit";
-      let boost = "Optional boost: Herbal Tea Pack for a simple daily rhythm.";
+      const kitSlug = kitSlugForAnswers({ goals, prefs, notes });
+      const kit = KIT_CONFIG[kitSlug] || KIT_CONFIG["balanced-starter-kit"];
 
-      if (hasAny(goals, ["hydration", "energy"]) || hasAny(prefs, ["juice", "lemonade"])) {
-        title = "The Hydration + Energy Starter Kit";
-        copy =
-          "A beverage-forward starter built around cold-pressed juices, herbal lemonade, and bright daily support. Ideal for customers who want something refreshing, simple, and easy to repeat.";
-        kitSlug = "hydration-energy-starter-kit";
-        boost = "Recommended boost: Herbal Tea Pack for steady daily rhythm support.";
+      resultTitle.textContent = kit.title;
+      resultCopy.textContent = kit.description;
+
+      if (boostNote) {
+        boostNote.textContent = kit.boost;
       }
-
-      if (hasAny(goals, ["calm"]) || hasAny(prefs, ["tea"])) {
-        title = "The Calm Ritual Starter Kit";
-        copy =
-          "A slower, grounding starter with tea rituals, gentle botanicals, and optional body care. Best for evening routines, stress support, and softer daily rhythm.";
-        kitSlug = "calm-ritual-starter-kit";
-        boost = "Recommended boost: Herbal Tea Pack for a softer evening ritual.";
-      }
-
-      if (hasAny(goals, ["skin"]) || hasAny(prefs, ["body-care"])) {
-        title = "The Skin + Body Ritual Kit";
-        copy =
-          "A body-centered starter with nourishing skincare, body butter, oils, and optional internal wellness support. Best for customers who want glow, softness, and ritual.";
-        kitSlug = "skin-body-ritual-kit";
-        boost = "Recommended boost: Sea Moss Gel for mineral-rich daily support.";
-      }
-
-      if (hasAny(goals, ["reset", "digestion"]) || hasAny(prefs, ["sea-moss"])) {
-        title = "The Reset + Mineral Support Kit";
-        copy =
-          "A wellness-focused starter with mineral-rich support, sea moss, teas, and optional beverages. Best for customers who want a deeper reset-style starting point.";
-        kitSlug = "reset-mineral-support-kit";
-        boost = "Recommended boost: Sea Moss Gel for mineral support, or Detox Add-On for a deeper reset.";
-      }
-
-      const reviewRequired = notes.includes("review") || notes.includes("sensitive");
-
-      if (reviewRequired) {
-        title = "Owner-Reviewed Starter Kit";
-        copy =
-          "Your answers suggest a more personalized review before recommending products. We’ll use your notes to shape a safe, simple starting ritual and follow up before finalizing.";
-        kitSlug = "owner-reviewed-starter-kit";
-        boost = "We recommend starting simple. You can skip boosts at checkout until your kit is reviewed.";
-      }
-
-      resultTitle.textContent = title;
-      resultCopy.textContent = copy;
-
-      if (boostNote) boostNote.textContent = boost;
 
       intake.hidden = true;
       resultCard.hidden = false;
 
-      setCheckout({ kitSlug, title, reviewRequired });
-
+      setCheckout(kitSlug);
       resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      try {
+        const response = await fetch(QUIZ_LEAD_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain",
+          },
+          body: JSON.stringify({
+            app_slug: "deeper-than-skin",
+            source: "starter-kit-quiz",
+            kit_slug: kitSlug,
+            kit_title: kit.title,
+            goals,
+            prefs,
+            notes,
+            name,
+            email,
+            phone,
+            message,
+            company,
+          }),
+        });
+
+        if (!response.ok) {
+          console.warn("[trial] quiz lead notification failed", response.status);
+        }
+      } catch (error) {
+        console.warn("[trial] quiz lead notification failed", error);
+      }
     });
 
+    form.dataset.jsReady = "true";
+
     resetBtn?.addEventListener("click", () => {
+      hideError();
       resultCard.hidden = true;
       intake.hidden = false;
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
-  })();
+  });
 </script>
 
 <style>
@@ -281,34 +419,45 @@ const ROUTES = {
 
   .trial-container {
     max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .page-masthead {
+    display: inline-flex;
+    margin-bottom: 1rem;
+    color: rgba(255, 248, 239, 0.72);
+    font-size: 0.82rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
   }
 
   .back-link {
     display: inline-flex;
-    margin-bottom: 20px;
-    color: rgba(255, 248, 239, 0.78);
+    margin-bottom: 1.8rem;
+    color: #fff8ef;
     text-decoration: none;
+    font-size: 1rem;
     font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
   .quiz-card {
     position: relative;
     overflow: hidden;
-    border-radius: 34px;
-    border: 1px solid rgba(224, 191, 105, 0.22);
+    border-radius: 36px;
+    border: 1px solid rgba(224, 191, 105, 0.2);
     background:
-      radial-gradient(circle at top right, rgba(212, 178, 89, 0.15), transparent 34%),
-      rgba(255, 248, 239, 0.045);
-    padding: clamp(22px, 4vw, 46px);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+      radial-gradient(circle at top right, rgba(212, 178, 89, 0.16), transparent 34%),
+      linear-gradient(180deg, rgba(255, 248, 239, 0.08), rgba(255, 248, 239, 0.03));
+    padding: clamp(28px, 4vw, 52px);
+    box-shadow: 0 28px 92px rgba(0, 0, 0, 0.3);
   }
 
   .quiz-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 22px;
-    margin-bottom: clamp(26px, 4vw, 44px);
+    display: grid;
+    gap: 24px;
+    margin-bottom: clamp(28px, 4vw, 40px);
   }
 
   .kicker,
@@ -318,65 +467,97 @@ const ROUTES = {
     letter-spacing: 0.18em;
     font-weight: 900;
     font-size: 0.78rem;
-    margin-bottom: 14px;
-  }
-
-  .kicker::after,
-  .result-overline::after {
-    content: "";
-    display: block;
-    width: 144px;
-    height: 1px;
-    margin-top: 12px;
-    background: rgba(227, 192, 107, 0.58);
+    margin-bottom: 12px;
   }
 
   .result-overline {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
   }
 
-  h1,
-  h2 {
+  .quiz-head h1,
+  .result-title {
     color: #fff8ef;
     margin: 0;
-  }
-
-  h1 {
-    font-size: clamp(2.7rem, 8vw, 5.6rem);
-    line-height: 0.92;
-    letter-spacing: -0.055em;
-  }
-
-  h2 {
-    font-size: clamp(1.4rem, 3vw, 2.35rem);
-    line-height: 1.02;
-    margin-bottom: 18px;
+    font-size: clamp(3rem, 6vw, 5.4rem);
+    line-height: 0.96;
+    letter-spacing: -0.05em;
   }
 
   .intro {
-    max-width: 820px;
-    margin: 22px 0 0;
-    color: rgba(255, 248, 239, 0.76);
-    font-size: clamp(1.02rem, 2vw, 1.2rem);
-    line-height: 1.7;
+    max-width: 840px;
+    margin: 1rem 0 0;
+    color: rgba(255, 248, 239, 0.78);
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    line-height: 1.75;
   }
 
-  .quiz-pill {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.72rem 1rem;
+  .progress-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .progress-step {
+    padding: 16px 18px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 248, 239, 0.08);
+    background: rgba(255, 248, 239, 0.04);
+    color: rgba(255, 248, 239, 0.9);
+    display: grid;
+    gap: 10px;
+  }
+
+  .progress-step.active {
+    background: rgba(227, 192, 107, 0.12);
+    border-color: rgba(227, 192, 107, 0.24);
+  }
+
+  .progress-step span {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
     border-radius: 999px;
-    border: 1px solid rgba(224, 191, 105, 0.22);
-    background: rgba(255, 248, 239, 0.06);
-    color: #f8ebcf;
+    background: rgba(227, 192, 107, 0.18);
     font-weight: 900;
-    white-space: nowrap;
+    color: #fff8ef;
+  }
+
+  .progress-step strong {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
+  }
+
+  .trust-row {
+    margin-bottom: 2rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .trust-row div {
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(227, 192, 107, 0.12);
+    background: rgba(255, 248, 239, 0.05);
+    color: rgba(255, 248, 239, 0.92);
+    font-weight: 700;
+    font-size: 0.95rem;
   }
 
   .quiz-block {
-    margin-top: clamp(28px, 4vw, 46px);
+    margin-top: clamp(28px, 4vw, 44px);
+  }
+
+  .quiz-block h2 {
+    margin: 0 0 18px;
+    color: #fff8ef;
+    font-size: clamp(1.4rem, 3vw, 2.2rem);
+    line-height: 1.05;
   }
 
   .option-grid {
@@ -388,21 +569,33 @@ const ROUTES = {
   label {
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-height: 74px;
+    gap: 14px;
+    min-height: 72px;
     padding: 18px 20px;
     border-radius: 22px;
     border: 1px solid rgba(224, 191, 105, 0.15);
+    background: rgba(255, 248, 239, 0.05);
     color: #fff8ef;
-    background: rgba(255, 248, 239, 0.052);
-    font-weight: 850;
+    font-weight: 800;
     cursor: pointer;
+    transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
   }
 
-  input[type="checkbox"],
-  input[type="radio"] {
-    width: 17px;
-    height: 17px;
+  label:hover,
+  label:focus-within {
+    transform: translateY(-1px);
+    border-color: rgba(227, 192, 107, 0.32);
+    background: rgba(255, 248, 239, 0.12);
+  }
+
+  label span {
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
     accent-color: #d4b259;
   }
 
@@ -415,33 +608,56 @@ const ROUTES = {
   .contact-grid input,
   textarea {
     width: 100%;
-    border-radius: 20px;
-    border: 1px solid rgba(224, 191, 105, 0.16);
-    background: rgba(255, 248, 239, 0.93);
+    border-radius: 22px;
+    border: 1px solid rgba(224, 191, 105, 0.18);
+    background: rgba(255, 248, 239, 0.95);
     color: #1f1e1b;
     font-size: 1rem;
     outline: none;
+    padding: 16px 18px;
+  }
+
+  .hp-field {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .contact-grid input {
-    min-height: 62px;
-    padding: 0 18px;
+    min-height: 58px;
   }
 
   textarea {
-    min-height: 120px;
+    min-height: 124px;
     margin-top: 14px;
-    padding: 18px;
     resize: vertical;
     font-family: inherit;
   }
 
+  .contact-copy {
+    max-width: 840px;
+    margin: 0.6rem 0 0;
+    color: rgba(255, 248, 239, 0.74);
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+
+  .form-error {
+    display: none;
+    color: #ffb3b3;
+    font-size: 0.85rem;
+    margin: 10px 0 0;
+  }
+
   .note {
-    max-width: 820px;
+    max-width: 840px;
     margin: 16px 0 0;
-    color: rgba(255, 248, 239, 0.58);
-    font-size: 0.92rem;
-    line-height: 1.55;
+    color: rgba(255, 248, 239, 0.62);
+    font-size: 0.95rem;
+    line-height: 1.7;
   }
 
   .result-card {
@@ -472,23 +688,23 @@ const ROUTES = {
     margin: 22px 0 0;
     color: rgba(255, 248, 239, 0.78);
     font-size: clamp(1.05rem, 2vw, 1.22rem);
-    line-height: 1.68;
+    line-height: 1.7;
   }
 
   .boost-note {
     margin-top: 24px;
-    padding: 18px 20px;
+    padding: 20px 22px;
     border-radius: 22px;
     border: 1px solid rgba(227, 192, 107, 0.26);
     background: rgba(227, 192, 107, 0.1);
     color: #fff8ef;
-    font-weight: 850;
-    line-height: 1.5;
+    font-weight: 800;
+    line-height: 1.6;
   }
 
   .conversion-box {
-    margin-top: 22px;
-    padding: 22px;
+    margin-top: 26px;
+    padding: 24px;
     border-radius: 24px;
     border: 1px solid rgba(224, 191, 105, 0.18);
     background: rgba(255, 248, 239, 0.05);
@@ -497,32 +713,29 @@ const ROUTES = {
   .conversion-box strong {
     display: block;
     color: #fff8ef;
-    font-size: 1.22rem;
-    margin-bottom: 8px;
+    font-size: 1.18rem;
+    margin-bottom: 10px;
   }
 
   .conversion-box p {
     margin: 0;
     color: rgba(255, 248, 239, 0.68);
     font-size: 1rem;
-    line-height: 1.6;
+    line-height: 1.65;
   }
 
   .pay-panel {
-    margin-top: 28px;
+    margin-top: 32px;
     display: grid;
-    gap: 14px;
+    gap: 16px;
   }
 
   .pay-button {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 98px;
-    padding: 20px 26px;
-    overflow: hidden;
+    display: grid;
+    gap: 12px;
+    min-height: 100px;
+    padding: 22px 26px;
     border-radius: 999px;
     text-decoration: none;
     color: #fff6e6;
@@ -549,42 +762,113 @@ const ROUTES = {
     box-shadow: 0 34px 86px rgba(0, 0, 0, 0.5);
   }
 
+  .pay-button:focus-visible,
+  .adjust-button:focus-visible {
+    outline: 2px solid rgba(227, 192, 107, 0.88);
+    outline-offset: 4px;
+  }
+
   .pay-button__eyebrow {
-    color: rgba(255, 248, 239, 0.68);
-    font-size: 0.74rem;
-    font-weight: 950;
+    color: rgba(255, 248, 239, 0.72);
+    font-size: 0.78rem;
+    font-weight: 900;
     letter-spacing: 0.16em;
     text-transform: uppercase;
   }
 
   .pay-button__main {
-    margin-top: 6px;
-    font-size: clamp(1.12rem, 2.4vw, 1.45rem);
+    font-size: clamp(1.12rem, 2.4vw, 1.5rem);
     font-weight: 950;
-    line-height: 1.15;
+    line-height: 1.1;
     text-align: center;
   }
 
   .pay-button__sub {
-    margin-top: 8px;
-    color: rgba(255, 248, 239, 0.7);
-    font-size: 0.88rem;
-    font-weight: 750;
-    line-height: 1.25;
+    color: rgba(255, 248, 239, 0.72);
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .secondary-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .secondary-cta {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 58px;
+    padding: 0 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(224, 191, 105, 0.18);
+    background: rgba(255, 248, 239, 0.06);
+    color: rgba(255, 248, 239, 0.92);
+    text-decoration: none;
+    font-weight: 800;
     text-align: center;
   }
 
   .adjust-button {
-    justify-self: center;
-    width: fit-content;
-    min-height: 48px;
-    padding: 0 20px;
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 58px;
+    padding: 0 24px;
     border-radius: 999px;
     border: 1px solid rgba(224, 191, 105, 0.16);
     background: rgba(255, 248, 239, 0.04);
-    color: rgba(255, 248, 239, 0.78);
+    color: rgba(255, 248, 239, 0.88);
     font-weight: 850;
     cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  }
+
+  .adjust-button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(224, 191, 105, 0.34);
+    background: rgba(255, 248, 239, 0.08);
+  }
+
+  .next-steps {
+    margin-top: 24px;
+    padding: 20px 22px;
+    border-radius: 24px;
+    border: 1px solid rgba(224, 191, 105, 0.14);
+    background: rgba(255, 248, 239, 0.05);
+  }
+
+  .next-title {
+    margin: 0 0 14px;
+    color: #fff8ef;
+    font-size: 1rem;
+    font-weight: 900;
+  }
+
+  .next-steps ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: rgba(255, 248, 239, 0.78);
+    display: grid;
+    gap: 10px;
+  }
+
+  .next-steps li {
+    position: relative;
+    padding-left: 22px;
+    line-height: 1.7;
+  }
+
+  .next-steps li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #e3c06b;
   }
 
   .sticky-submit {
@@ -600,8 +884,10 @@ const ROUTES = {
   }
 
   .submit-btn {
+    appearance: none;
+    -webkit-appearance: none;
     width: 100%;
-    min-height: 66px;
+    min-height: 68px;
     border: 0;
     border-radius: 999px;
     color: #fff6e6;
@@ -609,52 +895,98 @@ const ROUTES = {
     font-size: 1.08rem;
     background: linear-gradient(135deg, #604e24 0%, #153a2d 100%);
     cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  }
+
+  .submit-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+  }
+
+  .submit-btn:active {
+    transform: translateY(0);
+  }
+
+  .submit-btn:focus-visible {
+    outline: 2px solid rgba(227, 192, 107, 0.88);
+    outline-offset: 4px;
+  }
+
+  .submit-btn:disabled {
+    cursor: not-allowed;
+    background: rgba(255, 248, 239, 0.14);
+    color: rgba(255, 248, 239, 0.62);
+    box-shadow: none;
+    filter: none;
+    transform: none;
   }
 
   @media (max-width: 900px) {
-    .option-grid,
-    .contact-grid {
+    .progress-strip {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .quiz-head {
-      flex-direction: column;
+    .option-grid,
+    .contact-grid,
+    .trust-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .secondary-actions {
+      grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 640px) {
     .trial-section {
       padding-top: 24px;
+      padding-bottom: 64px;
     }
 
     .quiz-card {
-      border-radius: 26px;
-      padding: 20px;
+      border-radius: 28px;
+      padding: 22px;
     }
 
+    .page-masthead {
+      font-size: 0.78rem;
+    }
+
+    .back-link {
+      margin-bottom: 1.25rem;
+    }
+
+    .progress-strip,
     .option-grid,
-    .contact-grid {
+    .contact-grid,
+    .trust-row {
       grid-template-columns: 1fr;
-      gap: 10px;
+    }
+
+    .quiz-head h1,
+    .result-title {
+      font-size: clamp(2.6rem, 12vw, 4.25rem);
     }
 
     label {
-      min-height: 62px;
-      border-radius: 18px;
+      min-height: 64px;
+      padding: 14px 16px;
+      border-radius: 20px;
+    }
+
+    .contact-grid input,
+    textarea {
       padding: 14px 16px;
     }
 
-    .quiz-pill {
-      display: none;
-    }
-
     .pay-button {
-      border-radius: 28px;
-      min-height: 92px;
+      min-height: 86px;
+      padding: 18px 22px;
     }
 
     .result-card {
-      border-radius: 26px;
+      border-radius: 28px;
       padding: 24px;
     }
   }

@@ -1,0 +1,58 @@
+@base = https://smashpro.app/api/v1/index.php
+@app_slug = deeper-than-skin
+@api_key = YOUR_API_KEY
+
+### Health
+GET {{base}}?path=health
+
+### Public Commerce Categories
+GET {{base}}?path=public/commerce/categories&app_slug={{app_slug}}
+
+### Public Commerce Products
+GET {{base}}?path=public/commerce/products&app_slug={{app_slug}}
+
+### Public Commerce Products - Lake Carolina Market
+GET {{base}}?path=public/commerce/products&app_slug={{app_slug}}&category=lake-carolina-market
+
+### Public Commerce Featured
+GET {{base}}?path=public/commerce/featured&app_slug={{app_slug}}
+
+### Public Commerce Services
+GET {{base}}?path=public/commerce/services&app_slug={{app_slug}}
+
+### Public Waitlist Count
+GET {{base}}?path=public/waitlist/count&app_slug={{app_slug}}
+
+### Checkout Empty Cart Controlled Error
+POST {{base}}?path=public/commerce/checkout&app_slug={{app_slug}}
+Content-Type: text/plain
+
+{
+  "cart": []
+}
+
+### Quiz Lead Smoke
+POST {{base}}?path=public/quiz-lead&app_slug={{app_slug}}
+Content-Type: text/plain
+
+{
+  "app_slug": "deeper-than-skin",
+  "name": "API Test",
+  "email": "api-test@example.com",
+  "kit_slug": "balanced-starter-kit",
+  "kit_title": "The Balanced Starter Kit",
+  "goals": ["energy"],
+  "prefs": ["juice"],
+  "notes": ["low-sugar"],
+  "source": "api-http-test",
+  "company": ""
+}
+
+### Protected Admin Leads
+GET {{base}}?path=admin/leads&app_slug={{app_slug}}&api_key={{api_key}}
+
+### Protected Jobs Expected Controlled Error
+GET {{base}}?path=jobs&api_key={{api_key}}
+
+### Protected Services
+GET {{base}}?path=services&api_key={{api_key}}

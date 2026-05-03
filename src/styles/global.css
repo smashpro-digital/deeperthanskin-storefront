@@ -21,6 +21,12 @@
   --gold:#c8a24a;
   --gold2:#e0c47a;
   --line:rgba(255,255,255,.14);
+  --dts-green:#123a2d;
+  --dts-green-dark:#07110d;
+  --dts-cream:#f8f3e7;
+  --dts-gold:#c8a24a;
+  --dts-muted:rgba(255,255,255,.72);
+  --dts-border:rgba(224,191,105,.24);
 
   /* Luxury surfaces */
   --glass: rgba(255,255,255,.06);
@@ -90,6 +96,17 @@ body{
 /* Better default media behavior */
 img,video,canvas,svg{ display:block; max-width:100%; }
 a{ color:inherit; }
+button,
+input,
+select,
+textarea{
+  font:inherit;
+}
+input,
+select,
+textarea{
+  color:var(--text);
+}
 .container{ max-width:1160px; margin:0 auto; padding:0 var(--pad); }
 .section{ padding:76px 0; }
 
@@ -151,34 +168,94 @@ a{ color:inherit; }
 /* ---------- Buttons (global) ---------- */
 .btns{ display:flex; gap:12px; flex-wrap:wrap; margin-top:18px; }
 .btn{
+  appearance:none;
+  -webkit-appearance:none;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   gap:10px;
+  min-height:44px;
   padding:12px 16px;
   border-radius:14px;
   border:1px solid var(--line);
   text-decoration:none;
   font-weight:650;
   font-size:14px;
+  line-height:1.15;
   background: rgba(255,255,255,.02);
+  color:var(--dts-cream);
+  cursor:pointer;
+  text-align:center;
   transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease, filter .18s ease;
   will-change: transform;
 }
-.btn:hover{ transform: translateY(-1px); }
+.btn:hover{
+  transform: translateY(-1px);
+  border-color:rgba(224,191,105,.42);
+}
 .btn:active{ transform: translateY(0px); }
-.btn:focus-visible{ box-shadow: var(--ring); }
+.btn:focus-visible{
+  outline:2px solid transparent;
+  box-shadow: var(--ring);
+}
+.btn:disabled,
+.btn[aria-disabled="true"]{
+  cursor:not-allowed;
+  opacity:1;
+  filter:saturate(.72);
+  background:rgba(255,255,255,.08);
+  border-color:rgba(255,255,255,.16);
+  color:rgba(248,243,231,.66);
+  box-shadow:none;
+  transform:none;
+}
 
-.btn-primary{
-  background: rgba(200,162,74,.18);
+.btn-primary,
+.btn.primary{
+  background: linear-gradient(135deg, rgba(224,196,122,.98), rgba(200,162,74,.90));
   border-color: rgba(200,162,74,.42);
+  color:#07120d;
   box-shadow: 0 12px 34px rgba(200,162,74,.14);
 }
-.btn-primary:hover{
-  background: rgba(200,162,74,.26);
+.btn-primary:hover,
+.btn.primary:hover{
+  background: linear-gradient(135deg, rgba(236,211,148,.98), rgba(212,178,89,.95));
   box-shadow: 0 16px 44px rgba(200,162,74,.18);
 }
-.btn-ghost:hover{ background: rgba(255,255,255,.06); }
+.btn-secondary,
+.btn.secondary{
+  background:rgba(18,58,45,.86);
+  border-color:rgba(224,191,105,.28);
+  color:var(--dts-cream);
+}
+.btn-secondary:hover,
+.btn.secondary:hover{
+  background:rgba(24,72,56,.96);
+}
+.btn-ghost,
+.btn.ghost{
+  background:rgba(255,255,255,.035);
+  border-color:rgba(255,255,255,.16);
+  color:var(--dts-cream);
+}
+.btn-ghost:hover,
+.btn.ghost:hover{ background: rgba(255,255,255,.075); }
+.btn-danger,
+.btn.danger{
+  background:rgba(150,54,44,.16);
+  border-color:rgba(255,176,168,.36);
+  color:#ffd7d1;
+}
+.btn-danger:hover,
+.btn.danger:hover{
+  background:rgba(150,54,44,.24);
+}
+.nav-drawer .btn-ghost,
+.nav-drawer .btn.ghost{
+  color:rgba(0,0,0,.82);
+  border-color:rgba(0,0,0,.14);
+  background:rgba(255,255,255,.62);
+}
 
 /* =========================================================
    NAV (Mockup-style: light bar, centered wordmark)
