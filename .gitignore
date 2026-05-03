@@ -13,19 +13,32 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# environment variables
-.env
-.env.production
-tests/api/.env
-
 # macOS-specific files
 .DS_Store
 
 # jetbrains setting folder
 .idea/
 
-# local deployment secrets
+# Private API config / secrets
+api/bootstrap/config.php
+api/bootstrap/config.local.php
+api/bootstrap/*.local.php
+.env
+.env.*
 .vscode/sftp.json
 .vscode/settings.json
-api/bootstrap/config.php
 api/v1/routes/_square.config.php
+tests/api/.env
+
+# Private/admin/debug API routes
+api/v1/routes/admin.*
+api/v1/routes/dev.*
+api/v1/routes/private.*
+
+# Logs/debug output
+*.log
+api/v1/routes/*.log
+api/v1/routes/*debug*.log
+
+# Keep public API route files trackable
+!api/v1/routes/public.*
