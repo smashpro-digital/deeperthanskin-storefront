@@ -135,6 +135,52 @@ function extract_best_variation_from_square_item(array $obj): array {
   return $best;
 }
 
+function extract_variations_from_square_item(array $obj): array {
+  $itemId = trim((string)($obj["id"] ?? ""));
+  $item = $obj["item_data"] ?? null;
+  if ($itemId === "" || !is_array($item)) return [];
+
+  $variations = is_array($item["variations"] ?? null) ? $item["variations"] : [];
+  $out = [];
+
+  foreach ($variations as $idx => $v) {
+    if (!is_array($v)) continue;
+
+    $variationId = trim((string)($v["id"] ?? ""));
+    $vd = $v["item_variation_data"] ?? null;
+    if ($variationId === "" || !is_array($vd)) continue;
+
+    $priceMoney = $vd["price_money"] ?? null;
+    $amount = is_array($priceMoney) ? ($priceMoney["amount"] ?? null) : null;
+    $currency = is_array($priceMoney) ? ($priceMoney["currency"] ?? null) : null;
+
+    $name = isset($vd["name"]) ? trim((string)$vd["name"]) : "";
+    if ($name === "") $name = "Regular";
+
+    $sku = isset($vd["sku"]) ? trim((string)$vd["sku"]) : null;
+    if ($sku === "") $sku = null;
+
+    $upc = isset($vd["upc"]) ? trim((string)$vd["upc"]) : null;
+    if ($upc === "") $upc = null;
+
+    $out[] = [
+      "square_item_id" => $itemId,
+      "square_variation_id" => $variationId,
+      "name" => $name,
+      "sku" => $sku,
+      "upc" => $upc,
+      "price_amount" => (is_int($amount) || ctype_digit((string)$amount)) ? (int)$amount : null,
+      "currency_code" => is_string($currency) && trim($currency) !== "" ? trim($currency) : null,
+      "sort_order" => $idx + 1,
+      "is_deleted" => !empty($v["is_deleted"]) ? 1 : 0,
+      "is_active" => empty($v["is_deleted"]) ? 1 : 0,
+      "raw_json" => json_encode($v, JSON_UNESCAPED_SLASHES),
+    ];
+  }
+
+  return $out;
+}
+
 function resolve_variation_id_for_response(?string $dbVariationId, string $itemId, ?string $rawJson): ?string {
   $dbVariationId = is_string($dbVariationId) ? trim($dbVariationId) : "";
 
@@ -155,6 +201,90 @@ function resolve_variation_id_for_response(?string $dbVariationId, string $itemI
   }
 
   return $dbVariationId !== "" ? $dbVariationId : null;
+}
+
+function choose_response_variation(array $variations, ?string $fallbackVariationId, ?array $fallbackPriceMoney): array {
+  $fallbackVariationId = is_string($fallbackVariationId) && trim($fallbackVariationId) !== ""
+    ? trim($fallbackVariationId)
+    : null;
+
+  foreach ($variations as $v) {
+    if (empty($v["is_active"])) continue;
+
+    $vid = trim((string)($v["id"] ?? ""));
+    $pm = $v["price_money"] ?? null;
+
+    if ($vid !== "" && is_array($pm) && isset($pm["amount"], $pm["currency"])) {
+      return [
+        "variation_id" => $vid,
+        "price_money" => $pm,
+      ];
+    }
+  }
+
+  return [
+    "variation_id" => $fallbackVariationId,
+    "price_money" => $fallbackPriceMoney,
+  ];
+}
+
+function build_one_time_purchase_option_for_products(
+  bool $enabled,
+  ?string $variationId,
+  ?array $priceMoney,
+  array $variations,
+  bool $selectedByDefault
+): ?array {
+  if (!$enabled) return null;
+
+  $variationId = is_string($variationId) ? trim($variationId) : "";
+
+  return [
+    "id" => "one_time",
+    "type" => "one_time",
+    "label" => "One-time purchase",
+    "description" => "Add once and checkout securely.",
+    "enabled" => true,
+    "selected_by_default" => $selectedByDefault,
+    "variation_id" => $variationId !== "" ? $variationId : null,
+    "price_money" => $priceMoney,
+    "variations" => $variations,
+  ];
+}
+
+function build_subscription_purchase_option_for_products(array $row, bool $selectedByDefault): array {
+  $compareAtPriceMoney = (
+    isset($row["compare_at_amount"], $row["compare_at_currency"]) &&
+    $row["compare_at_amount"] !== null &&
+    $row["compare_at_currency"] !== null &&
+    (int)$row["compare_at_amount"] > 0 &&
+    trim((string)$row["compare_at_currency"]) !== ""
+  )
+    ? [
+        "amount" => (int)$row["compare_at_amount"],
+        "currency" => (string)$row["compare_at_currency"],
+      ]
+    : null;
+
+  return [
+    "id" => (string)$row["option_key"],
+    "type" => "subscription",
+    "label" => (string)$row["label"],
+    "description" => (string)($row["description"] ?? ""),
+    "badge" => (string)($row["badge"] ?? "Subscription"),
+    "enabled" => (bool)$row["enabled"],
+    "selected_by_default" => $selectedByDefault,
+    "square_plan_variation_id" => (string)$row["square_plan_variation_id"],
+    "price_money" => [
+      "amount" => (int)$row["price_amount"],
+      "currency" => (string)$row["price_currency"],
+    ],
+    "compare_at_price_money" => $compareAtPriceMoney,
+    "discount_percent" => $row["discount_percent"] !== null
+      ? (float)$row["discount_percent"]
+      : null,
+    "sort_order" => (int)$row["sort_order"],
+  ];
 }
 
 function commerce_category_ids_from_cfg_products(array $cfg, string $categorySlug): array {
@@ -360,6 +490,181 @@ function load_product_images_map(string $appSlug, array $itemIds): array {
   return $map;
 }
 
+function load_product_variations_map(string $appSlug, array $itemIds): array {
+  $itemIds = array_values(array_unique(array_filter(array_map(function ($v) {
+    return is_string($v) ? trim($v) : "";
+  }, $itemIds))));
+
+  if (!$itemIds) return [];
+
+  $placeholders = implode(",", array_fill(0, count($itemIds), "?"));
+  $params = array_merge([$appSlug], $itemIds);
+
+  $sql = "
+    SELECT
+      square_item_id,
+      square_variation_id,
+      name,
+      sku,
+      upc,
+      price_amount,
+      currency_code,
+      sort_order,
+      is_deleted,
+      is_active
+    FROM spd_square_product_variations
+    WHERE app_slug = ?
+      AND square_item_id IN ($placeholders)
+    ORDER BY square_item_id ASC, sort_order ASC, name ASC, square_variation_id ASC
+  ";
+
+  $map = [];
+
+  try {
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    foreach ($rows as $r) {
+      $itemId = trim((string)($r["square_item_id"] ?? ""));
+      $variationId = trim((string)($r["square_variation_id"] ?? ""));
+      if ($itemId === "" || $variationId === "") continue;
+
+      if (!isset($map[$itemId])) $map[$itemId] = [];
+
+      $amount = $r["price_amount"] ?? null;
+      $currency = $r["currency_code"] ?? null;
+      $priceMoney = null;
+
+      if ((is_int($amount) || ctype_digit((string)$amount)) && is_string($currency) && trim($currency) !== "") {
+        $priceMoney = [
+          "amount" => (int)$amount,
+          "currency" => trim((string)$currency),
+        ];
+      }
+
+      $map[$itemId][] = [
+        "id" => $variationId,
+        "variation_id" => $variationId,
+        "name" => (string)($r["name"] ?? ""),
+        "sku" => ($r["sku"] ?? null) !== null ? (string)$r["sku"] : null,
+        "upc" => ($r["upc"] ?? null) !== null ? (string)$r["upc"] : null,
+        "price_money" => $priceMoney,
+        "has_price" => $priceMoney !== null,
+        "sort_order" => (int)($r["sort_order"] ?? 0),
+        "is_deleted" => (int)($r["is_deleted"] ?? 0) === 1,
+        "is_active" => (int)($r["is_active"] ?? 0) === 1 && (int)($r["is_deleted"] ?? 0) === 0,
+      ];
+    }
+  } catch (Throwable $e) {
+    // Non-fatal. Old deployments can still use top-level variation_id.
+  }
+
+  return $map;
+}
+
+function load_storefront_product_meta_map(string $appSlug, array $itemIds): array {
+  $itemIds = array_values(array_unique(array_filter(array_map(function ($v) {
+    return is_string($v) ? trim($v) : "";
+  }, $itemIds))));
+
+  if (!$itemIds) return [];
+
+  $placeholders = implode(",", array_fill(0, count($itemIds), "?"));
+  $params = array_merge([$appSlug], $itemIds);
+
+  $sql = "
+    SELECT
+      id,
+      square_product_id,
+      one_time_enabled,
+      subscription_enabled,
+      status,
+      is_visible
+    FROM spd_storefront_products
+    WHERE app_slug = ?
+      AND square_product_id IN ($placeholders)
+  ";
+
+  $map = [];
+
+  try {
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    foreach ($rows as $r) {
+      $itemId = trim((string)($r["square_product_id"] ?? ""));
+      if ($itemId === "") continue;
+
+      $map[$itemId] = [
+        "storefront_product_id" => (int)($r["id"] ?? 0),
+        "one_time_enabled" => (int)($r["one_time_enabled"] ?? 0) === 1,
+        "subscription_enabled" => (int)($r["subscription_enabled"] ?? 0) === 1,
+        "status" => (string)($r["status"] ?? ""),
+        "is_visible" => (int)($r["is_visible"] ?? 0) === 1,
+      ];
+    }
+  } catch (Throwable $e) {
+    // Non-fatal. Square-only products still expose one-time purchase options.
+  }
+
+  return $map;
+}
+
+function load_subscription_options_map(string $appSlug, array $storefrontProductIds): array {
+  $storefrontProductIds = array_values(array_unique(array_filter(array_map(function ($v) {
+    return is_int($v) ? $v : (ctype_digit((string)$v) ? (int)$v : 0);
+  }, $storefrontProductIds))));
+
+  if (!$storefrontProductIds) return [];
+
+  $placeholders = implode(",", array_fill(0, count($storefrontProductIds), "?"));
+  $params = array_merge([$appSlug], $storefrontProductIds);
+
+  $sql = "
+    SELECT
+      storefront_product_id,
+      option_key,
+      label,
+      description,
+      badge,
+      square_plan_variation_id,
+      price_amount,
+      price_currency,
+      compare_at_amount,
+      compare_at_currency,
+      discount_percent,
+      enabled,
+      sort_order
+    FROM spd_storefront_product_subscription_options
+    WHERE app_slug = ?
+      AND storefront_product_id IN ($placeholders)
+      AND enabled = 1
+    ORDER BY storefront_product_id ASC, sort_order ASC, id ASC
+  ";
+
+  $map = [];
+
+  try {
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    foreach ($rows as $r) {
+      $storefrontProductId = (int)($r["storefront_product_id"] ?? 0);
+      if ($storefrontProductId <= 0) continue;
+
+      if (!isset($map[$storefrontProductId])) $map[$storefrontProductId] = [];
+      $map[$storefrontProductId][] = build_subscription_purchase_option_for_products($r, false);
+    }
+  } catch (Throwable $e) {
+    // Non-fatal. Product lists remain backwards-compatible.
+  }
+
+  return $map;
+}
+
 function load_product_categories_map(string $appSlug, array $itemIds, array $categoryMetaMap): array {
   $itemIds = array_values(array_unique(array_filter(array_map(function ($v) {
     return is_string($v) ? trim($v) : "";
@@ -463,6 +768,7 @@ $syncReport = [
   "ok" => true,
   "fetched" => 0,
   "upserted" => 0,
+  "variations_upserted" => 0,
   "category_links_upserted" => 0,
   "images_upserted" => 0,
   "error" => null,
@@ -626,9 +932,58 @@ if ($syncDb) {
         updated_at = NOW()
     ";
 
+    $sqlVariation = "
+      INSERT INTO spd_square_product_variations
+      (
+        app_slug,
+        square_item_id,
+        square_variation_id,
+        name,
+        sku,
+        upc,
+        price_amount,
+        currency_code,
+        sort_order,
+        is_deleted,
+        is_active,
+        raw_json,
+        created_at,
+        updated_at
+      )
+      VALUES
+      (
+        :app_slug,
+        :square_item_id,
+        :square_variation_id,
+        :name,
+        :sku,
+        :upc,
+        :price_amount,
+        :currency_code,
+        :sort_order,
+        :is_deleted,
+        :is_active,
+        :raw_json,
+        NOW(),
+        NOW()
+      )
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        sku = VALUES(sku),
+        upc = VALUES(upc),
+        price_amount = VALUES(price_amount),
+        currency_code = VALUES(currency_code),
+        sort_order = VALUES(sort_order),
+        is_deleted = VALUES(is_deleted),
+        is_active = VALUES(is_active),
+        raw_json = VALUES(raw_json),
+        updated_at = NOW()
+    ";
+
     $stmtProduct = $pdo->prepare($sqlProduct);
     $stmtLink = $pdo->prepare($sqlLink);
     $stmtImage = $pdo->prepare($sqlImage);
+    $stmtVariation = $pdo->prepare($sqlVariation);
 
     $allImageIds = [];
 
@@ -709,6 +1064,34 @@ if ($syncDb) {
       $bestCurrency = $best["currency"];
       $sku = $best["sku"];
       $upc = $best["upc"];
+
+      $pdo->prepare("
+        DELETE FROM spd_square_product_variations
+        WHERE app_slug = :app
+          AND square_item_id = :item
+      ")->execute([
+        ":app" => $appSlug,
+        ":item" => $itemId,
+      ]);
+
+      foreach (extract_variations_from_square_item($obj) as $variation) {
+        $stmtVariation->execute([
+          ":app_slug" => $appSlug,
+          ":square_item_id" => $itemId,
+          ":square_variation_id" => $variation["square_variation_id"],
+          ":name" => $variation["name"],
+          ":sku" => $variation["sku"],
+          ":upc" => $variation["upc"],
+          ":price_amount" => $variation["price_amount"],
+          ":currency_code" => $variation["currency_code"],
+          ":sort_order" => $variation["sort_order"],
+          ":is_deleted" => $variation["is_deleted"],
+          ":is_active" => $variation["is_active"],
+          ":raw_json" => $variation["raw_json"],
+        ]);
+
+        $syncReport["variations_upserted"]++;
+      }
 
       if (
         !is_string($variationId) ||
@@ -925,6 +1308,14 @@ $itemIds = array_values(array_filter(array_map(function ($r) {
 $categoryMetaMap = load_category_meta_map($appSlug);
 $productCategoriesMap = load_product_categories_map($appSlug, $itemIds, $categoryMetaMap);
 $productImagesMap = load_product_images_map($appSlug, $itemIds);
+$productVariationsMap = load_product_variations_map($appSlug, $itemIds);
+$storefrontProductMetaMap = load_storefront_product_meta_map($appSlug, $itemIds);
+$storefrontProductIds = [];
+foreach ($storefrontProductMetaMap as $meta) {
+  $storefrontProductId = (int)($meta["storefront_product_id"] ?? 0);
+  if ($storefrontProductId > 0) $storefrontProductIds[] = $storefrontProductId;
+}
+$subscriptionOptionsMap = load_subscription_options_map($appSlug, $storefrontProductIds);
 
 $normalized = [];
 
@@ -948,6 +1339,87 @@ foreach ($rows as $r) {
     $itemId,
     ($r["raw_json"] ?? null) !== null ? (string)$r["raw_json"] : null
   );
+
+  $variations = $productVariationsMap[$itemId] ?? [];
+  if (!$variations && ($r["raw_json"] ?? null) !== null) {
+    $decoded = json_decode((string)$r["raw_json"], true);
+    if (is_array($decoded)) {
+      foreach (extract_variations_from_square_item($decoded) as $v) {
+        $pm = null;
+        if ($v["price_amount"] !== null && $v["currency_code"] !== null) {
+          $pm = [
+            "amount" => (int)$v["price_amount"],
+            "currency" => (string)$v["currency_code"],
+          ];
+        }
+
+        $variations[] = [
+          "id" => $v["square_variation_id"],
+          "variation_id" => $v["square_variation_id"],
+          "name" => $v["name"],
+          "sku" => $v["sku"],
+          "upc" => $v["upc"],
+          "price_money" => $pm,
+          "has_price" => $pm !== null,
+          "sort_order" => (int)$v["sort_order"],
+          "is_deleted" => (int)$v["is_deleted"] === 1,
+          "is_active" => (int)$v["is_active"] === 1 && (int)$v["is_deleted"] === 0,
+        ];
+      }
+    }
+  }
+
+  $chosen = choose_response_variation($variations, $variationId, $priceMoney);
+  $variationId = $chosen["variation_id"];
+  $priceMoney = $chosen["price_money"];
+
+  $storefrontMeta = $storefrontProductMetaMap[$itemId] ?? null;
+  $storefrontProductId = is_array($storefrontMeta) ? (int)($storefrontMeta["storefront_product_id"] ?? 0) : 0;
+  $storefrontOnline = !is_array($storefrontMeta) || (
+    ($storefrontMeta["status"] ?? "") === "active" &&
+    !empty($storefrontMeta["is_visible"])
+  );
+
+  $oneTimeEnabled = is_array($storefrontMeta)
+    ? !empty($storefrontMeta["one_time_enabled"])
+    : true;
+
+  $oneTimeEnabled =
+    $storefrontOnline &&
+    $oneTimeEnabled &&
+    $variationId !== null &&
+    $variationId !== "" &&
+    $variationId !== $itemId;
+
+  $subscriptionOptions = $storefrontProductId > 0
+    ? ($subscriptionOptionsMap[$storefrontProductId] ?? [])
+    : [];
+
+  $purchaseOptions = [];
+  $oneTimePurchaseOption = build_one_time_purchase_option_for_products(
+    $oneTimeEnabled,
+    $variationId,
+    $priceMoney,
+    $variations,
+    true
+  );
+
+  if ($oneTimePurchaseOption !== null) {
+    $purchaseOptions[] = $oneTimePurchaseOption;
+  }
+
+  if ($storefrontOnline && (!is_array($storefrontMeta) || !empty($storefrontMeta["subscription_enabled"]))) {
+    foreach ($subscriptionOptions as $subscriptionOption) {
+      if (empty($subscriptionOption["enabled"])) continue;
+      $purchaseOptions[] = $subscriptionOption;
+    }
+  }
+
+  if (count($purchaseOptions) > 0 && !array_filter($purchaseOptions, function ($option) {
+    return !empty($option["selected_by_default"]);
+  })) {
+    $purchaseOptions[0]["selected_by_default"] = true;
+  }
 
   $categories = $productCategoriesMap[$itemId] ?? [];
   $categories = array_values(array_map(function ($c) {
@@ -1004,6 +1476,9 @@ foreach ($rows as $r) {
     "variation_id" => $variationId,
     "price_money" => $priceMoney,
     "has_price" => $priceMoney !== null,
+    "variations" => $variations,
+    "has_variations" => count($variations) > 1,
+    "purchase_options" => $purchaseOptions,
     "image_ids" => $imageIds,
 
     "category_id" => count($categoryIdsForItem) > 0 ? $categoryIdsForItem[0] : null,
