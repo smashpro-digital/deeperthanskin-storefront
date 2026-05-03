@@ -392,20 +392,39 @@ const shopUrl = `${base}shop`;
     }
 
     button {
+      appearance: none;
+      -webkit-appearance: none;
       min-height: 72px;
       border: 0;
       padding: 0 2rem;
       background: linear-gradient(135deg, #e5ad4a, #b56f22);
-      color: white;
+      color: #17120b;
       font-weight: 950;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       cursor: pointer;
       white-space: nowrap;
+      transition: filter .16s ease, transform .16s ease, box-shadow .16s ease;
+    }
+
+    button:hover {
+      filter: brightness(1.04);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:focus-visible {
+      outline: 2px solid rgba(247, 211, 140, 0.9);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 4px rgba(6, 32, 21, 0.22);
     }
 
     button[disabled] {
-      opacity: 0.72;
+      opacity: 1;
+      background: #ead8b9;
+      color: #5c4f39;
       cursor: wait;
     }
 

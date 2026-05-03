@@ -450,6 +450,7 @@ const ROUTES = {
 
           const card = document.createElement("article");
           card.className = "card";
+          card.setAttribute("data-id", String(id));
 
           card.innerHTML = `
             <a class="link" href="${escapeHtml(productUrl(id))}" aria-label="View ${title}">
@@ -474,12 +475,12 @@ const ROUTES = {
               <div class="ds">${desc || "Tap to view details."}</div>
 
               <div class="actions">
-                <a class="btn-mini" href="${escapeHtml(productUrl(id))}">View</a>
                 ${
                   canCart
-                    ? `<button class="btn-mini btn-mini--gold" type="button" data-add="1" data-id="${escapeHtml(id)}" data-vid="${escapeHtml(variationId)}">Add</button>`
-                    : `<span class="chip-mini" title="Requires variation_id and price">No quick add</span>`
+                    ? `<button class="btn btn-primary add" type="button" data-add="1" data-id="${escapeHtml(id)}" data-vid="${escapeHtml(variationId)}">Add to cart</button>`
+                    : `<span class="btn btn-primary btn-static" title="Requires variation_id and price">View details</span>`
                 }
+                <a class="btn btn-ghost" href="${escapeHtml(productUrl(id))}">View</a>
               </div>
             </div>
           `;
@@ -487,7 +488,7 @@ const ROUTES = {
           grid.appendChild(card);
         });
 
-        grid.querySelectorAll("[data-add]").forEach((btn) => {
+        grid.querySelectorAll("button.add[data-add]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const id = btn.getAttribute("data-id") || "";
             const vid = btn.getAttribute("data-vid") || "";
@@ -509,6 +510,8 @@ const ROUTES = {
                 qty: 1,
               });
               updateCartCount();
+              btn.textContent = "Added ✓";
+              setTimeout(() => (btn.textContent = "Add to cart"), 900);
               toast("Added to cart");
             } catch (e) {
               toast(e?.message || "Couldn’t add to cart");
@@ -639,6 +642,8 @@ const ROUTES = {
     }
     .chips { display: flex; gap: 8px; flex-wrap: wrap; }
     .chip {
+      appearance: none;
+      -webkit-appearance: none;
       border-radius: 999px;
       padding: 8px 12px;
       border: 1px solid rgba(255,255,255,.12);
@@ -649,6 +654,16 @@ const ROUTES = {
       transition: transform .12s ease, border-color .12s ease, background .12s ease;
     }
     .chip:hover { transform: translateY(-1px); border-color: rgba(200,162,74,.22); }
+    .chip:focus-visible {
+      outline: 2px solid rgba(200,162,74,.72);
+      outline-offset: 3px;
+    }
+    .chip:disabled {
+      cursor: not-allowed;
+      color: rgba(255,255,255,.55);
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.10);
+    }
     .chip.is-on {
       border-color: rgba(200,162,74,.35);
       background: rgba(200,162,74,.12);
@@ -665,6 +680,18 @@ const ROUTES = {
       color: rgba(255,255,255,.92);
       padding: 0 14px;
       outline: none;
+    }
+    .select select option {
+      background: #f8f3e7;
+      color: #07120d;
+    }
+    .search input::placeholder {
+      color: rgba(255,255,255,.58);
+    }
+    .search input:focus-visible,
+    .select select:focus-visible {
+      border-color: rgba(200,162,74,.52);
+      box-shadow: 0 0 0 3px rgba(200,162,74,.18);
     }
     .search input { width: min(320px, 72vw); }
 
@@ -783,6 +810,8 @@ const ROUTES = {
       margin-top: 2px;
     }
     .btn-mini {
+      appearance: none;
+      -webkit-appearance: none;
       border-radius: 999px;
       padding: 8px 12px;
       font-size: 12px;
@@ -796,10 +825,32 @@ const ROUTES = {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      min-height: 36px;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+    .btn-mini:hover {
+      transform: translateY(-1px);
+      border-color: rgba(200,162,74,.32);
+      background: rgba(255,255,255,.07);
+    }
+    .btn-mini:focus-visible {
+      outline: 2px solid rgba(200,162,74,.72);
+      outline-offset: 3px;
+    }
+    .btn-mini:disabled {
+      cursor: not-allowed;
+      background: rgba(255,255,255,.07);
+      border-color: rgba(255,255,255,.12);
+      color: rgba(255,255,255,.58);
+      transform: none;
     }
     .btn-mini--gold {
       border-color: rgba(200,162,74,.35);
       background: rgba(200,162,74,.14);
+    }
+    .btn-mini--gold:hover {
+      background: rgba(200,162,74,.22);
+      color: #fff8e9;
     }
     .chip-mini {
       font-size: 12px;
@@ -886,6 +937,61 @@ const ROUTES = {
     }
     @media (max-width: 560px) {
       .card { grid-column: span 12; }
+    }
+  </style>
+
+  <style is:global>
+    #featGrid .actions {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      justify-content: space-between;
+      padding: 10px 12px 14px;
+      margin-top: 2px;
+    }
+
+    #featGrid .actions .btn {
+      flex: 1;
+      min-height: 44px;
+      line-height: 1.15;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    #featGrid .actions button.btn {
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    #featGrid .actions .btn:focus-visible {
+      outline: 2px solid rgba(200,162,74,.72);
+      outline-offset: 3px;
+    }
+
+    #featGrid .actions button.btn:disabled {
+      cursor: not-allowed;
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.14);
+      color: rgba(255,255,255,.62);
+      box-shadow: none;
+      transform: none;
+    }
+
+    #featGrid .actions .btn-static {
+      cursor: default;
+      pointer-events: none;
+    }
+
+    @media (max-width: 420px) {
+      #featGrid .actions {
+        flex-direction: column;
+      }
+
+      #featGrid .actions .btn {
+        width: 100%;
+      }
     }
   </style>
 </BaseLayout>

@@ -762,6 +762,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     box-shadow: 0 34px 86px rgba(0, 0, 0, 0.5);
   }
 
+  .pay-button:focus-visible,
+  .adjust-button:focus-visible {
+    outline: 2px solid rgba(227, 192, 107, 0.88);
+    outline-offset: 4px;
+  }
+
   .pay-button__eyebrow {
     color: rgba(255, 248, 239, 0.72);
     font-size: 0.78rem;
@@ -808,6 +814,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   }
 
   .adjust-button {
+    appearance: none;
+    -webkit-appearance: none;
     min-height: 58px;
     padding: 0 24px;
     border-radius: 999px;
@@ -816,6 +824,13 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     color: rgba(255, 248, 239, 0.88);
     font-weight: 850;
     cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  }
+
+  .adjust-button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(224, 191, 105, 0.34);
+    background: rgba(255, 248, 239, 0.08);
   }
 
   .next-steps {
@@ -869,6 +884,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   }
 
   .submit-btn {
+    appearance: none;
+    -webkit-appearance: none;
     width: 100%;
     min-height: 68px;
     border: 0;
@@ -878,6 +895,31 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     font-size: 1.08rem;
     background: linear-gradient(135deg, #604e24 0%, #153a2d 100%);
     cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  }
+
+  .submit-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+  }
+
+  .submit-btn:active {
+    transform: translateY(0);
+  }
+
+  .submit-btn:focus-visible {
+    outline: 2px solid rgba(227, 192, 107, 0.88);
+    outline-offset: 4px;
+  }
+
+  .submit-btn:disabled {
+    cursor: not-allowed;
+    background: rgba(255, 248, 239, 0.14);
+    color: rgba(255, 248, 239, 0.62);
+    box-shadow: none;
+    filter: none;
+    transform: none;
   }
 
   @media (max-width: 900px) {

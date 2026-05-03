@@ -107,10 +107,13 @@ const protectedTests = [
     query: { api_key: API_KEY },
     expectStatus: [200, 400],
     failOnStatuses: [404],
-    validateJson: (json, status) => {
-      if (status >= 200 && status <= 299) return true;
-      return status === 400 && json?.error === "user_id is required";
-    },
+    validateJson: (json, status) => (
+      status >= 200 && status <= 299
+    ) || (
+      status === 400
+      && json?.ok === false
+      && json?.error === "user_id is required"
+    ),
   },
   {
     name: "PROTECTED services",
