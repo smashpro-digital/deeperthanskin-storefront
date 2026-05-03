@@ -268,6 +268,7 @@ const pageTitle = productSeed?.name
     const state = {
       mode: "one-time",
       selectedSubscriptionOptionId: "",
+      selectedVariationId: "",
       pdp: null,
       qty: 1,
     };
@@ -384,16 +385,179 @@ const pageTitle = productSeed?.name
       );
     }
 
+    function normalizeVariation(raw) {
+      if (!raw || typeof raw !== "object") return null;
+
+      const variationId = String(
+        raw.variation_id ||
+          raw.variationId ||
+          raw.square_variation_id ||
+          raw.id ||
+          ""
+      ).trim();
+
+      if (!variationId) return null;
+
+      const priceMoney =
+        raw.price_money && typeof raw.price_money.amount === "number"
+          ? {
+              amount: Number(raw.price_money.amount),
+              currency: raw.price_money.currency || "USD",
+            }
+          : null;
+
+      const name = String(raw.name || raw.label || raw.title || "Regular").trim() || "Regular";
+
+      return {
+        id: variationId,
+        variation_id: variationId,
+        name,
+        label: name,
+        sku: raw.sku || null,
+        upc: raw.upc || null,
+        price_money: priceMoney,
+        has_price: !!raw.has_price || priceMoney !== null,
+        sort_order: Number(raw.sort_order || raw.sort || 0),
+        is_active: raw.is_active !== false && raw.active !== false && raw.is_deleted !== true,
+      };
+    }
+
+    function normalizeVariations(product, oneTime) {
+      const raw =
+        (Array.isArray(product?.one_time?.variations) && product.one_time.variations) ||
+        (Array.isArray(product?.variations) && product.variations) ||
+        (Array.isArray(oneTime?.variations) && oneTime.variations) ||
+        [];
+
+      const seen = new Set();
+      const out = [];
+
+      raw
+        .map(normalizeVariation)
+        .filter(Boolean)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        .forEach((variation) => {
+          if (seen.has(variation.variation_id)) return;
+          seen.add(variation.variation_id);
+          out.push(variation);
+        });
+
+      const legacyId = String(oneTime?.variation_id || product?.variation_id || product?.variationId || "").trim();
+      const legacyPrice = oneTime?.price_money || product?.price_money || null;
+
+      if (legacyId && !seen.has(legacyId)) {
+        out.unshift({
+          id: legacyId,
+          variation_id: legacyId,
+          name: "Regular",
+          label: "Regular",
+          sku: null,
+          upc: null,
+          price_money: legacyPrice,
+          has_price: !!(oneTime?.has_price || product?.has_price || legacyPrice),
+          sort_order: 0,
+          is_active: true,
+        });
+      }
+
+      return out;
+    }
+
+    function getVariationList(pdp = state.pdp) {
+      return Array.isArray(pdp?.one_time?.variations) ? pdp.one_time.variations : [];
+    }
+
+    function getVariations(pdp = state.pdp) {
+      return getVariationList(pdp).filter((v) => v?.is_active !== false);
+    }
+
+    function getVariationId(variation) {
+      return String(
+        variation?.variation_id ||
+          variation?.variationId ||
+          variation?.square_variation_id ||
+          variation?.id ||
+          ""
+      ).trim();
+    }
+
+    function getSelectedVariation(pdp = state.pdp) {
+      const variations = getVariations(pdp);
+      if (!variations.length) {
+        const oneTime = pdp?.one_time || {};
+        return {
+          id: oneTime.variation_id || "",
+          variation_id: oneTime.variation_id || "",
+          name: "",
+          label: "",
+          price_money: oneTime.price_money || null,
+          has_price: !!oneTime.has_price,
+          is_active: !!oneTime.enabled,
+        };
+      }
+
+      const selected = String(state.selectedVariationId || "").trim();
+      return (
+        variations.find((v) => getVariationId(v) === selected) ||
+        variations[0]
+      );
+    }
+
+    function variationCartName(productName, variation) {
+      const baseName = String(productName || "Product").trim();
+      const variationName = String(variation?.name || "").trim();
+
+      if (!variationName || /^regular$/i.test(variationName)) return baseName;
+      return `${baseName} - ${variationName}`;
+    }
+
     function normalizePdpResponse(product) {
       const marketOnly = isMarketOnlyProduct(product);
 
-      const oneTime =
+      const oneTimeRaw =
         product?.one_time || {
           enabled: !marketOnly && !!(product?.variation_id || product?.variationId || product?.price_money),
           variation_id: product?.one_time?.variation_id || product?.variation_id || product?.variationId || "",
           has_price: !!(product?.one_time?.price_money || product?.price_money),
           price_money: product?.one_time?.price_money || product?.price_money || null,
         };
+
+      const variations = normalizeVariations(product, oneTimeRaw);
+
+      const firstAvailableVariation =
+        variations.find((v) => v?.is_active !== false && v?.variation_id && v?.price_money) ||
+        variations.find((v) => v?.is_active !== false && v?.variation_id) ||
+        null;
+
+      const oneTime = {
+        ...oneTimeRaw,
+        enabled:
+          !marketOnly &&
+          !!(
+            oneTimeRaw?.enabled ||
+            firstAvailableVariation?.variation_id ||
+            product?.variation_id ||
+            product?.variationId ||
+            product?.price_money
+          ),
+        variation_id:
+          oneTimeRaw?.variation_id ||
+          firstAvailableVariation?.variation_id ||
+          product?.variation_id ||
+          product?.variationId ||
+          "",
+        has_price:
+          !!oneTimeRaw?.has_price ||
+          !!oneTimeRaw?.price_money ||
+          !!firstAvailableVariation?.price_money ||
+          !!product?.price_money,
+        price_money:
+          oneTimeRaw?.price_money ||
+          firstAvailableVariation?.price_money ||
+          product?.price_money ||
+          null,
+        variations,
+      };
 
       if (marketOnly) {
         oneTime.enabled = false;
@@ -419,6 +583,7 @@ const pageTitle = productSeed?.name
           image_url: product?.image_url || product?.image || seed?.image_url || "",
           brand: product?.brand || "Deeper Than Skin",
           gallery: Array.isArray(product?.gallery) ? product.gallery : [],
+          variations,
           category_slug: product?.category_slug || "",
           category_slugs: Array.isArray(product?.category_slugs) ? product.category_slugs : [],
           categories: Array.isArray(product?.categories) ? product.categories : [],
@@ -449,6 +614,7 @@ const pageTitle = productSeed?.name
 
       const oneTime = state.pdp?.one_time;
       const selected = getSelectedOption();
+      const selectedVariation = getSelectedVariation();
 
       if (state.mode === "subscription" && selected) {
         const subscriberPrice = money(selected.subscriber_price_money);
@@ -466,15 +632,51 @@ const pageTitle = productSeed?.name
         `;
       }
 
-      if (oneTime?.has_price && oneTime?.price_money) {
+      if (oneTime?.has_price && selectedVariation?.price_money) {
         return `
           <div class="price-stack">
-            <div class="price">${escapeHtml(money(oneTime.price_money))}</div>
+            <div class="price">${escapeHtml(money(selectedVariation.price_money))}</div>
+            ${getVariations().length > 1 ? `<div class="price-subrow"><span class="save-badge">${escapeHtml(selectedVariation.name || "Selected option")}</span></div>` : ""}
           </div>
         `;
       }
 
       return `<div class="price muted">See price at checkout</div>`;
+    }
+
+    function selectedPaymentAmount() {
+      if (state.pdp?.availability?.market_only) return null;
+
+      const selected = getSelectedOption();
+      if (state.mode === "subscription" && selected?.subscriber_price_money) {
+        return selected.subscriber_price_money;
+      }
+
+      const selectedVariation = getSelectedVariation();
+      return selectedVariation?.price_money || state.pdp?.one_time?.price_money || null;
+    }
+
+    function renderPaymentMessaging() {
+      const amount = selectedPaymentAmount();
+      const installment =
+        amount && typeof amount.amount === "number"
+          ? money({ amount: Math.max(1, Math.round(amount.amount / 4)), currency: amount.currency || "USD" })
+          : "";
+
+      return `
+        <section class="pay-strip" aria-label="Payment options">
+          ${
+            installment
+              ? `<p class="afterpay-line">or 4 interest-free payments of <strong>${escapeHtml(installment)}</strong> with Afterpay</p>`
+              : `<p class="afterpay-line">Secure hosted payment is completed through Square checkout.</p>`
+          }
+          <div class="pay-pills">
+            <span>Card</span>
+            <span>Cash App Pay</span>
+            <span>Square Checkout</span>
+          </div>
+        </section>
+      `;
     }
 
     function renderQty() {
@@ -487,6 +689,40 @@ const pageTitle = productSeed?.name
             <button type="button" class="qty-btn" data-qty="plus" aria-label="Increase quantity">+</button>
           </div>
         </div>
+      `;
+    }
+
+    function renderVariationSelector(pdp) {
+      const vars = getVariations(pdp);
+      if (vars.length <= 1) return "";
+
+      const selected = getSelectedVariation(pdp);
+      const selectedId = selected ? getVariationId(selected) : "";
+
+      return `
+        <section class="variation-panel">
+          <label class="field-label" for="variation-select">Select an option</label>
+          <div class="select-shell">
+            <select id="variation-select" class="variation-select">
+              <option value="" ${selectedId ? "" : "selected"} disabled>Choose your option</option>
+              ${vars.map((v) => {
+                const id = getVariationId(v);
+                const label = v?.name || v?.label || "Option";
+                const price = v?.price_money ? money(v.price_money) : "";
+                return `
+                  <option value="${escapeHtml(id)}" ${id === selectedId ? "selected" : ""}>
+                    ${escapeHtml(label)}${price ? ` &mdash; ${escapeHtml(price)}` : ""}
+                  </option>
+                `;
+              }).join("")}
+            </select>
+          </div>
+          ${
+            selected
+              ? `<div class="selected-note">Selected: <strong>${escapeHtml(selected.name || selected.label || "Option")}</strong></div>`
+              : `<div class="selected-note">Choose a variation before adding this item to cart.</div>`
+          }
+        </section>
       `;
     }
 
@@ -555,18 +791,25 @@ const pageTitle = productSeed?.name
               <div class="buy-title">Choose your ritual</div>
             </div>
           </div>
-          <div class="mode-toggle" role="tablist" aria-label="Purchase options">
+          <div class="mode-toggle ${hasOneTime && hasSub ? "" : "mode-toggle--single"}" role="tablist" aria-label="Purchase options">
             ${
               hasOneTime
-                ? `<button type="button" class="mode-btn ${state.mode === "one-time" ? "is-active" : ""}" data-mode="one-time">One-time purchase</button>`
+                ? `<button type="button" class="mode-btn ${state.mode === "one-time" ? "is-active" : ""}" data-mode="one-time">
+                    <span class="mode-title">One time</span>
+                    <span class="mode-copy">Purchase today</span>
+                  </button>`
                 : ""
             }
             ${
               hasSub
-                ? `<button type="button" class="mode-btn ${state.mode === "subscription" ? "is-active" : ""}" data-mode="subscription">Subscribe & save</button>`
+                ? `<button type="button" class="mode-btn ${state.mode === "subscription" ? "is-active" : ""}" data-mode="subscription">
+                    <span class="mode-title">Subscription</span>
+                    <span class="mode-copy">Recurring ritual</span>
+                  </button>`
                 : ""
             }
           </div>
+          ${state.mode === "one-time" ? renderVariationSelector(pdp) : ""}
           ${state.mode === "one-time" ? renderQty() : ""}
           ${renderSubscriptionOptions(pdp.subscription)}
         </section>
@@ -604,6 +847,10 @@ const pageTitle = productSeed?.name
             <div class="fineprint">
               You’ll complete signup in secure Square checkout.
             </div>
+            <div class="payment-note">
+              <strong>Secure Square checkout</strong>
+              <span>Your subscription starts through Square's hosted checkout experience.</span>
+            </div>
             <div class="trust-row">
               <span>Secure hosted checkout</span>
               <span>Flexible delivery cadence</span>
@@ -626,6 +873,10 @@ const pageTitle = productSeed?.name
               <a class="mini-link" href="${escapeHtml(routes.shop || `${base}shop`)}">Continue browsing</a>
             </div>
             <div class="fineprint">${escapeHtml(pdp?.policies?.checkout_summary || "Payment happens securely at Square checkout.")}</div>
+            <div class="payment-note">
+              <strong>Secure Square checkout</strong>
+              <span>Cards, Apple Pay, and Google Pay may be available in Square checkout.</span>
+            </div>
             <div class="trust-row">
               <span>Secure Square checkout</span>
               <span>Fast hosted payment link</span>
@@ -652,6 +903,28 @@ const pageTitle = productSeed?.name
     function renderAccordions(desc, benefits, pdp) {
       const cleanDesc = normalizeDesc(desc);
       const benefitList = benefits.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
+      const descParts = cleanDesc
+        .split(/\s*â€¢\s*|\s*•\s*/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      const descMarkup =
+        descParts.length > 1
+          ? `
+            <p>${escapeHtml(descParts[0])}</p>
+            <ul class="detail-list detail-list--spaced">
+              ${descParts.slice(1).map((part) => `<li>${escapeHtml(part)}</li>`).join("")}
+            </ul>
+          `
+          : cleanDesc
+            ? cleanDesc
+                .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .slice(0, 4)
+                .map((part) => `<p>${escapeHtml(part)}</p>`)
+                .join("")
+            : "<p>No description yet.</p>";
 
       const howToUse = pdp?.availability?.market_only
         ? "Visit the market table, ask what is fresh that day, and choose your pour or bundle in person."
@@ -662,7 +935,7 @@ const pageTitle = productSeed?.name
           <details class="detail-item" open>
             <summary>Description</summary>
             <div class="detail-copy">
-              <p>${escapeHtml(cleanDesc || "No description yet.")}</p>
+              ${descMarkup}
             </div>
           </details>
 
@@ -740,6 +1013,20 @@ const pageTitle = productSeed?.name
         });
       });
 
+      root.querySelector("#variation-select")?.addEventListener("change", (event) => {
+        const select = event.currentTarget;
+        if (!select) return;
+        state.selectedVariationId = select.value || "";
+        render(pdp);
+      });
+
+      root.querySelectorAll("[data-variation]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.selectedVariationId = btn.getAttribute("data-variation") || "";
+          render(pdp);
+        });
+      });
+
       root.querySelectorAll("[data-qty]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const dir = btn.getAttribute("data-qty");
@@ -753,13 +1040,17 @@ const pageTitle = productSeed?.name
       root.querySelector("#add")?.addEventListener("click", () => {
         hideErr();
         try {
+          const selectedVariation = getSelectedVariation(pdp);
+          const variationId = selectedVariation?.variation_id;
+          if (!variationId) throw new Error("Please select an option");
+
           Cart.add({
             id: String(pdp?.product?.id || wantedId || ""),
-            variation_id: pdp?.one_time?.variation_id,
-            name: pdp?.product?.name || seed?.name || "",
+            variation_id: variationId,
+            name: variationCartName(pdp?.product?.name || seed?.name || "", selectedVariation),
             image_url: pdp?.product?.image_url || seed?.image_url || "",
-            price_money: pdp?.one_time?.price_money || null,
-            has_price: !!pdp?.one_time?.has_price,
+            price_money: selectedVariation?.price_money || pdp?.one_time?.price_money || null,
+            has_price: !!(selectedVariation?.has_price || pdp?.one_time?.has_price),
             qty: state.qty,
           });
           updateCount();
@@ -772,8 +1063,9 @@ const pageTitle = productSeed?.name
       root.querySelector("#checkout")?.addEventListener("click", async () => {
         hideErr();
         try {
-          const variationId = pdp?.one_time?.variation_id;
-          if (!variationId) throw new Error("Missing variation_id");
+          const selectedVariation = getSelectedVariation(pdp);
+          const variationId = selectedVariation?.variation_id;
+          if (!variationId) throw new Error("Please select an option");
 
           const payload = {
             cart: [
@@ -845,6 +1137,15 @@ const pageTitle = productSeed?.name
 
     function render(pdp) {
       state.pdp = pdp;
+      const variations = getVariations(pdp);
+      if (variations.length) {
+        const hasSelected = variations.some((v) => getVariationId(v) === String(state.selectedVariationId));
+        if (!hasSelected) {
+          const legacy = String(pdp?.one_time?.variation_id || "").trim();
+          const legacyMatch = variations.find((v) => getVariationId(v) === legacy);
+          state.selectedVariationId = getVariationId(legacyMatch || variations[0]);
+        }
+      }
 
       const name = escapeHtml(pdp?.product?.name || seed?.name || "Product");
       const rawDesc = String(pdp?.product?.description || "");
@@ -886,9 +1187,11 @@ const pageTitle = productSeed?.name
 
           <h1 class="title">${name}</h1>
 
-          <p class="hook">${escapeHtml(hook)}</p>
-
           ${renderPriceBlock()}
+
+          ${pdp?.availability?.market_only ? "" : renderPaymentMessaging()}
+
+          <p class="hook">${escapeHtml(hook)}</p>
 
           <div class="benefits">
             ${benefits.map((b) => `<span>${escapeHtml(b)}</span>`).join("")}
@@ -961,9 +1264,9 @@ const pageTitle = productSeed?.name
     }
 
     .container{
-      width:min(1240px, calc(100% - 32px));
+      width:min(1260px, calc(100% - 48px));
       margin:0 auto;
-      padding:20px 0 56px;
+      padding:28px 0 72px;
     }
 
     .crumbs{
@@ -985,8 +1288,8 @@ const pageTitle = productSeed?.name
 
     .prod{
       display:grid;
-      grid-template-columns:minmax(320px, 560px) minmax(320px, 1fr);
-      gap:34px;
+      grid-template-columns:minmax(0, 1.1fr) minmax(390px, .9fr);
+      gap:56px;
       align-items:start;
     }
 
@@ -997,16 +1300,20 @@ const pageTitle = productSeed?.name
 
     .media-shell{
       display:grid;
-      gap:14px;
+      gap:18px;
+      position:sticky;
+      top:104px;
     }
 
     .media{
       position:relative;
       border:1px solid var(--line);
-      border-radius:28px;
+      border-radius:30px;
       overflow:hidden;
-      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-      box-shadow:var(--shadow);
+      background:
+        radial-gradient(circle at 22% 0%, rgba(204,181,108,.13), transparent 38%),
+        linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+      box-shadow:0 26px 80px rgba(0,0,0,.32);
     }
 
     .media img{
@@ -1027,14 +1334,14 @@ const pageTitle = productSeed?.name
 
     .thumb-row{
       display:flex;
-      gap:10px;
+      gap:12px;
       flex-wrap:wrap;
     }
 
     .thumb{
-      width:82px;
-      height:82px;
-      border-radius:16px;
+      width:92px;
+      height:92px;
+      border-radius:18px;
       overflow:hidden;
       border:1px solid var(--line-2);
       background:rgba(255,255,255,.02);
@@ -1055,7 +1362,8 @@ const pageTitle = productSeed?.name
     }
 
     .prod-right{
-      padding:4px 2px;
+      padding:4px 0 0;
+      max-width:540px;
     }
 
     .pill{
@@ -1068,31 +1376,33 @@ const pageTitle = productSeed?.name
       border:1px solid var(--line);
       background:rgba(255,255,255,.03);
       color:var(--gold-2);
-      font-size:.84rem;
-      letter-spacing:.02em;
+      font-size:.86rem;
+      font-weight:700;
+      letter-spacing:.04em;
+      text-transform:uppercase;
     }
 
     .title{
-      margin:14px 0 8px;
-      font-size:clamp(2.2rem, 4vw, 3.35rem);
-      line-height:1.02;
-      letter-spacing:-.03em;
-      max-width:12ch;
+      margin:18px 0 10px;
+      font-size:clamp(2.55rem, 4vw, 4.35rem);
+      line-height:1;
+      letter-spacing:0;
+      max-width:14ch;
     }
 
     .hook{
-      margin:10px 0 0;
-      font-size:1.05rem;
-      line-height:1.65;
+      margin:18px 0 0;
+      font-size:1.08rem;
+      line-height:1.75;
       color:rgba(245,240,230,.92);
-      max-width:52ch;
+      max-width:58ch;
     }
 
-    .price-stack{ margin:18px 0 8px; }
+    .price-stack{ margin:18px 0 10px; }
 
     .price{
-      font-size:1.9rem;
-      font-weight:700;
+      font-size:2.05rem;
+      font-weight:800;
       color:var(--text);
       letter-spacing:-.02em;
     }
@@ -1132,13 +1442,13 @@ const pageTitle = productSeed?.name
     .benefits{
       display:flex;
       flex-wrap:wrap;
-      gap:8px;
-      margin:16px 0 0;
+      gap:10px;
+      margin:20px 0 0;
     }
 
     .benefits span{
-      font-size:.8rem;
-      padding:7px 11px;
+      font-size:.86rem;
+      padding:8px 12px;
       border-radius:999px;
       border:1px solid var(--line);
       background:rgba(255,255,255,.03);
@@ -1147,12 +1457,14 @@ const pageTitle = productSeed?.name
     }
 
     .buy-card{
-      margin-top:22px;
-      padding:18px;
-      border-radius:24px;
-      border:1px solid var(--line);
-      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
-      box-shadow:var(--shadow);
+      margin-top:28px;
+      padding:24px;
+      border-radius:28px;
+      border:1px solid rgba(204,181,108,.22);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(204,181,108,.13), transparent 36%),
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      box-shadow:0 24px 70px rgba(0,0,0,.28);
     }
 
     .buy-card--market{
@@ -1182,11 +1494,11 @@ const pageTitle = productSeed?.name
       justify-content:space-between;
       align-items:start;
       gap:12px;
-      margin-bottom:12px;
+      margin-bottom:16px;
     }
 
     .buy-kicker{
-      font-size:.76rem;
+      font-size:.78rem;
       letter-spacing:.08em;
       text-transform:uppercase;
       color:var(--gold-2);
@@ -1195,33 +1507,39 @@ const pageTitle = productSeed?.name
 
     .buy-title{
       margin-top:5px;
-      font-size:1.02rem;
+      font-size:1.18rem;
       font-weight:700;
     }
 
     .purchase-shell{
       display:grid;
-      gap:14px;
+      gap:16px;
     }
 
     .mode-toggle{
       display:grid;
       grid-template-columns:1fr 1fr;
-      gap:10px;
+      gap:12px;
+    }
+
+    .mode-toggle--single{
+      grid-template-columns:1fr;
     }
 
     .mode-btn{
       appearance:none;
       -webkit-appearance:none;
-      min-height:52px;
-      border-radius:16px;
-      border:1px solid var(--line-2);
-      background:rgba(255,255,255,.02);
+      display:grid;
+      gap:5px;
+      min-height:76px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.03);
       color:var(--text);
       font:inherit;
       cursor:pointer;
-      padding:0 16px;
-      text-align:center;
+      padding:14px 16px;
+      text-align:left;
       transition:.18s ease;
     }
 
@@ -1239,10 +1557,23 @@ const pageTitle = productSeed?.name
     }
 
     .mode-btn.is-active{
-      background:linear-gradient(180deg, rgba(204,181,108,.18), rgba(204,181,108,.08));
-      border-color:rgba(204,181,108,.38);
+      background:
+        linear-gradient(180deg, rgba(204,181,108,.20), rgba(204,181,108,.07)),
+        rgba(255,255,255,.02);
+      border-color:rgba(204,181,108,.5);
       color:var(--gold-2);
       box-shadow:0 10px 30px rgba(0,0,0,.18);
+    }
+
+    .mode-title{
+      font-size:1rem;
+      font-weight:800;
+    }
+
+    .mode-copy{
+      color:var(--muted);
+      font-size:.88rem;
+      line-height:1.35;
     }
 
     .qty-wrap{
@@ -1250,10 +1581,10 @@ const pageTitle = productSeed?.name
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      padding:12px 14px;
-      border-radius:16px;
-      border:1px solid var(--line-2);
-      background:rgba(255,255,255,.02);
+      padding:14px 16px;
+      border-radius:18px;
+      border:1px solid rgba(204,181,108,.18);
+      background:rgba(255,255,255,.03);
     }
 
     .qty-label{
@@ -1270,13 +1601,13 @@ const pageTitle = productSeed?.name
     .qty-btn{
       appearance:none;
       -webkit-appearance:none;
-      width:34px;
-      height:34px;
+      width:40px;
+      height:40px;
       border-radius:999px;
       border:1px solid var(--line);
       background:rgba(255,255,255,.04);
       color:var(--text);
-      font-size:1.1rem;
+      font-size:1.18rem;
       cursor:pointer;
       transition:transform .16s ease, border-color .16s ease, background .16s ease;
     }
@@ -1288,16 +1619,140 @@ const pageTitle = productSeed?.name
     }
 
     .qty-value{
-      min-width:22px;
+      min-width:28px;
       text-align:center;
-      font-weight:700;
+      font-size:1.06rem;
+      font-weight:800;
     }
 
     .purchase-panel{
-      border:1px solid var(--line);
+      border:1px solid rgba(204,181,108,.2);
+      border-radius:22px;
+      padding:20px;
+      background:rgba(4,12,8,.28);
+    }
+
+    .variation-panel{
+      border:1px solid rgba(204,181,108,.22);
       border-radius:22px;
       padding:18px;
-      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      background:
+        radial-gradient(circle at 12% 0%, rgba(204,181,108,.10), transparent 42%),
+        linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+    }
+
+    .field-label{
+      display:block;
+      margin:0 0 10px;
+      color:var(--gold-2);
+      font-size:.78rem;
+      font-weight:800;
+      letter-spacing:.09em;
+      text-transform:uppercase;
+    }
+
+    .select-shell{
+      position:relative;
+    }
+
+    .select-shell::after{
+      content:"";
+      position:absolute;
+      right:16px;
+      top:50%;
+      width:9px;
+      height:9px;
+      border-right:2px solid rgba(228,209,154,.92);
+      border-bottom:2px solid rgba(228,209,154,.92);
+      transform:translateY(-65%) rotate(45deg);
+      pointer-events:none;
+    }
+
+    .variation-select{
+      appearance:none;
+      -webkit-appearance:none;
+      width:100%;
+      min-height:62px;
+      padding:0 52px 0 18px;
+      border-radius:18px;
+      border:1px solid rgba(204,181,108,.32);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)),
+        rgba(7,18,13,.92);
+      color:var(--text);
+      font:inherit;
+      font-size:1rem;
+      font-weight:720;
+      cursor:pointer;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 26px rgba(0,0,0,.16);
+    }
+
+    .variation-select:hover{
+      border-color:rgba(204,181,108,.54);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.095), rgba(255,255,255,.035)),
+        rgba(7,18,13,.94);
+    }
+
+    .variation-select:focus-visible{
+      outline:2px solid rgba(204,181,108,.72);
+      outline-offset:3px;
+    }
+
+    .variation-select option{
+      background:#f8f3e7;
+      color:#07120d;
+    }
+
+    .selected-note{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:.9rem;
+      line-height:1.5;
+    }
+
+    .selected-note strong{
+      color:var(--gold-2);
+    }
+
+    .pay-strip{
+      display:grid;
+      gap:12px;
+      margin:12px 0 0;
+      padding:14px 16px;
+      border:1px solid rgba(204,181,108,.16);
+      border-radius:18px;
+      background:rgba(255,255,255,.028);
+    }
+
+    .afterpay-line{
+      margin:0;
+      color:rgba(245,240,230,.86);
+      font-size:.98rem;
+      line-height:1.5;
+    }
+
+    .afterpay-line strong{
+      color:var(--gold-2);
+    }
+
+    .pay-pills{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+
+    .pay-pills span{
+      display:inline-flex;
+      align-items:center;
+      min-height:30px;
+      padding:0 11px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.035);
+      color:var(--muted);
+      font-size:.82rem;
+      font-weight:700;
     }
 
     .purchase-panel.is-hidden{
@@ -1332,10 +1787,10 @@ const pageTitle = productSeed?.name
       width:100%;
       text-align:left;
       border-radius:18px;
-      border:1px solid var(--line-2);
-      background:rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.03);
       color:var(--text);
-      padding:14px;
+      padding:16px;
       cursor:pointer;
       transition:.18s ease;
     }
@@ -1401,7 +1856,7 @@ const pageTitle = productSeed?.name
     }
 
     .cta-stack{
-      margin-top:16px;
+      margin-top:18px;
     }
 
     .btns{
@@ -1414,8 +1869,8 @@ const pageTitle = productSeed?.name
     .btns-col{
       display:grid;
       grid-template-columns:1fr;
-      gap:10px;
-      margin-top:16px;
+      gap:12px;
+      margin-top:18px;
     }
 
     .btn{
@@ -1424,9 +1879,9 @@ const pageTitle = productSeed?.name
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      min-height:48px;
-      padding:0 16px;
-      border-radius:14px;
+      min-height:54px;
+      padding:0 18px;
+      border-radius:16px;
       text-decoration:none;
       border:1px solid var(--line);
       font-weight:600;
@@ -1461,7 +1916,7 @@ const pageTitle = productSeed?.name
       background:linear-gradient(135deg, rgba(224,196,122,.98), rgba(204,181,108,.88));
       border-color:rgba(204,181,108,.42);
       color:#07120d;
-      box-shadow:0 12px 30px rgba(204,181,108,.14);
+      box-shadow:0 16px 36px rgba(204,181,108,.18);
     }
 
     .btn-primary:hover{
@@ -1523,6 +1978,24 @@ const pageTitle = productSeed?.name
       line-height:1.55;
     }
 
+    .payment-note{
+      display:grid;
+      gap:4px;
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(204,181,108,.18);
+      background:rgba(204,181,108,.075);
+      color:var(--muted);
+      line-height:1.45;
+      font-size:.9rem;
+    }
+
+    .payment-note strong{
+      color:var(--gold-2);
+      font-size:1rem;
+    }
+
     .trust-row{
       display:flex;
       flex-wrap:wrap;
@@ -1551,18 +2024,19 @@ const pageTitle = productSeed?.name
     }
 
     .details-block{
-      margin-top:22px;
-      border-top:1px solid var(--line);
+      margin-top:28px;
+      border-top:1px solid rgba(204,181,108,.2);
     }
 
     .detail-item{
-      border-bottom:1px solid var(--line);
-      padding:14px 0;
+      border-bottom:1px solid rgba(204,181,108,.18);
+      padding:18px 0;
     }
 
     .detail-item summary{
       cursor:pointer;
-      font-weight:700;
+      font-size:1.02rem;
+      font-weight:800;
       list-style:none;
     }
 
@@ -1581,14 +2055,30 @@ const pageTitle = productSeed?.name
     }
 
     .detail-copy{
-      margin-top:12px;
+      margin-top:14px;
       color:var(--muted);
-      line-height:1.68;
+      font-size:1rem;
+      line-height:1.78;
+      max-width:68ch;
+    }
+
+    .detail-copy p{
+      margin:0 0 12px;
+    }
+
+    .detail-copy p:last-child{
+      margin-bottom:0;
     }
 
     .detail-list{
       margin:0;
       padding-left:18px;
+    }
+
+    .detail-list--spaced{
+      display:grid;
+      gap:8px;
+      margin-top:12px;
     }
 
     .error{
@@ -1727,8 +2217,33 @@ const pageTitle = productSeed?.name
     }
 
     @media (max-width: 920px){
+      .container{
+        width:min(100% - 28px, 680px);
+        padding:18px 0 52px;
+      }
+
       .prod{
         grid-template-columns:1fr;
+        gap:30px;
+      }
+
+      .media-shell{
+        position:static;
+        gap:14px;
+      }
+
+      .media{
+        border-radius:24px;
+      }
+
+      .thumb{
+        width:76px;
+        height:76px;
+        border-radius:15px;
+      }
+
+      .prod-right{
+        max-width:none;
       }
 
       .mode-toggle{
@@ -1737,10 +2252,56 @@ const pageTitle = productSeed?.name
 
       .title{
         max-width:none;
+        font-size:clamp(2.15rem, 12vw, 3rem);
       }
 
       .hook{
         max-width:none;
+      }
+
+      .buy-card{
+        padding:18px;
+        border-radius:24px;
+      }
+
+      .variation-select{
+        min-height:58px;
+      }
+
+      .btns,
+      .inline-links{
+        width:100%;
+      }
+
+      .inline-links{
+        align-items:flex-start;
+        flex-direction:column;
+        gap:10px;
+      }
+    }
+
+    @media (max-width: 520px){
+      .container{
+        width:min(100% - 24px, 680px);
+      }
+
+      .price{
+        font-size:1.75rem;
+      }
+
+      .pay-pills span{
+        flex:1 1 auto;
+        justify-content:center;
+      }
+
+      .qty-wrap{
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .qty-control{
+        width:100%;
+        justify-content:space-between;
       }
     }
   </style>
