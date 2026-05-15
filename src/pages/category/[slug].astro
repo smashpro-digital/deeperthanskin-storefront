@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import BeverageQuestionnaire from "../../components/BeverageQuestionnaire.astro";
+import MarketPulse from "../../components/MarketPulse.astro";
 
 export const prerender = true;
 
@@ -200,20 +201,24 @@ const ROUTES = {
       </section>
 
       {isMarketPage && (
-        <section class="market-note" aria-label="Market information">
-          <div>
-            <p class="kicker">How this works</p>
-            <h2>Preview here. Purchase at the market.</h2>
-            <p>
-              Use this page to explore what may be available at our table. Tap an item for
-              details, but market preview cards do not add items to website checkout.
-            </p>
-          </div>
-          <div class="market-note-card">
-            <strong>Market Day Focus</strong>
-            <span>Fresh pours, bundles, seasonal specials, and limited small-batch goods.</span>
-          </div>
-        </section>
+        <>
+          <section class="market-note" aria-label="Market information">
+            <div>
+              <p class="kicker">How this works</p>
+              <h2>Preview here. Purchase at the market.</h2>
+              <p>
+                Use this page to explore what may be available at our table. Tap an item for
+                details, but market preview cards do not add items to website checkout.
+              </p>
+            </div>
+            <div class="market-note-card">
+              <strong>Market Day Focus</strong>
+              <span>Fresh pours, bundles, seasonal specials, and limited small-batch goods.</span>
+            </div>
+          </section>
+
+          <MarketPulse />
+        </>
       )}
 
       {isBeveragesPage && (
