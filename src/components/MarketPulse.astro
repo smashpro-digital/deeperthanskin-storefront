@@ -19,12 +19,13 @@ const marketPulseEndpoint = configuredPulseEndpoint || (() => {
 })();
 
 const fallbackPourVideo = "/images/20260514_172549.mp4";
+const fallbackReactionVideo = "/images/20260514_174458.mp4";
 const reactionVideo1 =
   (import.meta.env.PUBLIC_MARKET_REACTION_VIDEO_1 as string | undefined) ||
   fallbackPourVideo;
 const reactionVideo2 =
   (import.meta.env.PUBLIC_MARKET_REACTION_VIDEO_2 as string | undefined) ||
-  fallbackPourVideo;
+  fallbackReactionVideo;
 
 const marketMoments = [
   {
