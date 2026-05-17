@@ -1,5 +1,8 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+
+const base = import.meta.env.BASE_URL || "/";
+const startUrl = `${base}start`;
 ---
 
 <BaseLayout
@@ -10,6 +13,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   <main class="trial-page">
     <section class="trial-section">
       <div class="container trial-container">
+        <a class="back-link" id="trial-back-to-start" href={startUrl}>Back to start</a>
         <p class="page-masthead">Deeper Than Skin • Starter Kit Builder</p>
         <form class="quiz-card" id="ritual-quiz" method="post" novalidate>
           <div class="quiz-intake" id="quiz-intake">
@@ -86,8 +90,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
             </div>
 
             <div class="quiz-block">
-              <h2>Where should we send your starter direction?</h2>
-              <p class="contact-copy">
+              <h2 id="trial-contact-heading">Where should we send your starter direction?</h2>
+              <p class="contact-copy" id="trial-contact-copy">
                 We’ll use this to follow up with your personalized kit and next steps.
               </p>
 
@@ -253,8 +257,85 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     const checkoutLink = document.getElementById("trial-checkout-link");
     const checkoutLabel = document.getElementById("trial-checkout-label");
     const errorEl = document.getElementById("form-error");
+    const backToStartLink = document.getElementById("trial-back-to-start");
+    const contactHeading = document.getElementById("trial-contact-heading");
+    const contactCopy = document.getElementById("trial-contact-copy");
 
     if (!form || !intake || !resultCard || !resultTitle || !resultCopy || !checkoutLink) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const backParams = new URLSearchParams();
+    ["source", "device", "event", "utm_source", "utm_medium", "utm_campaign"].forEach((key) => {
+      const value = params.get(key);
+      if (value) backParams.set(key, value);
+    });
+
+    if (backToStartLink && backParams.toString()) {
+      const backHref = backToStartLink.getAttribute("href") || "/start";
+      const separator = backHref.includes("?") ? "&" : "?";
+      backToStartLink.href = `${backHref}${separator}${backParams.toString()}`;
+    }
+
+    const readLeadProfile = () => {
+      try {
+        const raw = localStorage.getItem("dts_lead_profile");
+        if (!raw) return null;
+
+        const profile = JSON.parse(raw);
+        if (!profile || typeof profile !== "object") return null;
+        if (profile.app_slug && profile.app_slug !== "deeper-than-skin") return null;
+
+        return profile;
+      } catch (error) {
+        console.warn("[trial] profile read failed", error);
+        return null;
+      }
+    };
+
+    const setFieldValue = (selector, value) => {
+      const input = form.querySelector(selector);
+      if (!input || !value || input.value.trim()) return;
+      input.value = value;
+    };
+
+    const checkValues = (name, values) => {
+      if (!Array.isArray(values)) return;
+      values.forEach((value) => {
+        const input = form.querySelector(`input[name="${name}"][value="${value}"]`);
+        if (input) input.checked = true;
+      });
+    };
+
+    const saveLeadProfile = (updates) => {
+      try {
+        const existing = readLeadProfile() || {};
+        localStorage.setItem("dts_lead_profile", JSON.stringify({
+          ...existing,
+          ...updates,
+          app_slug: "deeper-than-skin",
+          updated_at: new Date().toISOString(),
+        }));
+      } catch (error) {
+        console.warn("[trial] profile save failed", error);
+      }
+    };
+
+    const profile = readLeadProfile();
+    if (profile?.email || profile?.phone) {
+      const profileName = profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+
+      setFieldValue('input[name="name"]', profileName);
+      setFieldValue('input[name="email"]', profile.email);
+      setFieldValue('input[name="phone"]', profile.phone);
+      checkValues("goals", profile.goals);
+      checkValues("prefs", profile.prefs);
+
+      if (contactHeading) contactHeading.textContent = "Confirm where we should send your starter direction.";
+      if (contactCopy) {
+        contactCopy.textContent =
+          "We filled this from your ritual list details. You can adjust anything before revealing your starter kit.";
+      }
+    }
 
     const showError = (msg) => {
       if (!errorEl) return;
@@ -349,6 +430,18 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       const kitSlug = kitSlugForAnswers({ goals, prefs, notes });
       const kit = KIT_CONFIG[kitSlug] || KIT_CONFIG["balanced-starter-kit"];
+
+      saveLeadProfile({
+        source: "starter-kit-quiz",
+        name,
+        email,
+        phone,
+        goals,
+        prefs,
+        notes,
+        kit_slug: kitSlug,
+        kit_title: kit.title,
+      });
 
       resultTitle.textContent = kit.title;
       resultCopy.textContent = kit.description;

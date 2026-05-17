@@ -6,13 +6,17 @@ export const prerender = true;
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
-const API_BASE =
-  (import.meta.env.PUBLIC_COMMERCE_API_BASE as string | undefined) ||
-  "https://smashpro.app/api/v1/routes";
+const API_ROOT =
+  (import.meta.env.PUBLIC_COMMERCE_API_ROOT as string | undefined) ||
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE_INDEX as string | undefined) ||
+  "https://smashpro.app/api/v1/index.php";
 
 const APP_SLUG =
   (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
   "deeper-than-skin";
+
+const PUBLIC_API_KEY =
+  (import.meta.env.PUBLIC_COMMERCE_API_KEY as string | undefined) || "";
 
 const ROUTES = {
   home: `${base}`,
@@ -22,8 +26,26 @@ const ROUTES = {
   wellness: `${base}category/wellness`,
 };
 
-const checkoutEndpoint =
-  `${API_BASE}/public.commerce.checkout.post.php?app_slug=${encodeURIComponent(APP_SLUG)}`;
+function publicApiUrl(path: string, params: Record<string, string | number | boolean> = {}) {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+
+  if (PUBLIC_API_KEY) {
+    url.searchParams.set("api_key", PUBLIC_API_KEY);
+  }
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value) !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
+const checkoutEndpoint = publicApiUrl("public/commerce/checkout");
+const isDev = import.meta.env.DEV;
 ---
 
 <BaseLayout title="Cart | Deeper Than Skin">
@@ -50,6 +72,9 @@ const checkoutEndpoint =
         data-base={base}
         data-routes={JSON.stringify(ROUTES)}
         data-checkout={checkoutEndpoint}
+        data-app-slug={APP_SLUG}
+        data-api-key={PUBLIC_API_KEY}
+        data-dev={isDev ? "1" : "0"}
       >
         <div class="lux-skel">
           <div class="skel skel-big"></div>
@@ -121,6 +146,12 @@ const checkoutEndpoint =
 
       const base = root.getAttribute("data-base") || "/";
       const checkoutEndpoint = root.getAttribute("data-checkout") || "";
+      const appSlug = root.getAttribute("data-app-slug") || "deeper-than-skin";
+      const publicApiKey = root.getAttribute("data-api-key") || "";
+      const isDev = root.getAttribute("data-dev") === "1";
+      const checkoutReturnBase = `${window.location.origin}${base}`;
+      const checkoutErrorMessage =
+        "Checkout is temporarily unavailable. Please try again, or contact us to complete your order.";
 
       const routes = (() => {
         try {
@@ -364,7 +395,10 @@ const checkoutEndpoint =
         `;
       };
 
-      async function startCheckout() {
+      async function startCheckout(ev) {
+        ev?.preventDefault?.();
+        ev?.stopPropagation?.();
+
         hideErr();
         if (isProcessing) return;
 
@@ -376,7 +410,7 @@ const checkoutEndpoint =
 
         const invalid = items.find((it) => !it?.variation_id);
         if (invalid) {
-          showErr(`Missing variation_id for ${invalid?.name || "an item"}. Re-add that product first.`);
+          showErr("One item needs to be reselected before checkout. Please remove it and add it again from the product page.");
           return;
         }
 
@@ -390,6 +424,10 @@ const checkoutEndpoint =
           }
 
           const payload = {
+            app_slug: appSlug,
+            ...(publicApiKey ? { api_key: publicApiKey } : {}),
+            success_url: `${checkoutReturnBase}cart?checkout=success`,
+            cancel_url: `${checkoutReturnBase}cart?checkout=cancelled`,
             cart: items.map((it) => ({
               variation_id: it.variation_id,
               qty: Number(it.qty || 1),
@@ -401,6 +439,7 @@ const checkoutEndpoint =
             headers: {
               "Content-Type": "application/json",
               "Accept": "application/json",
+              ...(publicApiKey ? { "x-api-key": publicApiKey } : {}),
             },
             body: JSON.stringify(payload),
           });
@@ -416,14 +455,17 @@ const checkoutEndpoint =
           }
 
           const data = JSON.parse(text);
-          if (!data?.ok || !data?.checkout_url) {
+          const redirectUrl = data?.checkout_url || data?.checkoutUrl || data?.payment_url || data?.paymentUrl || "";
+          if (!data?.ok || !redirectUrl) {
             throw new Error(data?.error || "Checkout unavailable");
           }
 
-          window.location.href = data.checkout_url;
+          window.location.href = redirectUrl;
         } catch (err) {
-          console.error(err);
-          showErr(err?.message || "Unable to start checkout.");
+          if (isDev) {
+            console.error("[cart checkout]", err);
+          }
+          showErr(checkoutErrorMessage);
         } finally {
           isProcessing = false;
           if (button) {
@@ -1898,6 +1940,168 @@ const checkoutEndpoint =
         height: 34px !important;
         min-width: 48px;
         line-height: 34px;
+      }
+    }
+  </style>
+
+  <style is:global>
+    #cart .summary-card{
+      display:grid;
+      gap:0;
+      padding:clamp(20px, 5vw, 28px) !important;
+      border-radius:28px !important;
+      border:1px solid rgba(226, 194, 130, .34) !important;
+      background:
+        radial-gradient(circle at 82% -10%, rgba(226, 194, 130, .16), transparent 34%),
+        linear-gradient(180deg, rgba(13, 37, 27, .98), rgba(8, 24, 16, .98)) !important;
+      color:#fff7e8 !important;
+      overflow:hidden;
+    }
+
+    #cart .summary-kicker{
+      color:#c6a96b !important;
+      font-size:.78rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    #cart .summary-heading{
+      margin:8px 0 0;
+      color:#fff7e8 !important;
+      font-size:clamp(1.35rem, 3vw, 1.65rem);
+      line-height:1.12;
+    }
+
+    #cart .summary-total-bar,
+    #cart .summary-block,
+    #cart .sumline{
+      box-shadow:none !important;
+      outline:0 !important;
+      text-shadow:none !important;
+    }
+
+    #cart .summary-total-bar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      margin-top:20px;
+      padding:0 0 18px !important;
+      border:0 !important;
+      border-bottom:1px solid rgba(226, 194, 130, .24) !important;
+      border-radius:0 !important;
+      background:transparent !important;
+      color:#fff7e8 !important;
+    }
+
+    #cart .summary-total-bar span{
+      color:rgba(255, 247, 232, .86) !important;
+      font-size:1rem;
+      line-height:1.35;
+    }
+
+    #cart .summary-price{
+      color:#fff7e8 !important;
+      font-size:clamp(1.45rem, 5vw, 1.8rem);
+      line-height:1.1;
+      white-space:nowrap;
+    }
+
+    #cart .summary-block{
+      display:grid;
+      gap:14px;
+      margin-top:18px;
+      padding:0 0 18px !important;
+      border-bottom:1px solid rgba(226, 194, 130, .18);
+      background:transparent !important;
+    }
+
+    #cart .sumline{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+      width:100%;
+      padding:0 !important;
+      border:0 !important;
+      border-radius:0 !important;
+      background:transparent !important;
+      color:rgba(255, 247, 232, .78) !important;
+      line-height:1.45;
+    }
+
+    #cart .sumline span{
+      color:rgba(255, 247, 232, .78) !important;
+      background:transparent !important;
+    }
+
+    #cart .sumline span:last-child{
+      text-align:right;
+      max-width:13rem;
+    }
+
+    #cart .summary-actions{
+      display:grid;
+      gap:12px;
+      margin-top:20px;
+    }
+
+    #cart .summary-note{
+      margin-top:16px;
+      padding:0 !important;
+      border:0 !important;
+      border-radius:0 !important;
+      background:transparent !important;
+      color:rgba(255, 247, 232, .70) !important;
+      font-size:.92rem;
+      line-height:1.6;
+    }
+
+    #cart .trust-row{
+      gap:8px 14px;
+      margin-top:16px;
+      color:rgba(255, 247, 232, .68) !important;
+      font-size:.82rem;
+      line-height:1.45;
+    }
+
+    #cart .trust-row span{
+      color:rgba(255, 247, 232, .68) !important;
+    }
+
+    #cart .error{
+      margin-top:16px;
+      padding:14px 15px !important;
+      border-radius:16px !important;
+      border:1px solid rgba(255, 190, 170, .34) !important;
+      background:rgba(255, 190, 170, .10) !important;
+      color:#ffe1d8 !important;
+      font-size:.94rem;
+      line-height:1.5;
+      overflow-wrap:break-word;
+    }
+
+    @media (max-width: 680px){
+      #cart .summary-card{
+        padding:20px !important;
+        border-radius:24px !important;
+      }
+
+      #cart .summary-total-bar{
+        align-items:flex-start;
+      }
+
+      #cart .sumline{
+        font-size:.94rem;
+      }
+
+      #cart .sumline span:last-child{
+        max-width:10.5rem;
+      }
+
+      #cart .summary-card .btn{
+        width:100%;
+        min-height:54px;
       }
     }
   </style>

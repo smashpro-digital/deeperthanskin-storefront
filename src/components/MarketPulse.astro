@@ -1,0 +1,427 @@
+---
+const marketMoments = [
+  {
+    title: "Sip reactions",
+    eyebrow: "Fresh response",
+    copy: "First tastes, favorite blends, and quick notes from the table.",
+  },
+  {
+    title: "Fresh pour clips",
+    eyebrow: "Behind the table",
+    copy: "Short-form pours and seasonal prep moments, curated before posting.",
+  },
+  {
+    title: "Kids treats",
+    eyebrow: "Family favorites",
+    copy: "Small market-day sweets and gentle sips for the little ones.",
+  },
+  {
+    title: "Market table moments",
+    eyebrow: "Community ritual",
+    copy: "Setup details, sold-out notes, and the glow of a good market day.",
+  },
+];
+---
+
+<section class="market-pulse" data-market-pulse aria-label="Market Pulse">
+  <div class="pulse-shell">
+    <div class="pulse-head">
+      <div>
+        <p class="pulse-kicker">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          Live-ish market activity
+        </p>
+        <h2>Market Pulse</h2>
+      </div>
+      <span class="pulse-source" data-pulse-source>Today</span>
+    </div>
+
+    <div class="pulse-ticker" aria-live="polite">
+      <div class="pulse-track" data-pulse-track>
+        <span class="pulse-item">Fresh pours are available at the market table</span>
+        <span class="pulse-meta">Today</span>
+        <span class="pulse-item">Ask about seasonal botanical lemonades</span>
+        <span class="pulse-meta">Market special</span>
+      </div>
+    </div>
+
+    <div class="pulse-stats" aria-label="Market stats">
+      <div class="pulse-chip">
+        <span>Orders today</span>
+        <strong data-pulse-orders>0</strong>
+      </div>
+      <div class="pulse-chip">
+        <span>Items poured</span>
+        <strong data-pulse-items>0</strong>
+      </div>
+      <div class="pulse-chip pulse-chip--wide">
+        <span>Top item</span>
+        <strong data-pulse-top>Fresh pours</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="market-seen" aria-label="Seen Around the Market">
+    <div class="seen-head">
+      <p class="pulse-kicker">Curated table notes</p>
+      <h2>Seen Around the Market</h2>
+    </div>
+    <div class="seen-grid">
+      {marketMoments.map((moment) => (
+        <article class="seen-card">
+          <div class="seen-media" aria-hidden="true">
+            <span></span>
+          </div>
+          <div>
+            <p>{moment.eyebrow}</p>
+            <h3>{moment.title}</h3>
+            <span>{moment.copy}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector("[data-market-pulse]");
+    if (!root) return;
+
+    const track = root.querySelector("[data-pulse-track]");
+    const source = root.querySelector("[data-pulse-source]");
+    const orders = root.querySelector("[data-pulse-orders]");
+    const items = root.querySelector("[data-pulse-items]");
+    const top = root.querySelector("[data-pulse-top]");
+
+    const fallback = {
+      ok: true,
+      source: "fallback",
+      updatedAt: new Date().toISOString(),
+      stats: {
+        ordersToday: 0,
+        itemsSoldToday: 0,
+        topItem: "Fresh pours",
+      },
+      ticker: [
+        {
+          label: "Fresh pours are available at the market table",
+          meta: "Today",
+          type: "note",
+        },
+        {
+          label: "Ask about seasonal botanical lemonades",
+          meta: "Market special",
+          type: "note",
+        },
+      ],
+    };
+
+    const safeText = (value, fallbackText = "") =>
+      String(value ?? fallbackText)
+        .replace(/[<>{}[\]\\]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 96);
+
+    const renderTicker = (ticker) => {
+      if (!track) return;
+
+      const rows = Array.isArray(ticker) && ticker.length ? ticker.slice(0, 8) : fallback.ticker;
+      track.replaceChildren();
+
+      rows.forEach((item) => {
+        const label = document.createElement("span");
+        label.className = "pulse-item";
+        label.textContent = safeText(item?.label, "Fresh pours are available");
+
+        const meta = document.createElement("span");
+        meta.className = "pulse-meta";
+        meta.textContent = safeText(item?.meta, "Today");
+
+        track.append(label, meta);
+      });
+    };
+
+    const renderPulse = (data) => {
+      const stats = data?.stats || fallback.stats;
+
+      if (source) source.textContent = data?.source === "square" ? "Square Orders" : "Market notes";
+      if (orders) orders.textContent = String(Math.max(0, Number(stats.ordersToday || 0)));
+      if (items) items.textContent = String(Math.max(0, Number(stats.itemsSoldToday || 0)));
+      if (top) top.textContent = safeText(stats.topItem, "Fresh pours");
+
+      renderTicker(data?.ticker);
+    };
+
+    const loadPulse = async () => {
+      try {
+        const response = await fetch("/api/market-pulse.json", {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          renderPulse(fallback);
+          return;
+        }
+
+        const data = await response.json();
+        renderPulse(data?.ok === true ? data : fallback);
+      } catch {
+        renderPulse(fallback);
+      }
+    };
+
+    renderPulse(fallback);
+    loadPulse();
+    window.setInterval(loadPulse, 60000);
+  })();
+</script>
+
+<style>
+  .market-pulse {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+  }
+
+  .pulse-shell,
+  .market-seen {
+    border-radius: 26px;
+    border: 1px solid rgba(200, 162, 74, .24);
+    background:
+      radial-gradient(620px 260px at 12% 0%, rgba(200, 162, 74, .13), transparent 68%),
+      linear-gradient(135deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .025)),
+      rgba(5, 17, 13, .72);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .24);
+    overflow: hidden;
+  }
+
+  .pulse-shell {
+    padding: 16px;
+  }
+
+  .pulse-head,
+  .seen-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .pulse-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 7px;
+    color: rgba(233, 206, 143, .92);
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #c6a96b;
+    box-shadow: 0 0 0 5px rgba(198, 169, 107, .13);
+  }
+
+  .pulse-head h2,
+  .seen-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(24px, 3vw, 36px);
+    line-height: 1;
+  }
+
+  .pulse-source {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 8px 10px;
+    border: 1px solid rgba(233, 206, 143, .22);
+    background: rgba(0, 0, 0, .16);
+    color: rgba(245, 241, 232, .78);
+    font-size: 12px;
+  }
+
+  .pulse-ticker {
+    position: relative;
+    margin-top: 14px;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    background: rgba(0, 0, 0, .18);
+  }
+
+  .pulse-track {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: max-content;
+    min-width: 100%;
+    padding: 12px;
+    animation: marketPulseScroll 30s linear infinite;
+  }
+
+  .pulse-item {
+    color: rgba(245, 241, 232, .94);
+    white-space: nowrap;
+  }
+
+  .pulse-meta {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    padding: 5px 8px;
+    color: #08130e;
+    background: linear-gradient(135deg, rgba(233, 206, 143, .96), rgba(198, 169, 107, .94));
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .pulse-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .pulse-chip {
+    min-width: 0;
+    border-radius: 18px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    background: rgba(255, 255, 255, .045);
+  }
+
+  .pulse-chip span {
+    display: block;
+    color: rgba(245, 241, 232, .64);
+    font-size: 12px;
+  }
+
+  .pulse-chip strong {
+    display: block;
+    margin-top: 5px;
+    overflow-wrap: anywhere;
+    color: rgba(245, 241, 232, .96);
+    font-size: 17px;
+  }
+
+  .market-seen {
+    padding: 16px;
+  }
+
+  .seen-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .seen-card {
+    min-width: 0;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .10);
+    background: rgba(255, 255, 255, .045);
+  }
+
+  .seen-media {
+    aspect-ratio: 16 / 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(circle at 35% 28%, rgba(245, 241, 232, .22), transparent 22%),
+      linear-gradient(135deg, rgba(198, 169, 107, .25), rgba(15, 42, 35, .66));
+  }
+
+  .seen-media span {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(233, 206, 143, .46);
+    background: rgba(0, 0, 0, .18);
+    box-shadow: 0 0 0 9px rgba(198, 169, 107, .08);
+  }
+
+  .seen-card div:last-child {
+    padding: 11px;
+  }
+
+  .seen-card p {
+    margin: 0 0 6px;
+    color: rgba(233, 206, 143, .88);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .seen-card h3 {
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .seen-card span {
+    display: block;
+    margin-top: 7px;
+    color: rgba(245, 241, 232, .68);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  @keyframes marketPulseScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-34%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-track {
+      animation: none;
+      width: auto;
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .seen-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pulse-head,
+    .seen-head {
+      display: block;
+    }
+
+    .pulse-source {
+      display: inline-flex;
+      margin-top: 10px;
+    }
+
+    .pulse-track {
+      width: auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      animation: none;
+    }
+
+    .pulse-item {
+      white-space: normal;
+    }
+
+    .pulse-meta {
+      width: fit-content;
+      margin-bottom: 6px;
+    }
+
+    .pulse-stats,
+    .seen-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

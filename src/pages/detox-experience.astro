@@ -6,12 +6,25 @@ export const prerender = true;
 const baseRaw = import.meta.env.BASE_URL || "/";
 const base = baseRaw.endsWith("/") ? baseRaw : `${baseRaw}/`;
 
+const API_ROOT =
+  (import.meta.env.PUBLIC_COMMERCE_API_ROOT as string | undefined) ||
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE_INDEX as string | undefined) ||
+  "https://smashpro.app/api/v1/index.php";
+
+const APP_SLUG =
+  (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+  "deeper-than-skin";
+
+const PUBLIC_API_KEY =
+  (import.meta.env.PUBLIC_COMMERCE_API_KEY as string | undefined) || "";
+
 /**
  * Replace these with your real Square payment/booking links.
  * Page renders safely even while links are blank.
  */
 const PAY_LINKS = {
-  single: "",
+  single:
+    (import.meta.env.PUBLIC_DETOX_SINGLE_SESSION_PAYMENT_LINK as string | undefined) || "",
   weekly: "",
   total: "",
   elite: "",
@@ -19,6 +32,41 @@ const PAY_LINKS = {
 
 const fallbackLink = `${base}category/wellness`;
 const safeLink = (url: string) => String(url || "").trim() || fallbackLink;
+const squareBookingFallback =
+  (import.meta.env.PUBLIC_SQUARE_BOOKING_URL as string | undefined) ||
+  "https://deeper-than-skin-llc.square.site/appointments";
+
+const DETOX_SINGLE_SESSION = {
+  productId:
+    (import.meta.env.PUBLIC_DETOX_SINGLE_SESSION_PRODUCT_ID as string | undefined) ||
+    "BSRNUARXBO7LYS7GDGUJYRP4",
+  variationId:
+    (import.meta.env.PUBLIC_DETOX_SINGLE_SESSION_VARIATION_ID as string | undefined) ||
+    "EDZDJOKHPNW462I7AXSKKJ6T",
+  name: "Ionic Foot Detox - Reset Session",
+  imageUrl: `${base}images/ionic-footbath.jpg`,
+  priceMoney: { amount: 4500, currency: "USD" },
+};
+
+function publicApiUrl(path: string, params: Record<string, string | number | boolean> = {}) {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("path", path);
+  url.searchParams.set("app_slug", APP_SLUG);
+
+  if (PUBLIC_API_KEY) {
+    url.searchParams.set("api_key", PUBLIC_API_KEY);
+  }
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value) !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
+const checkoutEndpoint = publicApiUrl("public/commerce/checkout");
 
 const HERO_IMAGE = `${base}images/ionic-foot-detox-experience.jpg`;
 
@@ -33,7 +81,7 @@ const tiers = [
     savings: "",
     badge: "",
     cta: "Book Single Session",
-    href: safeLink(PAY_LINKS.single),
+    href: safeLink(PAY_LINKS.single || squareBookingFallback),
     features: [
       "1 Ionic Foot Detox session",
       "30-minute grounding wellness ritual",
@@ -82,14 +130,18 @@ const tiers = [
 const eliteHref = safeLink(PAY_LINKS.elite);
 ---
 
-<BaseLayout title="Ionic Foot Detox Experience | Deeper Than Skin">
+<BaseLayout
+  title="Ionic Foot Detox Experience | Deeper Than Skin"
+  hideNav={true}
+  hideFooter={true}
+>
   <main class="detox-page">
     <section class="detox-hero">
       <div class="hero-bg" style={`background-image:url('${HERO_IMAGE}')`} aria-hidden="true"></div>
       <div class="hero-veil" aria-hidden="true"></div>
 
       <div class="container hero-inner">
-        <a class="crumb" href={`${base}category/wellness`}>← Back to Wellness</a>
+        <a class="crumb" id="detox-return-link" href={`${base}category/wellness`}>← Back to Wellness</a>
 
         <div class="hero-copy">
           <div class="kicker">Deeper Than Skin</div>
@@ -122,7 +174,16 @@ const eliteHref = safeLink(PAY_LINKS.elite);
       </div>
     </section>
 
-    <section id="plans" class="plans section-slim">
+    <section
+      id="plans"
+      class="plans section-slim"
+      data-single-session={JSON.stringify(DETOX_SINGLE_SESSION)}
+      data-cart-href={`${base}cart`}
+      data-checkout-endpoint={checkoutEndpoint}
+      data-app-slug={APP_SLUG}
+      data-api-key={PUBLIC_API_KEY}
+      data-payment-fallback={PAY_LINKS.single || squareBookingFallback}
+    >
       <div class="container">
         <div class="section-head">
           <div>
@@ -162,12 +223,18 @@ const eliteHref = safeLink(PAY_LINKS.elite);
                 ))}
               </ul>
 
-              <a class={`btn ${tier.id === "total" ? "btn-primary" : "btn-soft"}`} href={tier.href}>
+              <a
+                class={`btn ${tier.id === "total" ? "btn-primary" : "btn-soft"}`}
+                href={tier.href}
+                data-detox-single-cta={tier.id === "single" ? "1" : undefined}
+              >
                 {tier.cta}
               </a>
             </article>
           ))}
         </div>
+
+        <p class="plan-status" id="detox-plan-status" aria-live="polite"></p>
       </div>
     </section>
 
@@ -232,6 +299,158 @@ const eliteHref = safeLink(PAY_LINKS.elite);
         }, 80);
       }
     }
+  </script>
+
+  <script>
+    const plans = document.getElementById("plans");
+    const singleCta = document.querySelector("[data-detox-single-cta='1']");
+    const statusEl = document.getElementById("detox-plan-status");
+    const returnLink = document.getElementById("detox-return-link");
+
+    const trackedParamKeys = ["source", "device", "event", "utm_source", "utm_medium", "utm_campaign"];
+
+    const currentParams = new URLSearchParams(window.location.search);
+    const hasMarketContext =
+      currentParams.get("source") === "qr-market" ||
+      currentParams.has("device") ||
+      currentParams.has("event");
+
+    if (returnLink && hasMarketContext) {
+      returnLink.href = withPreservedParams("/start");
+      returnLink.textContent = "← Back to start";
+    }
+
+    function withPreservedParams(href) {
+      const url = new URL(href || "/cart", window.location.origin);
+      const current = new URLSearchParams(window.location.search);
+
+      trackedParamKeys.forEach((key) => {
+        const value = current.get(key);
+        if (value) url.searchParams.set(key, value);
+      });
+
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    function setStatus(message, state = "") {
+      if (!statusEl) return;
+      statusEl.textContent = message || "";
+      statusEl.dataset.state = state;
+    }
+
+    function setBusy(isBusy) {
+      if (!singleCta) return;
+      singleCta.setAttribute("aria-busy", isBusy ? "true" : "false");
+      singleCta.setAttribute("aria-disabled", isBusy ? "true" : "false");
+      singleCta.textContent = isBusy ? "Preparing secure checkout..." : "Book Single Session";
+    }
+
+    function trackingMetadata() {
+      const current = new URLSearchParams(window.location.search);
+      const metadata = {};
+
+      trackedParamKeys.forEach((key) => {
+        const value = current.get(key);
+        if (value) metadata[key] = value;
+      });
+
+      return metadata;
+    }
+
+    singleCta?.addEventListener("click", async (event) => {
+      event.preventDefault();
+
+      if (!plans) {
+        setStatus("Checkout is temporarily unavailable. Please try again, or contact us to complete your order.", "error");
+        return;
+      }
+
+      const paymentFallback = plans.getAttribute("data-payment-fallback") || "";
+      const cartHref = plans.getAttribute("data-cart-href") || "/cart";
+      const checkoutEndpoint = plans.getAttribute("data-checkout-endpoint") || "";
+      const appSlug = plans.getAttribute("data-app-slug") || "deeper-than-skin";
+      const publicApiKey = plans.getAttribute("data-api-key") || "";
+
+      try {
+        setBusy(true);
+        setStatus("Preparing secure checkout...", "loading");
+
+        const singleSession = JSON.parse(plans.getAttribute("data-single-session") || "{}");
+        const variationId = String(singleSession.variationId || "").trim();
+        const metadata = trackingMetadata();
+
+        if (!checkoutEndpoint || !variationId) {
+          console.warn("[detox checkout] Missing checkout endpoint or detox single-session variation mapping; using fallback.");
+          if (paymentFallback) {
+            window.location.href = paymentFallback;
+            return;
+          }
+
+          window.location.href = withPreservedParams(cartHref);
+          return;
+        }
+
+        const payload = {
+          app_slug: appSlug,
+          ...(publicApiKey ? { api_key: publicApiKey } : {}),
+          success_url: `${window.location.origin}${withPreservedParams("/detox-experience?checkout=success")}`,
+          cancel_url: `${window.location.origin}${withPreservedParams("/detox-experience?checkout=cancelled#plans")}`,
+          source: metadata.source || "",
+          device: metadata.device || "",
+          event: metadata.event || "",
+          metadata,
+          cart: [
+            {
+              variation_id: variationId,
+              qty: 1,
+            },
+          ],
+          items: [
+            {
+              name: singleSession.name || "Ionic Foot Detox - Reset Session",
+              price_money: singleSession.priceMoney || { amount: 4500, currency: "USD" },
+              qty: 1,
+            },
+          ],
+        };
+
+        const res = await fetch(checkoutEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            ...(publicApiKey ? { "x-api-key": publicApiKey } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${text.slice(0, 180)}`);
+        }
+
+        if (text.trim().startsWith("<")) {
+          throw new Error("Non-JSON response");
+        }
+
+        const data = JSON.parse(text);
+        const redirectUrl = data?.checkout_url || data?.checkoutUrl || data?.payment_url || data?.paymentUrl || "";
+
+        if (!data?.ok || !redirectUrl) {
+          throw new Error(data?.error || "Checkout unavailable");
+        }
+
+        window.location.href = redirectUrl;
+      } catch (error) {
+        console.error("[detox checkout]", error);
+        setBusy(false);
+        setStatus(
+          "Checkout is temporarily unavailable. Please try again, or contact us to complete your order.",
+          "error"
+        );
+      }
+    });
   </script>
 
   <style>
@@ -545,6 +764,29 @@ const eliteHref = safeLink(PAY_LINKS.elite);
 
     .tier .btn {
       width: 100%;
+    }
+
+    .tier .btn[aria-disabled="true"] {
+      pointer-events: none;
+      opacity: .78;
+      cursor: wait;
+    }
+
+    .plan-status {
+      min-height: 1.5em;
+      margin: 16px 0 0;
+      color: rgba(255,255,255,.74);
+      font-size: .95rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .plan-status[data-state="loading"] {
+      color: rgba(233,206,143,.96);
+    }
+
+    .plan-status[data-state="error"] {
+      color: #ffcabd;
     }
 
     .how {

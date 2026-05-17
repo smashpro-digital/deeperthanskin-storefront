@@ -25,6 +25,7 @@ api/bootstrap/config.local.php
 api/bootstrap/*.local.php
 .env
 .env.*
+!/.env.example
 .vscode/sftp.json
 .vscode/settings.json
 api/v1/routes/_square.config.php
