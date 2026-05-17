@@ -199,6 +199,13 @@ if ($sub === "/public/commerce/featured" && $method === "GET") {
   exit;
 }
 
+if ($sub === "/public/commerce/market-pulse" && $method === "GET") {
+  header("X-Route: public.commerce.market-pulse.get");
+  header("X-Correlation-Id: " . $correlationId);
+  require __DIR__ . "/routes/public.commerce.market-pulse.get.php";
+  exit;
+}
+
 if ($sub === "/public/commerce/products" && $method === "GET") {
   header("X-Route: public.commerce.products.get");
   header("X-Correlation-Id: " . $correlationId);
