@@ -1,35 +1,84 @@
 ---
+const API_ROOT =
+  (import.meta.env.PUBLIC_COMMERCE_API_ROOT as string | undefined) ||
+  (import.meta.env.PUBLIC_COMMERCE_API_BASE_INDEX as string | undefined) ||
+  "https://smashpro.app/api/v1/index.php";
+
+const APP_SLUG =
+  (import.meta.env.PUBLIC_COMMERCE_APP_SLUG as string | undefined) ||
+  "deeper-than-skin";
+
+const configuredPulseEndpoint =
+  (import.meta.env.PUBLIC_MARKET_PULSE_ENDPOINT as string | undefined) || "";
+
+const marketPulseEndpoint = configuredPulseEndpoint || (() => {
+  const url = new URL(API_ROOT);
+  url.searchParams.set("path", "public/commerce/market-pulse");
+  url.searchParams.set("app_slug", APP_SLUG);
+  return url.toString();
+})();
+
+const fallbackPourVideo = "/images/20260514_172549.mp4";
+const reactionVideo1 =
+  (import.meta.env.PUBLIC_MARKET_REACTION_VIDEO_1 as string | undefined) ||
+  fallbackPourVideo;
+const reactionVideo2 =
+  (import.meta.env.PUBLIC_MARKET_REACTION_VIDEO_2 as string | undefined) ||
+  fallbackPourVideo;
+
 const marketMoments = [
   {
     title: "Sip reactions",
     eyebrow: "Fresh response",
     copy: "First tastes, favorite blends, and quick notes from the table.",
+    kind: reactionVideo1 ? "video" : "image",
+    src: reactionVideo1,
+    poster: "/images/cat-juices.jpg",
+    alt: "Fresh juice pour reaction",
   },
   {
     title: "Fresh pour clips",
     eyebrow: "Behind the table",
     copy: "Short-form pours and seasonal prep moments, curated before posting.",
+    kind: reactionVideo2 ? "video" : "image",
+    src: reactionVideo2,
+    poster: "/images/hero-brand.png",
+    alt: "Botanical juice pour at the market table",
   },
   {
     title: "Kids treats",
     eyebrow: "Family favorites",
     copy: "Small market-day sweets and gentle sips for the little ones.",
+    kind: "image",
+    src: "/images/cat-functional-gummie.png",
+    poster: "/images/cat-functional-gummie.png",
+    alt: "Market treats and family favorites",
   },
   {
     title: "Market table moments",
     eyebrow: "Community ritual",
     copy: "Setup details, sold-out notes, and the glow of a good market day.",
+    kind: "image",
+    src: "/images/cat-wellness.png",
+    poster: "/images/cat-wellness.png",
+    alt: "Deeper Than Skin market table moment",
   },
 ];
 ---
 
-<section class="market-pulse" data-market-pulse aria-label="Market Pulse">
+<section
+  class="market-pulse"
+  data-market-pulse
+  data-live-endpoint={marketPulseEndpoint}
+  data-static-endpoint="/api/market-pulse.json"
+  aria-label="Market Pulse"
+>
   <div class="pulse-shell">
     <div class="pulse-head">
       <div>
         <p class="pulse-kicker">
           <span class="pulse-dot" aria-hidden="true"></span>
-          Live-ish market activity
+          Live market activity
         </p>
         <h2>Market Pulse</h2>
       </div>
@@ -58,19 +107,39 @@ const marketMoments = [
         <span>Top item</span>
         <strong data-pulse-top>Fresh pours</strong>
       </div>
+      <div class="pulse-chip pulse-chip--wide">
+        <span>Updated</span>
+        <strong data-pulse-updated>Checking...</strong>
+      </div>
     </div>
   </div>
 
   <div class="market-seen" aria-label="Seen Around the Market">
     <div class="seen-head">
-      <p class="pulse-kicker">Curated table notes</p>
-      <h2>Seen Around the Market</h2>
+      <div>
+        <p class="pulse-kicker">Curated table notes</p>
+        <h2>Seen Around the Market</h2>
+      </div>
+      <span class="pulse-source">Photos + reels</span>
     </div>
     <div class="seen-grid">
       {marketMoments.map((moment) => (
-        <article class="seen-card">
+        <article class={`seen-card ${moment.kind === "video" && moment.src ? "seen-card--video" : ""}`}>
           <div class="seen-media" aria-hidden="true">
-            <span></span>
+            {moment.kind === "video" && moment.src ? (
+              <video
+                autoplay
+                muted
+                loop
+                playsinline
+                preload="metadata"
+                poster={moment.poster}
+                src={moment.src}
+              ></video>
+            ) : (
+              <img src={moment.poster || moment.src} alt="" loading="lazy" />
+            )}
+            <span class={moment.kind === "video" && moment.src ? "seen-play seen-play--video" : "seen-play"}></span>
           </div>
           <div>
             <p>{moment.eyebrow}</p>
@@ -93,6 +162,9 @@ const marketMoments = [
     const orders = root.querySelector("[data-pulse-orders]");
     const items = root.querySelector("[data-pulse-items]");
     const top = root.querySelector("[data-pulse-top]");
+    const updated = root.querySelector("[data-pulse-updated]");
+    const liveEndpoint = root.getAttribute("data-live-endpoint") || "";
+    const staticEndpoint = root.getAttribute("data-static-endpoint") || "/api/market-pulse.json";
 
     const fallback = {
       ok: true,
@@ -114,6 +186,11 @@ const marketMoments = [
           meta: "Market special",
           type: "note",
         },
+        {
+          label: "Reaction clips and table notes are refreshed after market moments",
+          meta: "Curated",
+          type: "note",
+        },
       ],
     };
 
@@ -123,6 +200,20 @@ const marketMoments = [
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 96);
+
+    const formatUpdated = (value) => {
+      const timestamp = Date.parse(value || "");
+      if (!Number.isFinite(timestamp)) return "Market notes";
+
+      const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+      if (diffMinutes < 1) return "Just now";
+      if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+      const diffHours = Math.round(diffMinutes / 60);
+      if (diffHours < 24) return `${diffHours} hr ago`;
+
+      return "Today";
+    };
 
     const renderTicker = (ticker) => {
       if (!track) return;
@@ -146,28 +237,45 @@ const marketMoments = [
     const renderPulse = (data) => {
       const stats = data?.stats || fallback.stats;
 
-      if (source) source.textContent = data?.source === "square" ? "Square Orders" : "Market notes";
+      if (source) {
+        source.textContent =
+          data?.source === "square"
+            ? "Live Square orders"
+            : data?.source === "static"
+              ? "Static fallback"
+              : "Market notes";
+      }
       if (orders) orders.textContent = String(Math.max(0, Number(stats.ordersToday || 0)));
       if (items) items.textContent = String(Math.max(0, Number(stats.itemsSoldToday || 0)));
       if (top) top.textContent = safeText(stats.topItem, "Fresh pours");
+      if (updated) updated.textContent = formatUpdated(data?.updatedAt);
 
       renderTicker(data?.ticker);
     };
 
+    const fetchPulse = async (endpoint) => {
+      if (!endpoint) return null;
+
+      const response = await fetch(endpoint, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data?.ok === true ? data : null;
+    };
+
     const loadPulse = async () => {
       try {
-        const response = await fetch("/api/market-pulse.json", {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          renderPulse(fallback);
+        const data = await fetchPulse(liveEndpoint);
+        if (data) {
+          renderPulse(data);
           return;
         }
 
-        const data = await response.json();
-        renderPulse(data?.ok === true ? data : fallback);
+        const staticData = await fetchPulse(staticEndpoint);
+        renderPulse(staticData ? { ...staticData, source: "static" } : fallback);
       } catch {
         renderPulse(fallback);
       }
@@ -283,7 +391,7 @@ const marketMoments = [
 
   .pulse-stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
     margin-top: 12px;
   }
@@ -330,6 +438,7 @@ const marketMoments = [
   }
 
   .seen-media {
+    position: relative;
     aspect-ratio: 16 / 10;
     display: flex;
     align-items: center;
@@ -339,13 +448,56 @@ const marketMoments = [
       linear-gradient(135deg, rgba(198, 169, 107, .25), rgba(15, 42, 35, .66));
   }
 
-  .seen-media span {
+  .seen-media img,
+  .seen-media video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+
+  .seen-media video {
+    object-position: center 24%;
+  }
+
+  .seen-card--video .seen-media {
+    aspect-ratio: 9 / 14;
+  }
+
+  .seen-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, .02), rgba(0, 0, 0, .34)),
+      radial-gradient(circle at 50% 45%, transparent 22%, rgba(0, 0, 0, .18) 100%);
+    pointer-events: none;
+  }
+
+  .seen-play {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
     width: 34px;
     height: 34px;
     border-radius: 999px;
     border: 1px solid rgba(233, 206, 143, .46);
     background: rgba(0, 0, 0, .18);
     box-shadow: 0 0 0 9px rgba(198, 169, 107, .08);
+    z-index: 2;
+  }
+
+  .seen-play::before {
+    content: "";
+    position: absolute;
+    inset: 10px 9px 10px 12px;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+    background: rgba(245, 241, 232, .88);
+  }
+
+  .seen-play--video {
+    background: rgba(198, 169, 107, .82);
+    border-color: rgba(245, 241, 232, .44);
   }
 
   .seen-card div:last-child {
@@ -387,6 +539,10 @@ const marketMoments = [
   }
 
   @media (max-width: 900px) {
+    .pulse-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .seen-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
