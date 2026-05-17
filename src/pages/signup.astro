@@ -12,6 +12,7 @@ const WAITLIST_ENDPOINT =
 const logo = `${base}images/deeperthanskin_logo.png`;
 const heroImage = `${base}images/ionic-foot-detox-experience.jpg`;
 const shopUrl = `${base}shop`;
+const startUrl = `${base}start?source=qr-market&device=customer-phone&event=lake-carolina-market`;
 ---
 
 <BaseLayout
@@ -82,6 +83,20 @@ const shopUrl = `${base}shop`;
           data-endpoint={WAITLIST_ENDPOINT}
           novalidate
         >
+          <label class="sr-only" for="market-signup-name">Name optional</label>
+
+          <div class="input-wrap name-wrap">
+            <span aria-hidden="true">♡</span>
+
+            <input
+              id="market-signup-name"
+              name="name"
+              type="text"
+              autocomplete="name"
+              placeholder="Name (optional)"
+            />
+          </div>
+
           <label class="sr-only" for="market-signup-email">Email</label>
 
           <div class="form-row">
@@ -100,6 +115,29 @@ const shopUrl = `${base}shop`;
             </div>
 
             <button type="submit">Notify Me ›</button>
+          </div>
+
+          <label class="sms-opt-in" for="market-signup-sms-consent">
+            <input
+              id="market-signup-sms-consent"
+              name="sms_consent"
+              type="checkbox"
+              value="1"
+            />
+            <span>Text me updates too</span>
+          </label>
+
+          <div class="input-wrap phone-wrap" id="market-signup-phone-wrap" hidden>
+            <span aria-hidden="true">☎</span>
+
+            <input
+              id="market-signup-phone"
+              name="phone"
+              type="tel"
+              inputmode="tel"
+              autocomplete="tel"
+              placeholder="Mobile number"
+            />
           </div>
 
           <input
@@ -140,7 +178,7 @@ const shopUrl = `${base}shop`;
 
         <div class="qr-wrap">
           <span class="qr-label">Scan to start</span>
-          <a class="qr-box" href="/start">
+          <a class="qr-box" href={startUrl}>
             <img
               src="/images/https_shop_deeperthanskin_store_start_.png"
               alt="Scan to start your ritual"
@@ -367,6 +405,24 @@ const shopUrl = `${base}shop`;
       background: #fff7ea;
     }
 
+    .name-wrap {
+      margin-bottom: 0.85rem;
+      border: 1px solid rgba(224, 173, 82, 0.45);
+      border-radius: 999px;
+      background: #fff7ea;
+    }
+
+    .phone-wrap {
+      margin-top: 0.85rem;
+      border: 1px solid rgba(224, 173, 82, 0.45);
+      border-radius: 999px;
+      background: #fff7ea;
+    }
+
+    .phone-wrap[hidden] {
+      display: none;
+    }
+
     .input-wrap {
       display: flex;
       align-items: center;
@@ -389,6 +445,25 @@ const shopUrl = `${base}shop`;
 
     input::placeholder {
       color: rgba(24, 22, 16, 0.48);
+    }
+
+    .sms-opt-in {
+      width: fit-content;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0.95rem 0 0;
+      color: rgba(255, 248, 232, 0.86);
+      font-size: 0.95rem;
+      line-height: 1.35;
+      cursor: pointer;
+    }
+
+    .sms-opt-in input {
+      width: 1.15rem;
+      min-height: 1.15rem;
+      accent-color: #c6a96b;
+      cursor: pointer;
     }
 
     button {
@@ -637,6 +712,14 @@ const shopUrl = `${base}shop`;
         border-radius: 24px;
       }
 
+      .name-wrap {
+        border-radius: 24px;
+      }
+
+      .phone-wrap {
+        border-radius: 24px;
+      }
+
       .input-wrap {
         padding-right: 1.25rem;
       }
@@ -656,9 +739,33 @@ const shopUrl = `${base}shop`;
   (() => {
     const form = document.getElementById("market-signup-form");
     const emailInput = document.getElementById("market-signup-email");
+    const nameInput = document.getElementById("market-signup-name");
+    const smsConsentInput = document.getElementById("market-signup-sms-consent");
+    const phoneWrap = document.getElementById("market-signup-phone-wrap");
+    const phoneInput = document.getElementById("market-signup-phone");
     const statusEl = document.getElementById("market-signup-status");
 
     if (!form || !emailInput || !statusEl) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const sourceInput = form.querySelector('input[name="source"]');
+    const trackedSource = urlParams.get("source");
+    const trackedEvent = urlParams.get("event");
+    const trackedDevice = urlParams.get("device");
+
+    // Preserve QR/source context when a market visitor joins the list from /start.
+    if (sourceInput && trackedSource) {
+      sourceInput.value = [trackedSource, trackedEvent, trackedDevice]
+        .filter(Boolean)
+        .join(":");
+    }
+
+    smsConsentInput?.addEventListener("change", () => {
+      const wantsSms = smsConsentInput.checked;
+      if (phoneWrap) phoneWrap.hidden = !wantsSms;
+      if (!wantsSms && phoneInput) phoneInput.value = "";
+      if (wantsSms) phoneInput?.focus();
+    });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -671,6 +778,13 @@ const shopUrl = `${base}shop`;
       const consent = form.querySelector('input[name="consent"]');
 
       const email = emailInput.value.trim();
+      const name = nameInput?.value.trim() || "";
+      const nameParts = name.split(/\s+/).filter(Boolean);
+      const firstName = nameParts.shift() || "";
+      const lastName = nameParts.join(" ");
+      const smsConsent = smsConsentInput?.checked ? "1" : "0";
+      const phone = smsConsent === "1" ? phoneInput?.value.trim() || "" : "";
+      const sourceValue = source?.value || "market-signup-page";
 
       if (!endpoint) {
         statusEl.textContent = "Signup endpoint is missing.";
@@ -692,6 +806,13 @@ const shopUrl = `${base}shop`;
         return;
       }
 
+      if (smsConsent === "1" && phone.replace(/\D/g, "").length < 10) {
+        statusEl.textContent = "Enter a valid mobile number for text updates.";
+        statusEl.dataset.state = "error";
+        phoneInput?.focus();
+        return;
+      }
+
       statusEl.textContent = "Joining the list…";
       statusEl.dataset.state = "loading";
       submitBtn?.setAttribute("disabled", "disabled");
@@ -700,7 +821,12 @@ const shopUrl = `${base}shop`;
         const payload = {
           app_slug: appSlug?.value || "deeper-than-skin",
           email,
-          source: source?.value || "market-signup-page",
+          name,
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          sms_consent: smsConsent,
+          source: smsConsent === "1" ? `${sourceValue}:sms-opt-in` : sourceValue,
           consent: consent?.value || "1",
           company: company?.value || "",
         };

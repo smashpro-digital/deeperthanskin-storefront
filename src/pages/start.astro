@@ -1,309 +1,493 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+
+const TRACKING_DEFAULTS = {
+  source: "qr-market",
+  device: "customer-phone",
+  event: "lake-carolina-market",
+};
+
+const helpSmsHref = import.meta.env.PUBLIC_MARKET_SMS_HREF || "";
+
+// Source tracking defaults are applied to market-day CTAs and refreshed client-side
+// from the current URL so QR codes can override source/device/event without code edits.
+const withTracking = (href: string) => {
+  const [pathWithQuery, hash = ""] = href.split("#");
+  const [path, query = ""] = pathWithQuery.split("?");
+  const params = new URLSearchParams(query);
+
+  Object.entries(TRACKING_DEFAULTS).forEach(([key, value]) => {
+    if (!params.has(key)) params.set(key, value);
+  });
+
+  const paramString = params.toString();
+  return `${path}${paramString ? `?${paramString}` : ""}${hash ? `#${hash}` : ""}`;
+};
+
+const ctas = {
+  marketMenu: withTracking("/category/market"),
+  detox: withTracking("/detox-experience#plans"),
+  signup: withTracking("/ritual-list"),
+  quiz: withTracking("/trial"),
+  membership: withTracking("/membership"),
+};
 ---
 
 <BaseLayout
-  title="Start Your Ritual | Deeper Than Skin"
+  title="Choose Your Market Ritual | Deeper Than Skin"
   hideNav={true}
   hideFooter={true}
 >
   <main class="section start-page">
     <div class="container start-wrap">
-      <p class="masthead">Deeper Than Skin • Market Ritual</p>
+      <p class="masthead">Deeper Than Skin | Market Ritual</p>
 
-      <section class="start-hero">
-        <p class="eyebrow">Start here</p>
-        <h1>Choose your rhythm.</h1>
+      <section class="start-hero" aria-labelledby="start-heading">
+        <p class="eyebrow">Market Ritual</p>
+        <h1 id="start-heading">Choose your market ritual.</h1>
         <p>
-          You’re at the table, so keep it simple. Pick the path that fits today —
-          start with a fresh pour, explore a guided reset, or step into a flexible
-          monthly ritual.
+          You scanned in. Now pick the path that fits today: sip, detox, join the
+          list, or build a starter kit.
         </p>
       </section>
 
-      <section class="path-grid" aria-label="Start your ritual options">
-        <a href="/membership" class="path-card featured">
-          <span class="tag">Most Flexible</span>
-          <p class="eyebrow">Membership</p>
-          <h2>Flexible Wellness Membership</h2>
+      <section class="badge-row" aria-label="Market-day highlights">
+        <span>Fresh Today</span>
+        <span>Most Popular</span>
+        <span>Book Ahead</span>
+        <span>Stay Connected</span>
+      </section>
+
+      <section class="market-concierge" aria-label="Market ritual options">
+        <a href={ctas.marketMenu} class="path-card primary-card" data-track-cta>
+          <span class="tag">Fresh Today</span>
+          <p class="eyebrow">Buy today</p>
+          <h2>View Today's Market Menu</h2>
           <p>
-            One plan that can support juices, skincare, and ionic foot detox
-            scheduling allowance.
+            See fresh juices, herbal drinks, market cups, and limited pours ready
+            for pickup at the table.
           </p>
-          <span class="fake-btn primary">Explore Membership</span>
+          <span class="fake-btn primary">View Today's Market Menu</span>
         </a>
 
-        <a href="/category/market" class="path-card">
-          <p class="eyebrow">Fresh today</p>
-          <h2>Juices & Herbal Drinks</h2>
+        <a href={ctas.detox} class="path-card secondary-card" data-track-cta>
+          <span class="tag soft">Book Ahead</span>
+          <p class="eyebrow">Book detox</p>
+          <h2>Book a Detox Session</h2>
           <p>
-            Preview juices, herbal lemonades, fresh cups, and market specials.
+            Choose a single ionic foot detox or a weekly rhythm for deeper reset
+            support after market day.
           </p>
-          <span class="fake-btn secondary">View Market Menu</span>
+          <span class="fake-btn secondary">Book a Detox Session</span>
         </a>
 
-        <a href="/detox-experience#plans" class="path-card">
-          <p class="eyebrow">Guided care</p>
-          <h2>Ionic Foot Detox Plans</h2>
-          <p>
-            View single sessions, weekly care, and deeper reset memberships.
-          </p>
-          <span class="fake-btn secondary">View Detox Plans</span>
-        </a>
-
-        <a href="/signup" class="path-card">
-          <p class="eyebrow">Stay connected</p>
+        <a href={ctas.signup} class="path-card quiet-card" data-track-cta>
+          <span class="tag soft">Stay Connected</span>
+          <p class="eyebrow">Not ready yet</p>
           <h2>Join the Ritual List</h2>
           <p>
-            Get market drops, wellness notes, offers, and seasonal releases.
+            Get market drops, restock notes, wellness offers, and seasonal ritual
+            releases without choosing today.
           </p>
-          <span class="fake-btn ghost">Join the List</span>
+          <span class="fake-btn ghost">Join the Ritual List</span>
+        </a>
+
+        <a href={ctas.quiz} class="path-card quiet-card" data-track-cta>
+          <span class="tag soft">Most Popular</span>
+          <p class="eyebrow">Guided plan</p>
+          <h2>Build My Starter Kit</h2>
+          <p>
+            Take a quick ritual quiz and get pointed toward juices, teas,
+            skincare, or reset support based on what you need.
+          </p>
+          <span class="fake-btn ghost">Build My Starter Kit</span>
         </a>
       </section>
 
-      <a href="/trial" class="starter-kit-card">
-        <p class="eyebrow">Not sure yet?</p>
-        <h2>Build My Starter Kit</h2>
-        <p>
-          Take a 60-second ritual quiz and we’ll point you toward juices, teas,
-          skincare, or reset support based on what you need today.
-        </p>
-        <span class="fake-btn primary">Take the Quiz</span>
-      </a>
+      <section class="assist-strip" aria-label="Personal help">
+        <div>
+          <p class="eyebrow">Human touch</p>
+          <h2>Ask Us What Fits</h2>
+          <p>
+            Tell us your goal and we will point you to the right sip, detox, or
+            starter ritual while you are here.
+          </p>
+        </div>
 
-      <section class="soft-note">
-        <h2>Need a human touch?</h2>
-        <p>
-          Ask us what’s fresh today, what pairs with your goals, or which ritual
-          path makes the most sense before you tap.
-        </p>
+        {
+          helpSmsHref ? (
+            <a class="assist-action" href={helpSmsHref}>Tap to Text</a>
+          ) : (
+            <span
+              class="assist-action disabled"
+              role="link"
+              aria-disabled="true"
+              title="Text link is not configured yet"
+            >
+              Ask at the Table
+            </span>
+          )
+        }
       </section>
 
+      <a href={ctas.membership} class="membership-link" data-track-cta>
+        <span>Planning your full rhythm?</span>
+        <strong>Explore Flexible Wellness Membership</strong>
+      </a>
     </div>
   </main>
 
   <style>
     .start-page {
-      min-height: 100vh;
-      padding: clamp(40px, 6vw, 64px) 0;
+      min-height: 100svh;
+      padding: clamp(28px, 5vw, 58px) 0;
       background:
-        radial-gradient(circle at top, rgba(214, 179, 91, .14), transparent 30%),
-        radial-gradient(circle at 85% 10%, rgba(255, 255, 255, .08), transparent 20%),
-        linear-gradient(180deg, #08150f 0%, #020604 100%);
+        radial-gradient(circle at top, rgba(198, 169, 107, .16), transparent 28rem),
+        linear-gradient(180deg, #0f2a23 0%, #04120d 58%, #020604 100%);
     }
 
     .start-wrap {
-      max-width: 1020px;
+      max-width: 980px;
       margin: 0 auto;
-      padding: 0 18px;
+      padding: 0 16px;
     }
 
     .masthead {
-      margin: 0 auto 18px;
-      display: inline-flex;
-      font-size: .85rem;
-      letter-spacing: .22em;
+      width: fit-content;
+      margin: 0 auto 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .72rem;
+      letter-spacing: .2em;
       text-transform: uppercase;
-      color: rgba(255, 248, 239, .72);
-      opacity: .88;
+      color: rgba(245, 241, 232, .74);
       border-radius: 999px;
-      padding: 8px 18px;
-      background: rgba(255, 255, 255, .04);
-      border: 1px solid rgba(255, 255, 255, .06);
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, .045);
+      border: 1px solid rgba(198, 169, 107, .18);
       backdrop-filter: blur(10px);
     }
 
     .start-hero {
       text-align: center;
-      max-width: 760px;
-      margin: 0 auto 34px;
-    }
-
-    .start-hero h1 {
-      margin: 0;
-      font-size: clamp(2.6rem, 8vw, 5.8rem);
-      line-height: .92;
-      letter-spacing: -0.05em;
-      color: var(--cream, #f8f3e7);
-    }
-
-    .start-hero p:not(.eyebrow) {
-      max-width: 660px;
-      margin: 18px auto 0;
-      color: rgba(248, 243, 231, .82);
-      font-size: 1.04rem;
-      line-height: 1.75;
-    }
-
-    .path-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-    }
-
-    .path-card,
-    .starter-kit-card {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      min-height: 250px;
-      padding: 26px;
-      border-radius: 32px;
-      text-decoration: none;
-      color: var(--cream, #f8f3e7);
-      background:
-        radial-gradient(circle at top left, rgba(214, 179, 91, .16), transparent 42%),
-        rgba(255, 255, 255, .045);
-      border: 1px solid rgba(214, 179, 91, .22);
-      box-shadow: 0 26px 82px rgba(0, 0, 0, .22);
-      transition: transform .22s ease, border-color .22s ease, background .22s ease, box-shadow .22s ease;
-    }
-
-    .path-card:hover,
-    .starter-kit-card:hover,
-    .path-card:focus-visible,
-    .starter-kit-card:focus-visible {
-      transform: translateY(-4px);
-      border-color: rgba(214, 179, 91, .68);
-      background:
-        radial-gradient(circle at top left, rgba(214, 179, 91, .28), transparent 44%),
-        rgba(255, 255, 255, .09);
-      box-shadow: 0 40px 120px rgba(0, 0, 0, .24);
-      outline: none;
-    }
-
-    .path-card:focus-visible,
-    .starter-kit-card:focus-visible {
-      box-shadow: 0 0 0 4px rgba(214, 179, 91, .22), 0 40px 120px rgba(0, 0, 0, .24);
-    }
-
-    .path-card.featured {
-      background:
-        linear-gradient(135deg, rgba(214, 179, 91, .36), rgba(255, 255, 255, .1)),
-        rgba(255, 255, 255, .065);
-      border-color: rgba(214, 179, 91, .8);
-      box-shadow: 0 34px 110px rgba(0, 0, 0, .22);
-    }
-
-    .starter-kit-card {
-      margin-top: 22px;
-      width: 100%;
-      border-style: dashed;
-      background:
-        radial-gradient(circle at top left, rgba(214, 179, 91, .12), transparent 40%),
-        rgba(255, 255, 255, .035);
-      border-color: rgba(214, 179, 91, .34);
-      min-height: 220px;
-    }
-
-    .tag {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      padding: 7px 10px;
-      border-radius: 999px;
-      font-size: .68rem;
-      font-weight: 900;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: #132016;
-      background: #d6b35b;
+      max-width: 700px;
+      margin: 0 auto 18px;
     }
 
     .eyebrow {
-      margin: 0 0 10px;
-      color: #d6b35b;
+      margin: 0 0 8px;
+      color: #c6a96b;
       font-size: .72rem;
       font-weight: 900;
       letter-spacing: .16em;
       text-transform: uppercase;
     }
 
-    .starter-kit-card h2,
-    .path-card h2 {
+    .start-hero h1 {
       margin: 0;
-      font-size: clamp(1.45rem, 3vw, 2.2rem);
-      line-height: 1.02;
-      letter-spacing: -0.03em;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.85rem, 10vw, 5.35rem);
+      line-height: .9;
+      letter-spacing: -0.035em;
+      color: #f5f1e8;
     }
 
-    .path-card p:not(.eyebrow),
-    .starter-kit-card p:not(.eyebrow) {
-      margin: 14px 0 22px;
-      color: rgba(248, 243, 231, .78);
-      line-height: 1.65;
+    .start-hero p:not(.eyebrow) {
+      max-width: 590px;
+      margin: 14px auto 0;
+      color: rgba(245, 241, 232, .82);
+      font-size: clamp(1rem, 2.4vw, 1.12rem);
+      line-height: 1.55;
     }
 
-    .fake-btn {
+    .badge-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 18px 0 16px;
+    }
+
+    .badge-row span {
+      min-height: 38px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border-radius: 999px;
+      border: 1px solid rgba(198, 169, 107, .24);
+      background: rgba(255, 255, 255, .05);
+      color: rgba(245, 241, 232, .86);
+      font-size: .72rem;
+      font-weight: 850;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .market-concierge {
+      display: grid;
+      grid-template-columns: 1.25fr .95fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .path-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 218px;
+      padding: clamp(20px, 3vw, 28px);
+      border-radius: 24px;
+      text-decoration: none;
+      color: #f5f1e8;
+      background:
+        radial-gradient(circle at top left, rgba(198, 169, 107, .14), transparent 42%),
+        rgba(255, 255, 255, .045);
+      border: 1px solid rgba(198, 169, 107, .24);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .24);
+      transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+
+    .path-card:hover,
+    .path-card:focus-visible,
+    .assist-action:focus-visible,
+    .membership-link:focus-visible {
+      transform: translateY(-2px);
+      border-color: rgba(198, 169, 107, .72);
+      box-shadow: 0 0 0 4px rgba(198, 169, 107, .2), 0 30px 84px rgba(0, 0, 0, .28);
+      outline: none;
+    }
+
+    .primary-card {
+      min-height: 276px;
+      background:
+        linear-gradient(135deg, rgba(198, 169, 107, .36), rgba(255, 255, 255, .08)),
+        radial-gradient(circle at top right, rgba(97, 217, 184, .18), transparent 45%),
+        rgba(255, 255, 255, .06);
+      border-color: rgba(198, 169, 107, .78);
+    }
+
+    .secondary-card {
+      min-height: 276px;
+      background:
+        radial-gradient(circle at top left, rgba(198, 169, 107, .18), transparent 44%),
+        rgba(255, 255, 255, .055);
+    }
+
+    .quiet-card {
+      min-height: 202px;
+      background: rgba(255, 255, 255, .035);
+    }
+
+    .tag {
+      width: fit-content;
+      margin-bottom: 18px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: .68rem;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #132016;
+      background: #c6a96b;
+    }
+
+    .tag.soft {
+      color: #f5f1e8;
+      background: rgba(198, 169, 107, .14);
+      border: 1px solid rgba(198, 169, 107, .28);
+    }
+
+    .path-card h2 {
+      max-width: 15ch;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      line-height: .98;
+      letter-spacing: -0.025em;
+    }
+
+    .path-card p:not(.eyebrow) {
+      max-width: 44rem;
+      margin: 13px 0 22px;
+      color: rgba(245, 241, 232, .76);
+      line-height: 1.55;
+    }
+
+    .fake-btn,
+    .assist-action {
       margin-top: auto;
       width: fit-content;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 42px;
+      min-height: 46px;
       padding: 0 18px;
       border-radius: 999px;
-      font-weight: 900;
-      font-size: .86rem;
+      font-weight: 950;
+      font-size: .84rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
     }
 
-    .fake-btn.primary {
+    .fake-btn.primary,
+    .assist-action {
       color: #132016;
-      background: #d6b35b;
+      background: #c6a96b;
     }
 
     .fake-btn.secondary {
-      color: #f8f3e7;
-      border: 1px solid rgba(248, 243, 231, .22);
-      background: rgba(255, 255, 255, .06);
+      color: #f5f1e8;
+      border: 1px solid rgba(245, 241, 232, .24);
+      background: rgba(255, 255, 255, .075);
     }
 
     .fake-btn.ghost {
-      color: #d6b35b;
-      border: 1px solid rgba(214, 179, 91, .32);
+      color: #d9c58c;
+      border: 1px solid rgba(198, 169, 107, .34);
+      background: rgba(198, 169, 107, .06);
     }
 
-    .soft-note {
-      margin-top: 24px;
-      padding: 28px;
-      border-radius: 32px;
-      text-align: center;
-      background: rgba(255, 255, 255, .03);
-      border: 1px solid rgba(214, 179, 91, .22);
+    .assist-strip {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: clamp(20px, 3vw, 28px);
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at top right, rgba(198, 169, 107, .12), transparent 42%),
+        rgba(255, 255, 255, .035);
+      border: 1px solid rgba(198, 169, 107, .22);
     }
 
-    .soft-note h2 {
-      margin: 0 0 8px;
-      color: var(--cream, #f8f3e7);
-      font-size: 1.45rem;
+    .assist-strip h2 {
+      margin: 0;
+      color: #f5f1e8;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.55rem, 3vw, 2.25rem);
+      line-height: 1;
     }
 
-    .soft-note p {
-      max-width: 680px;
-      margin: 0 auto;
-      color: rgba(248, 243, 231, .72);
-      line-height: 1.75;
+    .assist-strip p:not(.eyebrow) {
+      max-width: 620px;
+      margin: 9px 0 0;
+      color: rgba(245, 241, 232, .74);
+      line-height: 1.55;
     }
 
-    @media (max-width: 860px) {
-      .start-wrap {
-        padding: 0 16px;
+    .assist-action {
+      flex: 0 0 auto;
+      text-decoration: none;
+      border: 1px solid rgba(198, 169, 107, .85);
+    }
+
+    .assist-action.disabled {
+      color: rgba(245, 241, 232, .86);
+      background: rgba(255, 255, 255, .06);
+      border-color: rgba(245, 241, 232, .18);
+      cursor: default;
+    }
+
+    .membership-link {
+      width: fit-content;
+      margin: 18px auto 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(245, 241, 232, .78);
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 9px 14px;
+      border: 1px solid transparent;
+    }
+
+    .membership-link strong {
+      color: #c6a96b;
+    }
+
+    @media (max-width: 780px) {
+      .start-page {
+        padding: 24px 0 30px;
       }
-    }
 
-    @media (max-width: 760px) {
-      .path-grid {
+      .start-wrap {
+        padding: 0 12px;
+      }
+
+      .masthead {
+        font-size: .66rem;
+        padding-inline: 12px;
+      }
+
+      .badge-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .market-concierge {
         grid-template-columns: 1fr;
       }
 
       .path-card,
-      .starter-kit-card {
+      .primary-card,
+      .secondary-card,
+      .quiet-card {
         min-height: auto;
+        border-radius: 20px;
       }
 
-      .start-page {
-        padding: clamp(36px, 8vw, 52px) 0;
+      .tag {
+        margin-bottom: 13px;
+      }
+
+      .path-card p:not(.eyebrow) {
+        margin-bottom: 18px;
+      }
+
+      .fake-btn,
+      .assist-action {
+        width: 100%;
+        min-height: 48px;
+      }
+
+      .assist-strip {
+        flex-direction: column;
+        align-items: stretch;
+        border-radius: 20px;
+      }
+
+      .membership-link {
+        width: 100%;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+        gap: 2px;
       }
     }
   </style>
 </BaseLayout>
+
+<script is:inline>
+  (() => {
+    const trackedLinks = document.querySelectorAll("[data-track-cta]");
+    const params = new URLSearchParams(window.location.search);
+    const sourceKeys = ["source", "device", "event", "utm_source", "utm_medium", "utm_campaign"];
+
+    if (!trackedLinks.length || !params.toString()) return;
+
+    trackedLinks.forEach((link) => {
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("mailto:") || href.startsWith("sms:") || href.startsWith("tel:")) return;
+
+      const url = new URL(href, window.location.origin);
+
+      // Preserve QR/source tracking on every next-step CTA without exposing raw data in the UI.
+      sourceKeys.forEach((key) => {
+        const value = params.get(key);
+        if (value) url.searchParams.set(key, value);
+      });
+
+      link.setAttribute("href", `${url.pathname}${url.search}${url.hash}`);
+    });
+  })();
+</script>

@@ -154,11 +154,15 @@ const ROUTES = {
 };
 ---
 
-<BaseLayout title={`${pageTitle} | Deeper Than Skin`}>
+<BaseLayout
+  title={`${pageTitle} | Deeper Than Skin`}
+  hideNav={isMarketPage}
+  hideFooter={isMarketPage}
+>
   <main class={`section category-page ${isMarketPage ? "market-page" : ""}`}>
     <div class="container">
       <div class="toprow">
-        <a class="crumb" href={isMarketPage ? ROUTES.featured : ROUTES.shop}>
+        <a class="crumb" id={isMarketPage ? "market-return-link" : undefined} href={isMarketPage ? ROUTES.featured : ROUTES.shop}>
           ← {isMarketPage ? "Back to Featured" : "Back to Shop"}
         </a>
 
@@ -188,7 +192,7 @@ const ROUTES = {
             {isMarketPage ? (
               <>
                 <a class="btn btn-primary" href="#market-menu">Preview Menu</a>
-                <a class="btn btn-ghost" href={ROUTES.featured}>Explore Featured</a>
+                <a class="btn btn-ghost" id="market-secondary-link" href={ROUTES.featured}>Explore Featured</a>
               </>
             ) : (
               <>
@@ -286,6 +290,40 @@ const ROUTES = {
 
   <script is:inline>
     const CART_KEY = "dts_cart_v1";
+
+    const trackedParamKeys = ["source", "device", "event", "utm_source", "utm_medium", "utm_campaign"];
+    const currentParams = new URLSearchParams(window.location.search);
+
+    function withPreservedParams(href) {
+      const url = new URL(href || "/", window.location.origin);
+
+      trackedParamKeys.forEach((key) => {
+        const value = currentParams.get(key);
+        if (value) url.searchParams.set(key, value);
+      });
+
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    const hasMarketContext =
+      currentParams.get("source") === "qr-market" ||
+      currentParams.has("device") ||
+      currentParams.has("event");
+
+    const marketReturnLink = document.getElementById("market-return-link");
+    const marketSecondaryLink = document.getElementById("market-secondary-link");
+
+    if (hasMarketContext) {
+      if (marketReturnLink) {
+        marketReturnLink.href = withPreservedParams("/start");
+        marketReturnLink.textContent = "← Back to start";
+      }
+
+      if (marketSecondaryLink) {
+        marketSecondaryLink.href = withPreservedParams("/start");
+        marketSecondaryLink.textContent = "Back to Start";
+      }
+    }
 
     const Cart = {
       read() {
