@@ -126,7 +126,7 @@ const marketMoments = [
     <div class="seen-grid">
       {marketMoments.map((moment) => (
         <article class={`seen-card ${moment.kind === "video" && moment.src ? "seen-card--video" : ""}`}>
-          <div class="seen-media" aria-hidden="true">
+          <div class="seen-media">
             {moment.kind === "video" && moment.src ? (
               <video
                 autoplay
@@ -138,11 +138,16 @@ const marketMoments = [
                 src={moment.src}
               ></video>
             ) : (
-              <img src={moment.poster || moment.src} alt="" loading="lazy" />
+              <img src={moment.poster || moment.src} alt={moment.alt} loading="lazy" />
             )}
             <span class={moment.kind === "video" && moment.src ? "seen-play seen-play--video" : "seen-play"}></span>
+            {moment.kind === "video" && moment.src ? (
+              <button class="seen-sound" type="button" data-market-sound aria-pressed="false">
+                <span>Sound</span>
+              </button>
+            ) : null}
           </div>
-          <div>
+          <div class="seen-copy">
             <p>{moment.eyebrow}</p>
             <h3>{moment.title}</h3>
             <span>{moment.copy}</span>
@@ -166,6 +171,7 @@ const marketMoments = [
     const updated = root.querySelector("[data-pulse-updated]");
     const liveEndpoint = root.getAttribute("data-live-endpoint") || "";
     const staticEndpoint = root.getAttribute("data-static-endpoint") || "/api/market-pulse.json";
+    const soundButtons = root.querySelectorAll("[data-market-sound]");
 
     const fallback = {
       ok: true,
@@ -281,6 +287,33 @@ const marketMoments = [
         renderPulse(fallback);
       }
     };
+
+    soundButtons.forEach((button) => {
+      const media = button.closest(".seen-media");
+      const video = media?.querySelector("video");
+      if (!video) return;
+
+      const label = button.querySelector("span");
+      const syncLabel = () => {
+        const isMuted = video.muted;
+        button.setAttribute("aria-pressed", String(!isMuted));
+        button.setAttribute("aria-label", isMuted ? "Turn video sound on" : "Mute video");
+        if (label) label.textContent = isMuted ? "Sound" : "Muted";
+      };
+
+      syncLabel();
+      button.addEventListener("click", async () => {
+        video.muted = !video.muted;
+        if (!video.muted) {
+          try {
+            await video.play();
+          } catch {
+            video.muted = true;
+          }
+        }
+        syncLabel();
+      });
+    });
 
     renderPulse(fallback);
     loadPulse();
@@ -494,11 +527,44 @@ const marketMoments = [
     border-color: rgba(245, 241, 232, .44);
   }
 
-  .seen-card div:last-child {
+  .seen-sound {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid rgba(245, 241, 232, .36);
+    border-radius: 999px;
+    background: rgba(6, 18, 14, .72);
+    color: rgba(245, 241, 232, .92);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .24);
+  }
+
+  .seen-sound[aria-pressed="true"] {
+    background: rgba(198, 169, 107, .86);
+    color: #0f2a23;
+  }
+
+  .seen-sound:focus-visible {
+    outline: 2px solid rgba(245, 241, 232, .9);
+    outline-offset: 3px;
+  }
+
+  .seen-copy {
     padding: 11px;
   }
 
-  .seen-card p {
+  .seen-copy p {
     margin: 0 0 6px;
     color: rgba(233, 206, 143, .88);
     font-size: 11px;
@@ -506,12 +572,12 @@ const marketMoments = [
     text-transform: uppercase;
   }
 
-  .seen-card h3 {
+  .seen-copy h3 {
     margin: 0;
     font-size: 15px;
   }
 
-  .seen-card span {
+  .seen-copy span {
     display: block;
     margin-top: 7px;
     color: rgba(245, 241, 232, .68);
