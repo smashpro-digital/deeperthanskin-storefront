@@ -241,9 +241,10 @@ if ($sub === "/public/commerce/juice-plan-checkout" && $method === "POST") {
 }
 /**
  * If someone hits /public/commerce/* with a wrong method,
- * return 405 instead of falling into protected auth.
+ * return 405 instead of falling into protected auth. The protected Square
+ * customer sync route is intentionally allowed through to auth below.
  */
-if (str_starts_with($sub, "/public/commerce/")) {
+if (str_starts_with($sub, "/public/commerce/") && $sub !== "/public/commerce/square-customers/sync") {
   json_error("Method Not Allowed", 405, [
     "path" => $sub,
     "method" => $method,
@@ -309,6 +310,13 @@ if ($sub === "/admin/leads" && $method === "GET") {
   header("X-Route: admin.leads.get");
   header("X-Correlation-Id: " . $correlationId);
   require __DIR__ . "/routes/admin.leads.get.php";
+  exit;
+}
+
+if ($sub === "/public/commerce/square-customers/sync" && $method === "POST") {
+  header("X-Route: public.commerce.square-customers.sync");
+  header("X-Correlation-Id: " . $correlationId);
+  require __DIR__ . "/routes/public.commerce.square-customers.sync.php";
   exit;
 }
 

@@ -48,6 +48,37 @@ Content-Type: text/plain
   "company": ""
 }
 
+### Square Customer Sync - Dry Run Default Market Sources
+POST {{base}}?path=public/commerce/square-customers/sync&app_slug={{app_slug}}&api_key={{api_key}}
+Content-Type: application/json
+
+{
+  "limit": 25,
+  "dry_run": true
+}
+
+### Square Customer Sync - Dry Run Tablet/Kiosk
+POST {{base}}?path=public/commerce/square-customers/sync&app_slug={{app_slug}}&api_key={{api_key}}
+Content-Type: application/json
+
+{
+  "source": "market-kiosk",
+  "source_device": "ipad-kiosk",
+  "limit": 25,
+  "dry_run": true
+}
+
+### Square Customer Sync - Dry Run Ritual List
+POST {{base}}?path=public/commerce/square-customers/sync&app_slug={{app_slug}}&api_key={{api_key}}
+Content-Type: application/json
+
+{
+  "source": "ritual-list",
+  "source_device": "customer-phone",
+  "limit": 25,
+  "dry_run": true
+}
+
 ### Protected Admin Leads
 GET {{base}}?path=admin/leads&app_slug={{app_slug}}&api_key={{api_key}}
 
