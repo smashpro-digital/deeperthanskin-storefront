@@ -7,7 +7,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test:api": "node tests/api/api-tests.mjs"
+    "test:api": "node tests/api/api-tests.mjs",
+    "deploy:api-routes": "C:\\msys64\\usr\\bin\\bash.exe scripts/deploy-api-routes.sh",
+    "deploy:api": "C:\\msys64\\usr\\bin\\bash.exe scripts/deploy-api.sh"
   },
   "dependencies": {
     "aos": "^2.3.4",

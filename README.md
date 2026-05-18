@@ -74,11 +74,69 @@ Updates go live automatically on commit.
 
 ### API Deploy Workflow
 
-- Edit PHP API routes only inside `api/v1/routes/`
-- Saving those files uploads them to `/public_html/smashpro.app/api/v1/routes/`
-- Frontend files do not auto-deploy through FTP
-- Frontend still deploys through normal Git/build flow
-- Keep `.vscode/sftp.json` local only
+FileZilla remains a safe manual backup, but API deploys can be run from scripts.
+Credentials are loaded from a local `.env.ftp` file and must never be committed.
+
+1. Install `lftp`.
+   - Git Bash/MSYS2: install the `lftp` package through MSYS2.
+   - WSL Ubuntu: `sudo apt update && sudo apt install lftp`.
+   - macOS: `brew install lftp`.
+   - On this Windows workstation, MSYS2 is installed at `C:\msys64` and the npm
+     scripts call `C:\msys64\usr\bin\bash.exe` directly.
+
+2. Create local FTP credentials in `.env.ftp`.
+
+   ```bash
+   FTP_HOST=your-host
+   FTP_USER=your-user
+   FTP_PASS=your-password
+   FTP_PORT=21
+   FTP_REMOTE_ROOT=/public_html/smashpro.app
+   ```
+
+3. Deploy API routes only. This uploads changed files from `api/v1/routes/` to
+   `$FTP_REMOTE_ROOT/api/v1/routes/` and does **not** delete remote files.
+
+   ```bash
+   npm run deploy:api-routes
+   ```
+
+   Only use remote deletion intentionally:
+
+   ```bash
+   npm run deploy:api-routes -- --delete
+   ```
+
+4. Deploy the full `api/` folder when router/bootstrap files changed.
+
+   ```bash
+   npm run deploy:api
+   ```
+
+   Full API deploys also avoid deletion unless `--delete` is explicitly passed.
+   The scripts exclude `.env*`, config files, logs, tests, SQL, README/scratch
+   files, `.git`, `.github`, and `node_modules`.
+
+5. Verify with the health check or Postman:
+
+   ```http
+   GET {{api_base}}?path=health
+   ```
+
+   For Square customer sync updates, use a dry run first:
+
+   ```http
+   POST {{api_base}}?path=public/commerce/square-customers/sync&app_slug=deeper-than-skin&api_key={{api_key}}
+   Content-Type: application/json
+
+   {
+     "limit": 25,
+     "dry_run": true
+   }
+   ```
+
+Frontend files do not deploy through FTP; the storefront still deploys through
+the normal GitHub Pages build from `main`. Keep `.vscode/sftp.json` local only.
 
 ---
 
