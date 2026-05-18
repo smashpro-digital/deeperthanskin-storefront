@@ -312,6 +312,13 @@ if ($sub === "/admin/leads" && $method === "GET") {
   exit;
 }
 
+if ($sub === "/public/commerce/square-customers/sync" && $method === "POST") {
+  header("X-Route: public.commerce.square-customers.sync");
+  header("X-Correlation-Id: " . $correlationId);
+  require __DIR__ . "/routes/public.commerce.square-customers.sync.php";
+  exit;
+}
+
 /* -------------------------------
    ROUTES (protected)
 -------------------------------- */

@@ -132,7 +132,12 @@ const startUrl = `${base}start`;
         />
 
         <input type="hidden" name="app_slug" value={APP_SLUG} />
-        <input type="hidden" name="source" value="ritual-list-page" />
+        <input type="hidden" name="source" value="ritual-list" />
+        <input type="hidden" name="source_device" value="customer-phone" />
+        <input type="hidden" name="event_slug" value="" />
+        <input type="hidden" name="event_date" value="" />
+        <input type="hidden" name="campaign" value="" />
+        <input type="hidden" name="interest" value="" />
         <input type="hidden" name="consent" value="1" />
 
         <p class="fine-print">
@@ -485,8 +490,16 @@ const startUrl = `${base}start`;
     const sourceInput = form.querySelector('input[name="source"]');
     const startUrl = form.getAttribute("data-start-url") || "/start";
     const trackedSource = urlParams.get("source");
-    const trackedEvent = urlParams.get("event");
-    const trackedDevice = urlParams.get("device");
+    const trackedEvent = urlParams.get("event") || urlParams.get("event_slug");
+    const trackedDevice = urlParams.get("device") || urlParams.get("source_device");
+    const trackedEventDate = urlParams.get("event_date");
+    const trackedCampaign = urlParams.get("campaign");
+    const trackedInterest = urlParams.get("interest");
+    const sourceDeviceInput = form.querySelector('input[name="source_device"]');
+    const eventSlugInput = form.querySelector('input[name="event_slug"]');
+    const eventDateInput = form.querySelector('input[name="event_date"]');
+    const campaignInput = form.querySelector('input[name="campaign"]');
+    const interestInput = form.querySelector('input[name="interest"]');
 
     const preservedParams = new URLSearchParams();
     if (trackedSource) preservedParams.set("source", trackedSource);
@@ -498,10 +511,13 @@ const startUrl = `${base}start`;
     }
 
     if (sourceInput && trackedSource) {
-      sourceInput.value = [trackedSource, trackedEvent, trackedDevice]
-        .filter(Boolean)
-        .join(":");
+      sourceInput.value = trackedSource;
     }
+    if (sourceDeviceInput && trackedDevice) sourceDeviceInput.value = trackedDevice;
+    if (eventSlugInput && trackedEvent) eventSlugInput.value = trackedEvent;
+    if (eventDateInput && trackedEventDate) eventDateInput.value = trackedEventDate;
+    if (campaignInput && trackedCampaign) campaignInput.value = trackedCampaign;
+    if (interestInput && trackedInterest) interestInput.value = trackedInterest;
 
     smsConsentInput?.addEventListener("change", () => {
       const wantsSms = smsConsentInput.checked;
@@ -548,7 +564,11 @@ const startUrl = `${base}start`;
       const company = form.querySelector('input[name="company"]')?.value || "";
       const appSlug = form.querySelector('input[name="app_slug"]')?.value || "deeper-than-skin";
       const consent = form.querySelector('input[name="consent"]')?.value || "1";
-      const baseSource = sourceInput?.value || "ritual-list-page";
+      const baseSource = sourceInput?.value || "ritual-list";
+      const sourceDevice = sourceDeviceInput?.value || "customer-phone";
+      const eventSlug = eventSlugInput?.value || "";
+      const eventDate = eventDateInput?.value || "";
+      const campaign = campaignInput?.value || "";
       const name = nameInput.value.trim();
       const email = emailInput.value.trim();
       const smsConsent = smsConsentInput?.checked ? "1" : "0";
@@ -560,7 +580,8 @@ const startUrl = `${base}start`;
       const firstName = nameParts.shift() || "";
       const lastName = nameParts.join(" ");
       const [segmentSlug, segmentTitle] = inferSegment(goals, prefs);
-      const source = `${baseSource}:${segmentSlug}${smsConsent === "1" ? ":sms-opt-in" : ""}`;
+      const source = baseSource;
+      const interest = interestInput?.value || segmentSlug;
 
       if (!waitlistEndpoint || !quizEndpoint) {
         setStatus("Signup endpoint is missing.", "error");
@@ -609,7 +630,13 @@ const startUrl = `${base}start`;
             last_name: lastName,
             phone,
             sms_consent: smsConsent,
+            sms_opt_in: smsConsent,
             source,
+            source_device: sourceDevice,
+            event_slug: eventSlug,
+            event_date: eventDate,
+            campaign,
+            interest,
             consent,
             company,
           }),
@@ -631,6 +658,11 @@ const startUrl = `${base}start`;
             body: JSON.stringify({
               app_slug: appSlug,
               source,
+              source_device: sourceDevice,
+              event_slug: eventSlug,
+              event_date: eventDate,
+              campaign,
+              interest,
               kit_slug: segmentSlug,
               kit_title: segmentTitle,
               goals,
@@ -656,6 +688,12 @@ const startUrl = `${base}start`;
           email,
           phone,
           sms_consent: smsConsent,
+          sms_opt_in: smsConsent,
+          source_device: sourceDevice,
+          event_slug: eventSlug,
+          event_date: eventDate,
+          campaign,
+          interest,
           goals,
           prefs,
           segment_slug: segmentSlug,

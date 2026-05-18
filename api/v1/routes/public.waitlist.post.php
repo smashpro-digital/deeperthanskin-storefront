@@ -115,6 +115,29 @@ function to_bool01($v): int {
   return in_array($s, ["1","true","yes","y","on"], true) ? 1 : 0;
 }
 
+function waitlist_columns(): array {
+  static $columns = null;
+  if (is_array($columns)) return $columns;
+
+  $columns = [];
+  try {
+    $stmt = db()->query("SHOW COLUMNS FROM spd_waitlist");
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      $field = (string)($row["Field"] ?? "");
+      if ($field !== "") $columns[$field] = true;
+    }
+  } catch (Throwable $e) {
+    $columns = [];
+  }
+
+  return $columns;
+}
+
+function waitlist_has_column(string $column): bool {
+  $columns = waitlist_columns();
+  return isset($columns[$column]);
+}
+
 function render_template(string $tpl, array $vars): string {
   foreach ($vars as $k => $v) {
     $tpl = str_replace("{{{$k}}}", (string)$v, $tpl);
@@ -347,6 +370,12 @@ $last    = clamp($body["last_name"] ?? null, 80);
 $phone   = clamp($body["phone"] ?? null, 30);
 $source  = clamp($body["source"] ?? "landing-page", 80);
 $consent = to_bool01($body["consent"] ?? 1);
+$sourceDevice = clamp($body["source_device"] ?? $body["device"] ?? null, 80);
+$eventSlug = clamp($body["event_slug"] ?? $body["event"] ?? null, 120);
+$eventDate = clamp($body["event_date"] ?? null, 10);
+$campaign = clamp($body["campaign"] ?? null, 120);
+$interest = clamp($body["interest"] ?? null, 120);
+$smsOptIn = to_bool01($body["sms_opt_in"] ?? $body["sms_consent"] ?? 0);
 
 /* -------------------------------
    Determine created flag (reliable)
@@ -364,31 +393,72 @@ try {
 /* -------------------------------
    UPSERT
 -------------------------------- */
+$insertValues = [
+  "app_slug" => $appSlug,
+  "email" => $email,
+  "first_name" => $first,
+  "last_name" => $last,
+  "phone" => $phone,
+  "source" => $source,
+  "consent" => $consent,
+];
+
+$optionalValues = [
+  "source_device" => $sourceDevice,
+  "event_slug" => $eventSlug,
+  "event_date" => $eventDate,
+  "campaign" => $campaign,
+  "interest" => $interest,
+  "sms_opt_in" => $smsOptIn,
+];
+
+foreach ($optionalValues as $column => $value) {
+  if (waitlist_has_column($column)) {
+    $insertValues[$column] = $value;
+  }
+}
+
+$columns = array_keys($insertValues);
+$columnSql = implode(", ", $columns);
+$valueSql = implode(", ", array_map(function ($column) {
+  return ":" . $column;
+}, $columns));
+$updates = [
+  "first_name = COALESCE(VALUES(first_name), first_name)",
+  "last_name  = COALESCE(VALUES(last_name), last_name)",
+  "phone      = COALESCE(VALUES(phone), phone)",
+  "source     = VALUES(source)",
+  "consent    = GREATEST(consent, VALUES(consent))",
+];
+
+foreach (["source_device", "event_slug", "event_date", "campaign", "interest"] as $column) {
+  if (isset($insertValues[$column])) {
+    $updates[] = "{$column} = COALESCE(VALUES({$column}), {$column})";
+  }
+}
+
+if (isset($insertValues["sms_opt_in"])) {
+  $updates[] = "sms_opt_in = GREATEST(COALESCE(sms_opt_in, 0), VALUES(sms_opt_in))";
+}
+
+$updates[] = "updated_at = CURRENT_TIMESTAMP";
+
 $sql = "
   INSERT INTO spd_waitlist
-    (app_slug, email, first_name, last_name, phone, source, consent)
+    ({$columnSql})
   VALUES
-    (:app_slug, :email, :first_name, :last_name, :phone, :source, :consent)
+    ({$valueSql})
   ON DUPLICATE KEY UPDATE
-    first_name = COALESCE(VALUES(first_name), first_name),
-    last_name  = COALESCE(VALUES(last_name), last_name),
-    phone      = COALESCE(VALUES(phone), phone),
-    source     = VALUES(source),
-    consent    = GREATEST(consent, VALUES(consent)),
-    updated_at = CURRENT_TIMESTAMP
+    " . implode(",\n    ", $updates) . "
 ";
 
 try {
   $stmt = db()->prepare($sql);
-  $stmt->execute([
-    ":app_slug" => $appSlug,
-    ":email" => $email,
-    ":first_name" => $first,
-    ":last_name" => $last,
-    ":phone" => $phone,
-    ":source" => $source,
-    ":consent" => $consent,
-  ]);
+  $params = [];
+  foreach ($insertValues as $column => $value) {
+    $params[":" . $column] = $value;
+  }
+  $stmt->execute($params);
 
   // Send confirmation email best-effort
   $emailSent = false;

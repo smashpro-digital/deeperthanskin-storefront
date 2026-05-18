@@ -150,7 +150,12 @@ const startUrl = `${base}start?source=qr-market&device=customer-phone&event=lake
           />
 
           <input type="hidden" name="app_slug" value={APP_SLUG} />
-          <input type="hidden" name="source" value="market-signup-page" />
+          <input type="hidden" name="source" value="market-kiosk" />
+          <input type="hidden" name="source_device" value="ipad-kiosk" />
+          <input type="hidden" name="event_slug" value="" />
+          <input type="hidden" name="event_date" value="" />
+          <input type="hidden" name="campaign" value="" />
+          <input type="hidden" name="interest" value="market-updates" />
           <input type="hidden" name="consent" value="1" />
 
           <p class="fine-print">
@@ -749,16 +754,27 @@ const startUrl = `${base}start?source=qr-market&device=customer-phone&event=lake
 
     const urlParams = new URLSearchParams(window.location.search);
     const sourceInput = form.querySelector('input[name="source"]');
+    const sourceDeviceInput = form.querySelector('input[name="source_device"]');
+    const eventSlugInput = form.querySelector('input[name="event_slug"]');
+    const eventDateInput = form.querySelector('input[name="event_date"]');
+    const campaignInput = form.querySelector('input[name="campaign"]');
+    const interestInput = form.querySelector('input[name="interest"]');
     const trackedSource = urlParams.get("source");
-    const trackedEvent = urlParams.get("event");
-    const trackedDevice = urlParams.get("device");
+    const trackedEvent = urlParams.get("event") || urlParams.get("event_slug");
+    const trackedDevice = urlParams.get("device") || urlParams.get("source_device");
+    const trackedEventDate = urlParams.get("event_date");
+    const trackedCampaign = urlParams.get("campaign");
+    const trackedInterest = urlParams.get("interest");
 
-    // Preserve QR/source context when a market visitor joins the list from /start.
+    // Preserve QR/source context when a market visitor joins from /start.
     if (sourceInput && trackedSource) {
-      sourceInput.value = [trackedSource, trackedEvent, trackedDevice]
-        .filter(Boolean)
-        .join(":");
+      sourceInput.value = trackedSource;
     }
+    if (sourceDeviceInput && trackedDevice) sourceDeviceInput.value = trackedDevice;
+    if (eventSlugInput && trackedEvent) eventSlugInput.value = trackedEvent;
+    if (eventDateInput && trackedEventDate) eventDateInput.value = trackedEventDate;
+    if (campaignInput && trackedCampaign) campaignInput.value = trackedCampaign;
+    if (interestInput && trackedInterest) interestInput.value = trackedInterest;
 
     smsConsentInput?.addEventListener("change", () => {
       const wantsSms = smsConsentInput.checked;
@@ -774,6 +790,11 @@ const startUrl = `${base}start?source=qr-market&device=customer-phone&event=lake
       const submitBtn = form.querySelector('button[type="submit"]');
       const company = form.querySelector('input[name="company"]');
       const source = form.querySelector('input[name="source"]');
+      const sourceDevice = form.querySelector('input[name="source_device"]');
+      const eventSlug = form.querySelector('input[name="event_slug"]');
+      const eventDate = form.querySelector('input[name="event_date"]');
+      const campaign = form.querySelector('input[name="campaign"]');
+      const interest = form.querySelector('input[name="interest"]');
       const appSlug = form.querySelector('input[name="app_slug"]');
       const consent = form.querySelector('input[name="consent"]');
 
@@ -826,7 +847,13 @@ const startUrl = `${base}start?source=qr-market&device=customer-phone&event=lake
           last_name: lastName,
           phone,
           sms_consent: smsConsent,
-          source: smsConsent === "1" ? `${sourceValue}:sms-opt-in` : sourceValue,
+          sms_opt_in: smsConsent,
+          source: sourceValue,
+          source_device: sourceDevice?.value || "ipad-kiosk",
+          event_slug: eventSlug?.value || "",
+          event_date: eventDate?.value || "",
+          campaign: campaign?.value || "",
+          interest: interest?.value || "market-updates",
           consent: consent?.value || "1",
           company: company?.value || "",
         };
