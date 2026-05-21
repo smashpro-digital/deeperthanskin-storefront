@@ -608,6 +608,10 @@ const ROUTES = {
     }
 
     function marketTagline(it, isFeaturedMarket) {
+      if (isSoldOutItem(it)) {
+        return "Today's featured pour has already sold through. Join the next drop for first access when this ritual returns.";
+      }
+
       const desc = String(it?.description || "").replace(/\s+/g, " ").trim();
       if (desc) {
         const clean = desc.length > 92 ? desc.slice(0, 89) + "…" : desc;
@@ -636,6 +640,57 @@ const ROUTES = {
         haystack.includes("favorite") ||
         haystack.includes("featured")
       );
+    }
+
+    function isSoldOutItem(it) {
+      if (!it || typeof it !== "object") return false;
+
+      const boolSignals = [
+        it.sold_out,
+        it.is_sold_out,
+        it.out_of_stock,
+        it.is_out_of_stock,
+      ];
+
+      if (boolSignals.some((value) => value === true || value === 1 || value === "1")) {
+        return true;
+      }
+
+      if (it.available === false || it.is_available === false || it.in_stock === false) {
+        return true;
+      }
+
+      const availability = it.availability || {};
+      if (availability && typeof availability === "object") {
+        if (availability.available === false || availability.in_stock === false) return true;
+        const availabilityText = [
+          availability.status,
+          availability.label,
+          availability.message,
+        ].join(" ").toLowerCase();
+
+        if (/(sold\s*out|out\s*of\s*stock|unavailable|gone\s*today)/.test(availabilityText)) {
+          return true;
+        }
+      }
+
+      const statusText = [
+        it.status,
+        it.inventory_status,
+        it.stock_status,
+      ].join(" ").toLowerCase();
+
+      if (/(sold[_\s-]*out|out[_\s-]*of[_\s-]*stock|unavailable|gone[_\s-]*today)/.test(statusText)) {
+        return true;
+      }
+
+      const count = Number(it.inventory_count ?? it.stock_count ?? it.quantity_available);
+      const tracksInventory =
+        it.track_inventory === true ||
+        it.track_inventory === 1 ||
+        it.inventory_tracking === true;
+
+      return tracksInventory && Number.isFinite(count) && count <= 0;
     }
 
     async function fetchJson(url) {
@@ -717,10 +772,12 @@ const ROUTES = {
       const isDetox = isDetoxExperienceItem(it);
       const isFeaturedMarket = !!it?._market_featured;
       const staffPick = isFeaturedMarket && isStaffPick(it);
+      const soldOut = isFeaturedMarket && isSoldOutItem(it);
 
       const productUrl = `${productBase}${encodeURIComponent(id)}`;
       const detoxUrl = detoxExperienceUrl;
       const detoxPlansUrl = `${detoxExperienceUrl}#plans`;
+      const signupUrl = `${base}signup?source=market-sold-out&item=${encodeURIComponent(rawTitle)}`;
 
       const defaultDesc = isMarketEducation
         ? "A market-day preview item. Availability may vary by event and season."
@@ -738,7 +795,7 @@ const ROUTES = {
       const linkHref = isDetox ? detoxUrl : productUrl;
 
       return `
-        <article class="card ${isDetox ? "card--experience" : ""} ${isMarketEducation ? "card--market" : ""} ${isFeaturedMarket ? "card--featured-market" : ""} ${it?._market_event_match ? "card--event-match" : ""}" data-id="${escapeHtml(id)}">
+        <article class="card ${isDetox ? "card--experience" : ""} ${isMarketEducation ? "card--market" : ""} ${isFeaturedMarket ? "card--featured-market" : ""} ${soldOut ? "card--sold-out" : ""} ${it?._market_event_match ? "card--event-match" : ""}" data-id="${escapeHtml(id)}">
           <a
             class="card-link"
             href="${linkHref}"
@@ -753,6 +810,7 @@ const ROUTES = {
               />
               ${isFeaturedMarket ? `<div class="badge badge--featured-market">${escapeHtml(featuredCategoryName)}</div>` : isMarketEducation ? `<div class="badge badge--experience">At Market</div>` : ""}
               ${staffPick ? `<div class="badge badge--staff">Staff Pick</div>` : ""}
+              ${soldOut ? `<div class="sold-out-mark"><span>Sold Out Today</span></div>` : ""}
               ${isDetox ? `<div class="badge badge--experience">Signature Experience</div>` : ""}
               <div class="shine" aria-hidden="true"></div>
             </div>
@@ -765,14 +823,16 @@ const ROUTES = {
                 </div>
               </div>
               <p class="desc">${desc}</p>
-              ${isFeaturedMarket ? `<div class="market-pills"><span>Fresh Pour Today</span>${it?._market_event_match ? `<span>${escapeHtml(eventConfig.label)}</span>` : ""}</div>` : ""}
+              ${isFeaturedMarket ? `<div class="market-pills"><span>${soldOut ? "Poured Out" : "Fresh Pour Today"}</span>${it?._market_event_match ? `<span>${escapeHtml(eventConfig.label)}</span>` : ""}</div>` : ""}
             </div>
           </a>
 
           <div class="actions">
             ${
               isFeaturedMarket
-                ? `<span class="market-status-pill" aria-label="Available at market only">Available at Market</span><a class="btn btn-primary btn-reset btn-featured-cta" href="${linkHref}">View Details</a>`
+                ? soldOut
+                  ? `<span class="market-status-pill market-status-pill--sold-out" aria-label="Sold out at market">Sold Out Today</span><a class="btn btn-primary btn-reset btn-featured-cta btn-featured-cta--sold-out" href="${signupUrl}">Get Restock Updates</a>`
+                  : `<span class="market-status-pill" aria-label="Available at market only">Available at Market</span><a class="btn btn-primary btn-reset btn-featured-cta" href="${linkHref}">View Details</a>`
                 : isMarketEducation
                 ? `<span class="market-status-pill" aria-label="Available at market only">Available at Market</span>`
                 : isDetox
@@ -1374,6 +1434,28 @@ const ROUTES = {
         0 0 0 1px rgba(200,162,74,.16) inset;
     }
 
+    .card--featured-market.card--sold-out {
+      position: relative;
+      border-color: rgba(198,169,107,.70);
+      background:
+        radial-gradient(420px 220px at 24% 0%, rgba(198,169,107,.26), transparent 70%),
+        linear-gradient(180deg, rgba(246,241,229,.96), rgba(219,209,185,.92));
+      box-shadow:
+        0 28px 70px rgba(0,0,0,.34),
+        0 0 0 1px rgba(198,169,107,.26) inset;
+    }
+
+    .card--sold-out .media img {
+      filter: saturate(.72) contrast(.94);
+      transform: scale(1.01);
+    }
+
+    .card--sold-out .shine {
+      background:
+        radial-gradient(340px 180px at 50% 26%, rgba(198,169,107,.22), transparent 68%),
+        linear-gradient(180deg, rgba(8,19,14,.24), rgba(8,19,14,.62));
+    }
+
     .grid--featured .card {
       grid-column: span 6;
     }
@@ -1462,6 +1544,35 @@ const ROUTES = {
       border-color: rgba(245,241,232,.22);
       background: rgba(8,19,14,.68);
       backdrop-filter: blur(10px);
+    }
+
+    .sold-out-mark {
+      position: absolute;
+      z-index: 4;
+      inset: auto 12px 12px 12px;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .sold-out-mark span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(245,225,174,.58);
+      background:
+        radial-gradient(110px 58px at 18% 0%, rgba(255,255,255,.22), transparent 70%),
+        rgba(8,19,14,.76);
+      color: rgba(245,241,232,.96);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      box-shadow: 0 18px 42px rgba(0,0,0,.34);
+      backdrop-filter: blur(12px);
     }
 
     .body { padding: 12px 12px 10px; }
@@ -1573,6 +1684,14 @@ const ROUTES = {
       color: #173529;
     }
 
+    .market-status-pill--sold-out {
+      border-color: rgba(15,42,35,.24);
+      background:
+        radial-gradient(90px 52px at 20% 0%, rgba(255,255,255,.20), transparent 68%),
+        rgba(15,42,35,.10);
+      color: rgba(15,42,35,.78);
+    }
+
     .card--market .actions .btn-ghost {
       color: #0f2a23;
       border-color: rgba(15,42,35,.28);
@@ -1630,6 +1749,22 @@ const ROUTES = {
       min-height: 50px;
       font-size: 14px;
       letter-spacing: .02em;
+    }
+
+    .btn-featured-cta--sold-out {
+      background:
+        radial-gradient(120px 80px at 30% 10%, rgba(255,255,255,.18), transparent 70%),
+        linear-gradient(135deg, rgba(15,42,35,.96), rgba(30,64,52,.94));
+      border-color: rgba(198,169,107,.45);
+      color: rgba(245,241,232,.96);
+      box-shadow: 0 14px 34px rgba(15,42,35,.22);
+    }
+
+    .btn-featured-cta--sold-out:hover {
+      background:
+        radial-gradient(120px 80px at 30% 10%, rgba(255,255,255,.22), transparent 70%),
+        linear-gradient(135deg, rgba(19,52,41,.98), rgba(39,78,63,.96));
+      color: #fffaf0;
     }
 
     .empty {
