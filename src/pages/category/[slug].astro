@@ -765,16 +765,16 @@ const ROUTES = {
                 </div>
               </div>
               <p class="desc">${desc}</p>
-              ${isFeaturedMarket ? `<div class="market-pills"><span>Available at Market</span>${it?._market_event_match ? `<span>${escapeHtml(eventConfig.label)}</span>` : ""}</div>` : ""}
+              ${isFeaturedMarket ? `<div class="market-pills"><span>Fresh Pour Today</span>${it?._market_event_match ? `<span>${escapeHtml(eventConfig.label)}</span>` : ""}</div>` : ""}
             </div>
           </a>
 
           <div class="actions">
             ${
               isFeaturedMarket
-                ? `<a class="btn btn-primary btn-reset btn-featured-cta" href="${linkHref}">View Details</a>`
+                ? `<span class="market-status-pill" aria-label="Available at market only">Available at Market</span><a class="btn btn-primary btn-reset btn-featured-cta" href="${linkHref}">View Details</a>`
                 : isMarketEducation
-                ? `<span class="btn btn-primary btn-reset btn-static" aria-label="Available at market only">Available at Market</span>`
+                ? `<span class="market-status-pill" aria-label="Available at market only">Available at Market</span>`
                 : isDetox
                   ? `<a class="btn btn-primary btn-reset" href="${detoxPlansUrl}">Start Your Reset</a>`
                   : `<button class="btn btn-primary add" type="button">Add to cart</button>`
@@ -1543,6 +1543,36 @@ const ROUTES = {
       text-align: center;
     }
 
+    .market-status-pill {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(198,169,107,.55);
+      background: rgba(198,169,107,.18);
+      color: #0f2a23;
+      font-size: 11px;
+      font-weight: 850;
+      line-height: 1.15;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      cursor: default;
+      box-shadow: 0 10px 24px rgba(198,169,107,.12);
+    }
+
+    .card--featured-market .market-status-pill {
+      min-height: 42px;
+      border-color: rgba(198,169,107,.62);
+      background:
+        radial-gradient(90px 52px at 20% 0%, rgba(255,255,255,.24), transparent 68%),
+        rgba(198,169,107,.22);
+      color: #173529;
+    }
+
     .card--market .actions .btn-ghost {
       color: #0f2a23;
       border-color: rgba(15,42,35,.28);
@@ -1675,6 +1705,7 @@ const ROUTES = {
       }
       .actions { flex-direction: column; }
       .actions .btn { width: 100%; }
+      .market-status-pill { width: 100%; }
       .grid--featured {
         display: flex;
         overflow-x: auto;
