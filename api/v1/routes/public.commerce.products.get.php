@@ -53,6 +53,40 @@ function product_slugify(string $s): string {
   return $s !== "" ? $s : "product";
 }
 
+function product_db_text(?string $value): ?string {
+  if (!is_string($value)) return null;
+
+  $value = trim($value);
+  if ($value === "") return null;
+
+  // Some legacy MySQL text columns reject 4-byte Unicode characters.
+  // Strip those for DB writes so one decorated Square item cannot block sync.
+  $clean = preg_replace('/[\x{10000}-\x{10FFFF}]/u', '', $value);
+  if (!is_string($clean)) $clean = $value;
+
+  $clean = trim($clean);
+  return $clean !== "" ? $clean : null;
+}
+
+function product_db_name(?string $value): ?string {
+  $clean = product_db_text($value);
+  if ($clean === null) return null;
+
+  $clean = preg_replace('/\p{So}/u', '', $clean);
+  if (!is_string($clean)) $clean = product_db_text($value) ?? "";
+
+  $ascii = @iconv("UTF-8", "ASCII//TRANSLIT//IGNORE", $clean);
+  if (is_string($ascii) && trim($ascii) !== "") {
+    $clean = $ascii;
+  }
+
+  $clean = preg_replace('/[^\x20-\x7E]/', '', $clean);
+  if (!is_string($clean)) $clean = "";
+
+  $clean = trim(preg_replace('/\s+/u', ' ', $clean) ?? $clean);
+  return $clean !== "" ? $clean : null;
+}
+
 function normalize_slug(?string $s): ?string {
   if (!is_string($s)) return null;
   $s = trim($s);
@@ -154,7 +188,7 @@ function extract_variations_from_square_item(array $obj): array {
     $amount = is_array($priceMoney) ? ($priceMoney["amount"] ?? null) : null;
     $currency = is_array($priceMoney) ? ($priceMoney["currency"] ?? null) : null;
 
-    $name = isset($vd["name"]) ? trim((string)$vd["name"]) : "";
+    $name = product_db_name(isset($vd["name"]) ? (string)$vd["name"] : null) ?? "";
     if ($name === "") $name = "Regular";
 
     $sku = isset($vd["sku"]) ? trim((string)$vd["sku"]) : null;
@@ -179,6 +213,171 @@ function extract_variations_from_square_item(array $obj): array {
   }
 
   return $out;
+}
+
+function extract_category_ids_from_square_item_data(array $item): array {
+  $ids = [];
+
+  $categories = is_array($item["categories"] ?? null) ? $item["categories"] : [];
+  foreach ($categories as $c) {
+    if (!is_array($c)) continue;
+
+    $cid = trim((string)($c["id"] ?? ""));
+    if ($cid !== "") $ids[] = $cid;
+  }
+
+  $legacyCid = trim((string)($item["category_id"] ?? ""));
+  if ($legacyCid !== "") $ids[] = $legacyCid;
+
+  $categoryIds = is_array($item["category_ids"] ?? null) ? $item["category_ids"] : [];
+  foreach ($categoryIds as $cidRaw) {
+    $cid = is_string($cidRaw) ? trim($cidRaw) : "";
+    if ($cid !== "") $ids[] = $cid;
+  }
+
+  $reporting = $item["reporting_category"] ?? null;
+  if (is_array($reporting)) {
+    foreach (["id", "category_id"] as $key) {
+      $cid = trim((string)($reporting[$key] ?? ""));
+      if ($cid !== "") $ids[] = $cid;
+    }
+  }
+
+  foreach (["reporting_category_id", "reporting_category"] as $key) {
+    $cid = is_string($item[$key] ?? null) ? trim((string)$item[$key]) : "";
+    if ($cid !== "") $ids[] = $cid;
+  }
+
+  return array_values(array_unique($ids));
+}
+
+function square_category_item_objects(array $cfg, array $categoryIds): array {
+  $categoryIds = array_values(array_unique(array_filter($categoryIds, function ($v) {
+    return is_string($v) && trim($v) !== "";
+  })));
+
+  if (!$categoryIds) return [];
+
+  $searchResp = square_try_products($cfg, "POST", [
+    "/catalog/search-catalog-items",
+    "catalog/search-catalog-items",
+    "/v2/catalog/search-catalog-items",
+    "v2/catalog/search-catalog-items",
+  ], [
+    "category_ids" => $categoryIds,
+    "archived_state" => "ARCHIVED_STATE_NOT_ARCHIVED",
+    "limit" => 100,
+    "sort_order" => "ASC",
+  ]);
+
+  $searchedItems = $searchResp["items"] ?? [];
+  if (!is_array($searchedItems)) return [];
+
+  $ids = [];
+  foreach ($searchedItems as $item) {
+    if (!is_array($item)) continue;
+    if (($item["type"] ?? "") !== "ITEM") continue;
+
+    $id = trim((string)($item["id"] ?? ""));
+    if ($id !== "") $ids[] = $id;
+  }
+
+  $ids = array_values(array_unique($ids));
+  if (!$ids) return [];
+
+  try {
+    $batchResp = square_try_products($cfg, "POST", [
+      "/catalog/batch-retrieve",
+      "catalog/batch-retrieve",
+      "/v2/catalog/batch-retrieve",
+      "v2/catalog/batch-retrieve",
+    ], [
+      "object_ids" => $ids,
+      "include_related_objects" => false,
+    ]);
+
+    $batchObjects = $batchResp["objects"] ?? [];
+    if (is_array($batchObjects) && count($batchObjects) > 0) {
+      return array_values(array_filter($batchObjects, function ($obj) {
+        return is_array($obj) && (($obj["type"] ?? "") === "ITEM");
+      }));
+    }
+  } catch (Throwable $e) {
+    // Fall back to search result objects.
+  }
+
+  return $searchedItems;
+}
+
+function square_category_fallback_rows(array $cfg, array $objects): array {
+  $imageIds = [];
+
+  foreach ($objects as $obj) {
+    if (!is_array($obj)) continue;
+    $item = $obj["item_data"] ?? null;
+    if (!is_array($item)) continue;
+
+    foreach ((is_array($item["image_ids"] ?? null) ? $item["image_ids"] : []) as $iid) {
+      if (is_string($iid) && trim($iid) !== "") $imageIds[trim($iid)] = true;
+    }
+  }
+
+  $imageUrlMap = [];
+  $imageIdList = array_values(array_keys($imageIds));
+  foreach (array_chunk($imageIdList, 250) as $chunk) {
+    try {
+      $imgResp = square_try_products($cfg, "POST", [
+        "/catalog/batch-retrieve",
+        "catalog/batch-retrieve",
+        "/v2/catalog/batch-retrieve",
+        "v2/catalog/batch-retrieve",
+      ], [
+        "object_ids" => $chunk,
+        "include_related_objects" => false,
+      ]);
+
+      foreach (($imgResp["objects"] ?? []) as $imgObj) {
+        if (!is_array($imgObj) || (($imgObj["type"] ?? "") !== "IMAGE")) continue;
+        $iid = trim((string)($imgObj["id"] ?? ""));
+        $url = trim((string)($imgObj["image_data"]["url"] ?? ""));
+        if ($iid !== "" && $url !== "") $imageUrlMap[$iid] = $url;
+      }
+    } catch (Throwable $e) {
+      // Images are optional for fallback rows.
+    }
+  }
+
+  $rows = [];
+  foreach ($objects as $obj) {
+    if (!is_array($obj)) continue;
+    if (!empty($obj["is_deleted"]) || !empty($obj["is_archived"])) continue;
+
+    $itemId = trim((string)($obj["id"] ?? ""));
+    $item = $obj["item_data"] ?? null;
+    if ($itemId === "" || !is_array($item)) continue;
+
+    $name = product_db_name(isset($item["name"]) ? (string)$item["name"] : null) ?? "";
+    if ($name === "") continue;
+
+    $best = extract_best_variation_from_square_item($obj);
+    $imageIdsForItem = is_array($item["image_ids"] ?? null) ? $item["image_ids"] : [];
+    $primaryImageId = isset($imageIdsForItem[0]) && is_string($imageIdsForItem[0]) ? trim($imageIdsForItem[0]) : "";
+
+    $rows[] = [
+      "id" => $itemId,
+      "name" => $name,
+      "description" => product_db_text(isset($item["description"]) ? (string)$item["description"] : null) ?? "",
+      "image_url" => $primaryImageId !== "" ? ($imageUrlMap[$primaryImageId] ?? null) : null,
+      "variation_id" => $best["variation_id"],
+      "price_amount" => $best["amount"],
+      "currency_code" => $best["currency"],
+      "is_active" => 1,
+      "is_deleted" => 0,
+      "raw_json" => json_encode($obj, JSON_UNESCAPED_SLASHES),
+    ];
+  }
+
+  return $rows;
 }
 
 function resolve_variation_id_for_response(?string $dbVariationId, string $itemId, ?string $rawJson): ?string {
@@ -324,7 +523,7 @@ function product_env_value(string $appSlug, string $key, string $default = ""): 
 function product_market_category_env(string $appSlug, string $categorySlug): array {
   $categorySlug = product_slugify($categorySlug);
 
-  if ($categorySlug === "market" || $categorySlug === "lake-carolina-market") {
+  if ($categorySlug === "market") {
     return [
       "id" => product_env_value($appSlug, "MARKET_CATEGORY_ID", ""),
       "name" => product_env_value($appSlug, "MARKET_CATEGORY_NAME", "Market"),
@@ -846,10 +1045,14 @@ $syncReport = [
   "attempted" => $syncDb,
   "ok" => true,
   "fetched" => 0,
+  "category_search_fetched" => 0,
+  "category_search_items" => [],
   "upserted" => 0,
   "variations_upserted" => 0,
   "category_links_upserted" => 0,
   "images_upserted" => 0,
+  "item_errors" => 0,
+  "item_error_samples" => [],
   "error" => null,
 ];
 
@@ -890,6 +1093,104 @@ if ($syncDb) {
     } while (is_string($cursor) && $cursor !== "");
 
     $syncReport["fetched"] = count($objects);
+
+    $explicitCategoryIdsByItemId = [];
+    if ($effectiveCategorySlug !== null) {
+      try {
+        $syncCategoryIds = commerce_resolve_category_ids_products(
+          $cfg,
+          (string)($cfg["app_slug"] ?? $appSlug),
+          $effectiveCategorySlug,
+          $effectiveCategoryName,
+          $effectiveCategoryId
+        );
+
+        if (count($syncCategoryIds) > 0) {
+          $searchResp = square_try_products($cfg, "POST", [
+            "/catalog/search-catalog-items",
+            "catalog/search-catalog-items",
+            "/v2/catalog/search-catalog-items",
+            "v2/catalog/search-catalog-items",
+          ], [
+            "category_ids" => array_values($syncCategoryIds),
+            "archived_state" => "ARCHIVED_STATE_NOT_ARCHIVED",
+            "limit" => 100,
+            "sort_order" => "ASC",
+          ]);
+
+          $searchedItems = $searchResp["items"] ?? [];
+          if (is_array($searchedItems)) {
+            $seenObjectIds = [];
+            foreach ($objects as $existingObj) {
+              if (is_array($existingObj) && is_string($existingObj["id"] ?? null)) {
+                $seenObjectIds[$existingObj["id"]] = true;
+              }
+            }
+
+            $searchedItemIds = [];
+            foreach ($searchedItems as $searchedItem) {
+              if (!is_array($searchedItem)) continue;
+              if (($searchedItem["type"] ?? "") !== "ITEM") continue;
+
+              $searchedItemId = trim((string)($searchedItem["id"] ?? ""));
+              if ($searchedItemId === "") continue;
+              $searchedItemIds[] = $searchedItemId;
+
+              if (count($syncReport["category_search_items"]) < 5) {
+                $searchedData = $searchedItem["item_data"] ?? [];
+                $syncReport["category_search_items"][] = [
+                  "id" => $searchedItemId,
+                  "name" => product_db_name(is_array($searchedData) && isset($searchedData["name"]) ? (string)$searchedData["name"] : "") ?? "",
+                ];
+              }
+
+              $explicitCategoryIdsByItemId[$searchedItemId] = array_values($syncCategoryIds);
+            }
+
+            $itemsToMerge = $searchedItems;
+            $searchedItemIds = array_values(array_unique($searchedItemIds));
+
+            if (count($searchedItemIds) > 0) {
+              try {
+                $batchResp = square_try_products($cfg, "POST", [
+                  "/catalog/batch-retrieve",
+                  "catalog/batch-retrieve",
+                  "/v2/catalog/batch-retrieve",
+                  "v2/catalog/batch-retrieve",
+                ], [
+                  "object_ids" => $searchedItemIds,
+                  "include_related_objects" => false,
+                ]);
+
+                $batchObjects = $batchResp["objects"] ?? [];
+                if (is_array($batchObjects) && count($batchObjects) > 0) {
+                  $itemsToMerge = $batchObjects;
+                }
+              } catch (Throwable $e) {
+                // Fall back to the search result objects.
+              }
+            }
+
+            foreach ($itemsToMerge as $searchedItem) {
+              if (!is_array($searchedItem)) continue;
+              if (($searchedItem["type"] ?? "") !== "ITEM") continue;
+
+              $searchedItemId = trim((string)($searchedItem["id"] ?? ""));
+              if ($searchedItemId === "") continue;
+
+              if (!isset($seenObjectIds[$searchedItemId])) {
+                $objects[] = $searchedItem;
+                $seenObjectIds[$searchedItemId] = true;
+              }
+            }
+
+            $syncReport["category_search_fetched"] = count($searchedItems);
+          }
+        }
+      } catch (Throwable $e) {
+        // Non-fatal. Catalog list sync still handles normal category links.
+      }
+    }
 
     $pdo = db();
 
@@ -1129,11 +1430,11 @@ if ($syncDb) {
 
       if ($itemId === "" || !is_array($item)) continue;
 
-      $name = trim((string)($item["name"] ?? ""));
+      try {
+      $name = product_db_name(isset($item["name"]) ? (string)$item["name"] : null) ?? "";
       if ($name === "") continue;
 
-      $description = isset($item["description"]) ? trim((string)$item["description"]) : null;
-      if ($description === "") $description = null;
+      $description = product_db_text(isset($item["description"]) ? (string)$item["description"] : null);
 
       $slug = product_slugify($name);
       $best = extract_best_variation_from_square_item($obj);
@@ -1218,15 +1519,16 @@ if ($syncDb) {
         ":item" => $itemId,
       ]);
 
-      $cats = is_array($item["categories"] ?? null) ? $item["categories"] : [];
+      $categoryLinkIds = array_merge(
+        extract_category_ids_from_square_item_data($item),
+        $explicitCategoryIdsByItemId[$itemId] ?? []
+      );
+      $categoryLinkIds = array_values(array_unique(array_filter($categoryLinkIds, function ($v) {
+        return is_string($v) && trim($v) !== "";
+      })));
       $primaryDone = false;
 
-      foreach ($cats as $c) {
-        if (!is_array($c)) continue;
-
-        $cid = trim((string)($c["id"] ?? ""));
-        if ($cid === "") continue;
-
+      foreach ($categoryLinkIds as $cid) {
         $stmtLink->execute([
           ":app_slug" => $appSlug,
           ":square_item_id" => $itemId,
@@ -1236,20 +1538,6 @@ if ($syncDb) {
 
         $primaryDone = true;
         $syncReport["category_links_upserted"]++;
-      }
-
-      if (!$primaryDone) {
-        $legacyCid = trim((string)($item["category_id"] ?? ""));
-        if ($legacyCid !== "") {
-          $stmtLink->execute([
-            ":app_slug" => $appSlug,
-            ":square_item_id" => $itemId,
-            ":square_category_id" => $legacyCid,
-            ":is_primary" => 1,
-          ]);
-
-          $syncReport["category_links_upserted"]++;
-        }
       }
 
       $pdo->prepare("
@@ -1272,9 +1560,7 @@ if ($syncDb) {
 
         if (is_array($imgObj)) {
           $candidateAlt = $imgObj["image_data"]["caption"] ?? null;
-          if (is_string($candidateAlt) && trim($candidateAlt) !== "") {
-            $altText = trim($candidateAlt);
-          }
+          $altText = product_db_text(is_string($candidateAlt) ? $candidateAlt : null);
         }
 
         $stmtImage->execute([
@@ -1289,6 +1575,17 @@ if ($syncDb) {
         ]);
 
         $syncReport["images_upserted"]++;
+      }
+      } catch (Throwable $itemSyncError) {
+        $syncReport["item_errors"]++;
+        if (count($syncReport["item_error_samples"]) < 3) {
+          $rawName = isset($item["name"]) ? (string)$item["name"] : "";
+          $syncReport["item_error_samples"][] = [
+            "item_id" => $itemId,
+            "name" => product_db_name($rawName) ?? "",
+            "error" => $itemSyncError->getMessage(),
+          ];
+        }
       }
     }
 
@@ -1379,6 +1676,14 @@ try {
   }
 
   $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+  if (!$rows && $effectiveCategorySlug !== null && count($categoryIds) > 0) {
+    try {
+      $rows = square_category_fallback_rows($cfg, square_category_item_objects($cfg, $categoryIds));
+    } catch (Throwable $e) {
+      $rows = [];
+    }
+  }
 } catch (Throwable $e) {
   json_fail("Product query failed", 500, [
     "details" => $e->getMessage(),
