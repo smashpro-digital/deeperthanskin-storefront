@@ -310,67 +310,117 @@ function commerce_category_ids_from_cfg_products(array $cfg, string $categorySlu
   return [];
 }
 
+function product_env_value(string $appSlug, string $key, string $default = ""): string {
+  $prefixed = commerce_env($appSlug, $key, "");
+  if ($prefixed !== "") return $prefixed;
+
+  $raw = getenv($key);
+  if ($raw === false) return $default;
+
+  $raw = is_string($raw) ? trim($raw) : "";
+  return $raw !== "" ? $raw : $default;
+}
+
+function product_market_category_env(string $appSlug, string $categorySlug): array {
+  $categorySlug = product_slugify($categorySlug);
+
+  if ($categorySlug === "market" || $categorySlug === "lake-carolina-market") {
+    return [
+      "id" => product_env_value($appSlug, "MARKET_CATEGORY_ID", ""),
+      "name" => product_env_value($appSlug, "MARKET_CATEGORY_NAME", "Market"),
+    ];
+  }
+
+  if ($categorySlug === "featured-market-drinks" || $categorySlug === "featured-drinks") {
+    return [
+      "id" => product_env_value($appSlug, "FEATURED_MARKET_CATEGORY_ID", ""),
+      "name" => product_env_value($appSlug, "FEATURED_MARKET_CATEGORY_NAME", "Featured Drinks"),
+    ];
+  }
+
+  if ($categorySlug === "lake-carolina-market") {
+    return [
+      "id" => product_env_value($appSlug, "LAKE_CAROLINA_MARKET_CATEGORY_ID", ""),
+      "name" => "Lake Carolina Market",
+    ];
+  }
+
+  if ($categorySlug === "soda-city-market") {
+    return [
+      "id" => product_env_value($appSlug, "SODA_CITY_MARKET_CATEGORY_ID", ""),
+      "name" => "Soda City Market",
+    ];
+  }
+
+  return ["id" => "", "name" => ""];
+}
+
 /**
- * Resolve category slug to Square category IDs.
+ * Resolve category slug/name/id to Square category IDs.
  * Includes descendants so a parent category like "market" returns:
  * - Market
  * - Lake Carolina Market
  */
-function commerce_category_ids_from_db_products(string $appSlug, string $categorySlug): array {
+function commerce_category_ids_from_db_products(
+  string $appSlug,
+  string $categorySlug,
+  ?string $categoryName = null,
+  ?string $categoryId = null
+): array {
   $stmt = db()->prepare("
     SELECT
       square_category_id,
-      parent_square_category_id
+      parent_square_category_id,
+      name,
+      slug
     FROM spd_square_categories
     WHERE app_slug = :app
-      AND slug = :slug
-      AND is_active = 1
-      AND is_deleted = 0
-    LIMIT 1
-  ");
-
-  $stmt->execute([
-    ":app" => $appSlug,
-    ":slug" => $categorySlug,
-  ]);
-
-  $root = $stmt->fetch(PDO::FETCH_ASSOC);
-  if (!$root) return [];
-
-  $rootId = trim((string)($root["square_category_id"] ?? ""));
-  if ($rootId === "") return [];
-
-  $allStmt = db()->prepare("
-    SELECT
-      square_category_id,
-      parent_square_category_id
-    FROM spd_square_categories
-    WHERE app_slug = :app
-      AND is_active = 1
       AND is_deleted = 0
   ");
 
-  $allStmt->execute([":app" => $appSlug]);
-  $rows = $allStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+  $stmt->execute([":app" => $appSlug]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+  $targetSlug = product_slugify($categorySlug);
+  $targetNameSlug = is_string($categoryName) && trim($categoryName) !== ""
+    ? product_slugify($categoryName)
+    : "";
+  $targetId = is_string($categoryId) ? trim($categoryId) : "";
+
+  $rootIds = [];
   $childrenByParent = [];
 
   foreach ($rows as $r) {
     $id = trim((string)($r["square_category_id"] ?? ""));
     $parent = trim((string)($r["parent_square_category_id"] ?? ""));
+    $slug = product_slugify((string)($r["slug"] ?? ""));
+    $nameSlug = product_slugify((string)($r["name"] ?? ""));
 
-    if ($id === "" || $parent === "") continue;
+    if ($id === "") continue;
 
-    if (!isset($childrenByParent[$parent])) {
-      $childrenByParent[$parent] = [];
+    if ($parent !== "") {
+      if (!isset($childrenByParent[$parent])) {
+        $childrenByParent[$parent] = [];
+      }
+
+      $childrenByParent[$parent][] = $id;
     }
 
-    $childrenByParent[$parent][] = $id;
+    $matchesId = $targetId !== "" && hash_equals($targetId, $id);
+    $matchesSlug = $targetSlug !== "" && ($slug === $targetSlug || $nameSlug === $targetSlug);
+    $matchesName = $targetNameSlug !== "" && ($nameSlug === $targetNameSlug || $slug === $targetNameSlug);
+
+    if ($matchesId || $matchesSlug || $matchesName) {
+      $rootIds[] = $id;
+    }
   }
 
-  $ids = [$rootId];
-  $queue = [$rootId];
-  $seen = [$rootId => true];
+  $rootIds = array_values(array_unique($rootIds));
+  if (!$rootIds) return [];
+
+  $ids = $rootIds;
+  $queue = $rootIds;
+  $seen = array_fill_keys($rootIds, true);
 
   while ($queue) {
     $current = array_shift($queue);
@@ -388,15 +438,35 @@ function commerce_category_ids_from_db_products(string $appSlug, string $categor
   return array_values(array_unique($ids));
 }
 
-function commerce_resolve_category_ids_products(array $cfg, string $appSlug, string $categorySlug): array {
+function commerce_resolve_category_ids_products(
+  array $cfg,
+  string $appSlug,
+  string $categorySlug,
+  ?string $categoryName = null,
+  ?string $categoryId = null
+): array {
+  $env = product_market_category_env($appSlug, $categorySlug);
+  $categoryName = is_string($categoryName) && trim($categoryName) !== ""
+    ? trim($categoryName)
+    : (string)($env["name"] ?? "");
+  $categoryId = is_string($categoryId) && trim($categoryId) !== ""
+    ? trim($categoryId)
+    : (string)($env["id"] ?? "");
+
   try {
-    $ids = commerce_category_ids_from_db_products($appSlug, $categorySlug);
+    $ids = commerce_category_ids_from_db_products($appSlug, $categorySlug, $categoryName, $categoryId);
     if (count($ids) > 0) return $ids;
   } catch (Throwable $e) {
     // fallback below
   }
 
-  return commerce_category_ids_from_cfg_products($cfg, $categorySlug);
+  $ids = [];
+  if ($categoryId !== "") $ids[] = $categoryId;
+  $ids = array_merge($ids, commerce_category_ids_from_cfg_products($cfg, $categorySlug));
+
+  return array_values(array_unique(array_filter($ids, function ($v) {
+    return is_string($v) && trim($v) !== "";
+  })));
 }
 
 function load_category_meta_map(string $appSlug): array {
@@ -407,12 +477,11 @@ function load_category_meta_map(string $appSlug): array {
       SELECT
         square_category_id,
         name,
-        slug,
-        parent_square_category_id
-      FROM spd_square_categories
-      WHERE app_slug = :app
-        AND is_active = 1
-        AND is_deleted = 0
+      slug,
+      parent_square_category_id
+    FROM spd_square_categories
+    WHERE app_slug = :app
+      AND is_deleted = 0
     ");
 
     $stmt->execute([":app" => $appSlug]);
@@ -759,7 +828,17 @@ $categorySlugFilter = $_GET["category_slug"] ?? null;
 $categorySlugFilter = is_string($categorySlugFilter) ? trim($categorySlugFilter) : null;
 if ($categorySlugFilter === "") $categorySlugFilter = null;
 
-$effectiveCategorySlug = normalize_slug($categorySlugFilter ?: $categorySlug);
+$categoryNameFilter = $_GET["category_name"] ?? null;
+$categoryNameFilter = is_string($categoryNameFilter) ? trim($categoryNameFilter) : null;
+if ($categoryNameFilter === "") $categoryNameFilter = null;
+
+$categoryIdFilter = $_GET["category_id"] ?? null;
+$categoryIdFilter = is_string($categoryIdFilter) ? trim($categoryIdFilter) : null;
+if ($categoryIdFilter === "") $categoryIdFilter = null;
+
+$effectiveCategorySlug = normalize_slug($categorySlugFilter ?: $categorySlug ?: $categoryNameFilter ?: $categoryIdFilter);
+$effectiveCategoryName = $categoryNameFilter;
+$effectiveCategoryId = $categoryIdFilter;
 $syncDb = ((int)($_GET["sync_db"] ?? 0) === 1);
 
 /* Optional Square sync */
@@ -1224,11 +1303,19 @@ $categoryIds = [];
 
 if ($effectiveCategorySlug !== null) {
   $effectiveApp = (string)($cfg["app_slug"] ?? $appSlug);
-  $categoryIds = commerce_resolve_category_ids_products($cfg, $effectiveApp, $effectiveCategorySlug);
+  $categoryIds = commerce_resolve_category_ids_products(
+    $cfg,
+    $effectiveApp,
+    $effectiveCategorySlug,
+    $effectiveCategoryName,
+    $effectiveCategoryId
+  );
 
   if (count($categoryIds) === 0) {
     json_fail("Unknown category (no mapping in DB or category_map)", 400, [
       "category" => $effectiveCategorySlug,
+      "category_name" => $effectiveCategoryName,
+      "category_id" => $effectiveCategoryId,
       "hint" => "Sync categories into spd_square_categories or set category_map in spd_commerce_apps.",
     ]);
   }
@@ -1498,6 +1585,7 @@ json_ok([
   "app_slug" => $cfg["app_slug"] ?? $appSlug,
   "mode" => "db-first",
   "category" => $effectiveCategorySlug,
+  "category_name" => $effectiveCategoryName,
   "category_ids" => $categoryIds,
   "count" => count($normalized),
   "items" => $normalized,

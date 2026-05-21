@@ -42,6 +42,21 @@ const pageSlug = apiSlug;
 const isBeveragesPage = pageSlug === "beverages";
 const isMarketPage = pageSlug === "market";
 
+const MARKET_CATEGORY_ID = (import.meta.env.MARKET_CATEGORY_ID as string | undefined) || "";
+const FEATURED_MARKET_CATEGORY_ID =
+  (import.meta.env.FEATURED_MARKET_CATEGORY_ID as string | undefined) || "";
+const LAKE_CAROLINA_MARKET_CATEGORY_ID =
+  (import.meta.env.LAKE_CAROLINA_MARKET_CATEGORY_ID as string | undefined) || "";
+const SODA_CITY_MARKET_CATEGORY_ID =
+  (import.meta.env.SODA_CITY_MARKET_CATEGORY_ID as string | undefined) || "";
+const MARKET_CATEGORY_NAME =
+  (import.meta.env.MARKET_CATEGORY_NAME as string | undefined) || "Market";
+const FEATURED_MARKET_CATEGORY_NAME =
+  (import.meta.env.FEATURED_MARKET_CATEGORY_NAME as string | undefined) ||
+  "Featured Drinks";
+const LAKE_CAROLINA_MARKET_CATEGORY_NAME = "Lake Carolina Market";
+const SODA_CITY_MARKET_CATEGORY_NAME = "Soda City Market";
+
 export async function getStaticPaths() {
   const slugs = [
     "market",
@@ -86,6 +101,32 @@ const productsEndpoint = publicApiUrl("public/commerce/products", {
   limit: 120,
   category: apiSlug,
   category_slug: apiSlug,
+  category_id: isMarketPage ? MARKET_CATEGORY_ID : "",
+  category_name: isMarketPage ? MARKET_CATEGORY_NAME : "",
+});
+
+const featuredMarketEndpoint = publicApiUrl("public/commerce/products", {
+  limit: 120,
+  category: "featured-drinks",
+  category_slug: "featured-drinks",
+  category_id: FEATURED_MARKET_CATEGORY_ID,
+  category_name: FEATURED_MARKET_CATEGORY_NAME,
+});
+
+const lakeCarolinaMarketEndpoint = publicApiUrl("public/commerce/products", {
+  limit: 120,
+  category: "lake-carolina-market",
+  category_slug: "lake-carolina-market",
+  category_id: LAKE_CAROLINA_MARKET_CATEGORY_ID,
+  category_name: LAKE_CAROLINA_MARKET_CATEGORY_NAME,
+});
+
+const sodaCityMarketEndpoint = publicApiUrl("public/commerce/products", {
+  limit: 120,
+  category: "soda-city-market",
+  category_slug: "soda-city-market",
+  category_id: SODA_CITY_MARKET_CATEGORY_ID,
+  category_name: SODA_CITY_MARKET_CATEGORY_NAME,
 });
 
 const categoriesEndpoint = publicApiUrl("public/commerce/categories");
@@ -181,6 +222,7 @@ const ROUTES = {
         data-cat-slug={apiSlug}
         data-categories-endpoint={categoriesEndpoint}
         data-base={base}
+        id={isMarketPage ? "market-experience-hero" : undefined}
       >
         <div class="hero-bg" aria-hidden="true"></div>
         <div class="hero-inner">
@@ -201,6 +243,24 @@ const ROUTES = {
               </>
             )}
           </div>
+
+          {isMarketPage && (
+            <section id="featured-market-section" class="featured-market-section" hidden>
+              <div class="featured-glow featured-glow--one" aria-hidden="true"></div>
+              <div class="featured-glow featured-glow--two" aria-hidden="true"></div>
+              <div class="market-section-head">
+                <div>
+                  <p class="kicker" id="featured-market-kicker">Featured This Market</p>
+                  <h3 id="featured-market-title">Featured at the Market</h3>
+                  <p class="featured-market-copy" id="featured-market-copy">
+                    Botanical pours, fresh market rituals, and small-batch wellness favorites selected for today's table.
+                  </p>
+                </div>
+                <span class="featured-section-badge">Fresh Pour Today</span>
+              </div>
+              <div class="grid grid--featured" id="featured-market-grid"></div>
+            </section>
+          )}
         </div>
       </section>
 
@@ -247,15 +307,32 @@ const ROUTES = {
           />
         </div>
 
+        {isMarketPage && (
+          <div id="regular-market-head" class="market-section-head market-section-head--regular" hidden>
+            <div>
+              <p class="kicker">Market Menu</p>
+              <h3>Regular market items</h3>
+            </div>
+          </div>
+        )}
+
         <div
           class="grid"
           id="cat-grid"
           data-endpoint={productsEndpoint}
+          data-featured-endpoint={isMarketPage ? featuredMarketEndpoint : ""}
+          data-lake-carolina-endpoint={isMarketPage ? lakeCarolinaMarketEndpoint : ""}
+          data-soda-city-endpoint={isMarketPage ? sodaCityMarketEndpoint : ""}
           data-fallback={fallbackImg}
           data-base={base}
           data-product-base={ROUTES.productBase}
           data-detox-experience={ROUTES.detoxExperience}
           data-market-mode={isMarketPage ? "education" : "shop"}
+          data-market-category-name={MARKET_CATEGORY_NAME}
+          data-featured-category-name={FEATURED_MARKET_CATEGORY_NAME}
+          data-lake-carolina-category-name={LAKE_CAROLINA_MARKET_CATEGORY_NAME}
+          data-soda-city-category-name={SODA_CITY_MARKET_CATEGORY_NAME}
+          data-debug-market={import.meta.env.DEV && isMarketPage ? "1" : "0"}
         >
           {Array.from({ length: 8 }).map(() => (
             <div class="card skel-card" aria-hidden="true">
@@ -272,7 +349,7 @@ const ROUTES = {
         <div id="empty" class="empty" hidden>
           <div class="kicker">Notice</div>
           <h3 class="h2" style="margin:6px 0 8px">
-            {isMarketPage ? "Market menu is being prepared" : "No products found"}
+            {isMarketPage ? "Fresh pours are being prepared for this market." : "No products found"}
           </h3>
           <p class="p">
             {isMarketPage
@@ -366,6 +443,9 @@ const ROUTES = {
     };
 
     const grid = document.getElementById("cat-grid");
+    const featuredGrid = document.getElementById("featured-market-grid");
+    const featuredSection = document.getElementById("featured-market-section");
+    const regularMarketHead = document.getElementById("regular-market-head");
     const empty = document.getElementById("empty");
     const q = document.getElementById("q");
     const cartPill = document.getElementById("cartPill");
@@ -374,6 +454,9 @@ const ROUTES = {
     if (!grid) throw new Error("cat-grid missing");
 
     const endpoint = grid.getAttribute("data-endpoint") || "";
+    const featuredEndpoint = grid.getAttribute("data-featured-endpoint") || "";
+    const lakeCarolinaEndpoint = grid.getAttribute("data-lake-carolina-endpoint") || "";
+    const sodaCityEndpoint = grid.getAttribute("data-soda-city-endpoint") || "";
     const fallback = grid.getAttribute("data-fallback") || "";
     const base = grid.getAttribute("data-base") || "/";
     const productBase = grid.getAttribute("data-product-base") || base + "product/";
@@ -381,6 +464,58 @@ const ROUTES = {
       grid.getAttribute("data-detox-experience") || base + "detox-experience";
     const marketMode = grid.getAttribute("data-market-mode") || "shop";
     const isMarketEducation = marketMode === "education";
+    const marketCategoryName = grid.getAttribute("data-market-category-name") || "Market";
+    const featuredCategoryName =
+      grid.getAttribute("data-featured-category-name") || "Featured Market Drinks";
+    const lakeCarolinaCategoryName =
+      grid.getAttribute("data-lake-carolina-category-name") || "Lake Carolina Market";
+    const sodaCityCategoryName =
+      grid.getAttribute("data-soda-city-category-name") || "Soda City Market";
+    const DEBUG_MARKET = isMarketEducation && grid.getAttribute("data-debug-market") === "1";
+
+    const eventSlug = normalizeSlug(currentParams.get("event") || "");
+    const eventConfig =
+      eventSlug === "soda-city-market"
+        ? {
+            slug: "soda-city-market",
+            label: "Soda City Market",
+            categoryName: sodaCityCategoryName,
+            endpoint: sodaCityEndpoint,
+            tone: "soda",
+            heading: "Featured at Soda City Market",
+            copy: "A brighter urban wellness menu built for city energy, fresh pours, and easy market-day rituals.",
+          }
+        : eventSlug === "lake-carolina-market"
+          ? {
+              slug: "lake-carolina-market",
+              label: "Lake Carolina Market",
+              categoryName: lakeCarolinaCategoryName,
+              endpoint: lakeCarolinaEndpoint,
+              tone: "lake",
+              heading: "Featured at Lake Carolina Market",
+              copy: "A soft botanical market edit for slow sipping, family strolls, and restorative wellness rituals.",
+            }
+          : {
+              slug: "",
+              label: "the Market",
+              categoryName: "",
+              endpoint: "",
+              tone: "default",
+              heading: "Featured This Market",
+              copy: "Botanical pours, fresh market rituals, and small-batch wellness favorites selected for today's table.",
+            };
+
+    if (isMarketEducation) {
+      document.documentElement.dataset.marketEvent = eventConfig.tone;
+      const hero = document.getElementById("market-experience-hero");
+      if (hero) hero.setAttribute("data-market-event", eventConfig.tone);
+      const title = document.getElementById("featured-market-title");
+      const copy = document.getElementById("featured-market-copy");
+      const kicker = document.getElementById("featured-market-kicker");
+      if (title) title.textContent = eventConfig.heading;
+      if (copy) copy.textContent = eventConfig.copy;
+      if (kicker) kicker.textContent = eventConfig.label === "the Market" ? "Featured This Market" : eventConfig.label;
+    }
 
     const escapeHtml = (s) =>
       String(s || "")
@@ -432,6 +567,74 @@ const ROUTES = {
         haystack.includes("ionic foot detox") ||
         haystack.includes("foot detox") ||
         haystack.includes("detox experience")
+      );
+    }
+
+    function categoryNames(it) {
+      const cats = Array.isArray(it?.categories) ? it.categories : [];
+      const names = cats.map((cat) => String(cat?.name || "").trim()).filter(Boolean);
+      const legacy = String(it?.category || "").trim();
+      return Array.from(new Set([...names, legacy].filter(Boolean)));
+    }
+
+    function categoryIds(it) {
+      const ids = Array.isArray(it?.category_ids) ? it.category_ids : [];
+      const cats = Array.isArray(it?.categories) ? it.categories : [];
+      return Array.from(new Set([
+        ...ids.map((id) => String(id || "").trim()),
+        ...cats.map((cat) => String(cat?.id || "").trim()),
+        String(it?.category_id || "").trim(),
+      ].filter(Boolean)));
+    }
+
+    function debugMarketMatches(items, label) {
+      if (!DEBUG_MARKET) return;
+
+      console.groupCollapsed(
+        `[market-preview] ${label}: ${items.length} item(s), event=${eventConfig.slug || "none"}`
+      );
+      items.forEach((item) => {
+        console.debug({
+          name: item?.name || item?.title || "",
+          category_names: categoryNames(item),
+          category_ids: categoryIds(item),
+          featured: !!item?._market_featured || categoryNames(item).some((name) => normalizeSlug(name) === "featured-market-drinks"),
+          event_match: eventConfig.categoryName
+            ? categoryNames(item).some((name) => normalizeSlug(name) === normalizeSlug(eventConfig.categoryName))
+            : false,
+        });
+      });
+      console.groupEnd();
+    }
+
+    function marketTagline(it, isFeaturedMarket) {
+      const desc = String(it?.description || "").replace(/\s+/g, " ").trim();
+      if (desc) {
+        const clean = desc.length > 92 ? desc.slice(0, 89) + "…" : desc;
+        return clean;
+      }
+
+      const name = String(it?.name || it?.title || "").toLowerCase();
+      if (name.includes("lemonade")) return "A bright botanical sip crafted for market-day renewal.";
+      if (name.includes("tea")) return "An herbal pour made for calm energy and slow ritual.";
+      if (name.includes("juice")) return "Fresh hydration with a restorative wellness finish.";
+      if (isFeaturedMarket) return "A featured market ritual selected for freshness, balance, and glow.";
+      return "A market-day ritual crafted in small batches for intentional wellness.";
+    }
+
+    function isStaffPick(it) {
+      const haystack = [
+        it?.name,
+        it?.title,
+        it?.description,
+        categoryNames(it).join(" "),
+      ].join(" ").toLowerCase();
+
+      return (
+        haystack.includes("staff pick") ||
+        haystack.includes("signature") ||
+        haystack.includes("favorite") ||
+        haystack.includes("featured")
       );
     }
 
@@ -512,6 +715,8 @@ const ROUTES = {
       const rawTitle = String(it?.name || it?.title || "Product");
       const title = escapeHtml(rawTitle);
       const isDetox = isDetoxExperienceItem(it);
+      const isFeaturedMarket = !!it?._market_featured;
+      const staffPick = isFeaturedMarket && isStaffPick(it);
 
       const productUrl = `${productBase}${encodeURIComponent(id)}`;
       const detoxUrl = detoxExperienceUrl;
@@ -523,8 +728,9 @@ const ROUTES = {
           ? "A guided reset experience. Choose a single session or step into a membership for deeper consistency."
           : "Tap to view details.";
 
-      const descRaw = String(it?.description || defaultDesc);
-      const desc = escapeHtml(descRaw.length > 126 ? descRaw.slice(0, 123) + "…" : descRaw);
+      const descRaw = isMarketEducation ? marketTagline(it, isFeaturedMarket) : String(it?.description || defaultDesc);
+      const descLimit = isFeaturedMarket ? 150 : 126;
+      const desc = escapeHtml(descRaw.length > descLimit ? descRaw.slice(0, descLimit - 3) + "…" : descRaw);
 
       const img = it?.image_url && String(it.image_url).trim() ? it.image_url : fallback;
       const price = isMarketEducation ? "Market Item" : money(it?.price_money);
@@ -532,7 +738,7 @@ const ROUTES = {
       const linkHref = isDetox ? detoxUrl : productUrl;
 
       return `
-        <article class="card ${isDetox ? "card--experience" : ""} ${isMarketEducation ? "card--market" : ""}" data-id="${escapeHtml(id)}">
+        <article class="card ${isDetox ? "card--experience" : ""} ${isMarketEducation ? "card--market" : ""} ${isFeaturedMarket ? "card--featured-market" : ""} ${it?._market_event_match ? "card--event-match" : ""}" data-id="${escapeHtml(id)}">
           <a
             class="card-link"
             href="${linkHref}"
@@ -545,7 +751,8 @@ const ROUTES = {
                 loading="lazy"
                 onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';"
               />
-              ${isMarketEducation ? `<div class="badge badge--experience">At Market</div>` : ""}
+              ${isFeaturedMarket ? `<div class="badge badge--featured-market">${escapeHtml(featuredCategoryName)}</div>` : isMarketEducation ? `<div class="badge badge--experience">At Market</div>` : ""}
+              ${staffPick ? `<div class="badge badge--staff">Staff Pick</div>` : ""}
               ${isDetox ? `<div class="badge badge--experience">Signature Experience</div>` : ""}
               <div class="shine" aria-hidden="true"></div>
             </div>
@@ -558,53 +765,74 @@ const ROUTES = {
                 </div>
               </div>
               <p class="desc">${desc}</p>
+              ${isFeaturedMarket ? `<div class="market-pills"><span>Available at Market</span>${it?._market_event_match ? `<span>${escapeHtml(eventConfig.label)}</span>` : ""}</div>` : ""}
             </div>
           </a>
 
           <div class="actions">
             ${
-              isMarketEducation
+              isFeaturedMarket
+                ? `<a class="btn btn-primary btn-reset btn-featured-cta" href="${linkHref}">View Details</a>`
+                : isMarketEducation
                 ? `<span class="btn btn-primary btn-reset btn-static" aria-label="Available at market only">Available at Market</span>`
                 : isDetox
                   ? `<a class="btn btn-primary btn-reset" href="${detoxPlansUrl}">Start Your Reset</a>`
                   : `<button class="btn btn-primary add" type="button">Add to cart</button>`
             }
 
-            <a class="btn btn-ghost" href="${linkHref}">
+            ${isFeaturedMarket ? "" : `<a class="btn btn-ghost" href="${linkHref}">
               ${isMarketEducation ? "View Details" : isDetox ? "View Plans" : "View"}
-            </a>
+            </a>`}
           </div>
         </article>
       `;
+    };
+
+    const itemMatchesQuery = (p, query) => {
+      if (!query) return true;
+      return (
+        String(p?.name || p?.title || "").toLowerCase().includes(query) ||
+        String(p?.description || "").toLowerCase().includes(query) ||
+        categoryNames(p).join(" ").toLowerCase().includes(query)
+      );
     };
 
     const render = (items) => {
       ALL = Array.isArray(items) ? items : [];
       const query = String(q?.value || "").trim().toLowerCase();
 
-      const filtered = query
-        ? ALL.filter((p) =>
-            String(p?.name || p?.title || "").toLowerCase().includes(query) ||
-            String(p?.description || "").toLowerCase().includes(query)
-          )
-        : ALL;
+      const filtered = ALL.filter((p) => itemMatchesQuery(p, query));
+      const featured = isMarketEducation ? filtered.filter((p) => !!p?._market_featured) : [];
+      const regular = isMarketEducation ? filtered.filter((p) => !p?._market_featured) : filtered;
 
       grid.innerHTML = "";
+      if (featuredGrid) featuredGrid.innerHTML = "";
 
-      if (!filtered.length) {
+      if (!featured.length && !regular.length) {
+        if (featuredSection) featuredSection.hidden = true;
+        if (regularMarketHead) regularMarketHead.hidden = true;
         if (empty) empty.hidden = false;
         return;
       }
 
       if (empty) empty.hidden = true;
-      grid.innerHTML = filtered.map(cardHtml).join("");
+
+      if (isMarketEducation) {
+        if (featuredSection) featuredSection.hidden = featured.length === 0;
+        if (featuredGrid) featuredGrid.innerHTML = featured.map(cardHtml).join("");
+        if (regularMarketHead) regularMarketHead.hidden = regular.length === 0;
+        grid.innerHTML = regular.map(cardHtml).join("");
+        return;
+      }
+
+      grid.innerHTML = regular.map(cardHtml).join("");
 
       if (isMarketEducation) return;
 
       grid.querySelectorAll(".card").forEach((card) => {
         const id = card.getAttribute("data-id");
         const btn = card.querySelector("button.add");
-        const p = filtered.find((x) => String(x?.id || x?.product_id || "") === String(id || ""));
+        const p = regular.find((x) => String(x?.id || x?.product_id || "") === String(id || ""));
 
         if (!btn || !p) return;
 
@@ -630,6 +858,79 @@ const ROUTES = {
 
     async function load() {
       try {
+        if (isMarketEducation) {
+          const [marketResult, featuredResult, eventResult] = await Promise.allSettled([
+            fetchJson(endpoint),
+            featuredEndpoint ? fetchJson(featuredEndpoint) : Promise.resolve({ items: [] }),
+            eventConfig.endpoint ? fetchJson(eventConfig.endpoint) : Promise.resolve({ items: [] }),
+          ]);
+
+          const marketItems =
+            marketResult.status === "fulfilled" && marketResult.value?.ok !== false
+              ? unwrapItems(marketResult.value)
+              : [];
+          const featuredItems =
+            featuredResult.status === "fulfilled" && featuredResult.value?.ok !== false
+              ? unwrapItems(featuredResult.value)
+              : [];
+          const eventItems =
+            eventResult.status === "fulfilled" && eventResult.value?.ok !== false
+              ? unwrapItems(eventResult.value)
+              : [];
+
+          if (DEBUG_MARKET) {
+            if (marketResult.status === "rejected") {
+              console.debug("[market-preview] market category request failed", marketResult.reason);
+            }
+            if (featuredResult.status === "rejected") {
+              console.debug("[market-preview] featured category request failed", featuredResult.reason);
+            }
+            if (eventResult.status === "rejected") {
+              console.debug("[market-preview] event category request failed", eventResult.reason);
+            }
+            console.debug("[market-preview] event detection", {
+              query_event: eventSlug,
+              detected_event: eventConfig.slug || null,
+              event_category: eventConfig.categoryName || null,
+            });
+          }
+
+          debugMarketMatches(featuredItems, featuredCategoryName);
+          debugMarketMatches(eventItems, eventConfig.categoryName || "Event category");
+          debugMarketMatches(marketItems, marketCategoryName);
+
+          const featuredIds = new Set();
+          const eventIds = new Set(
+            eventItems
+              .map((item) => String(item?.id || item?.product_id || "").trim())
+              .filter(Boolean)
+          );
+          const merged = [];
+
+          featuredItems.forEach((item) => {
+            const id = String(item?.id || item?.product_id || "").trim();
+            if (!id || featuredIds.has(id)) return;
+            featuredIds.add(id);
+            merged.push({ ...item, _market_featured: true, _market_event_match: eventIds.has(id) });
+          });
+
+          eventItems.forEach((item) => {
+            const id = String(item?.id || item?.product_id || "").trim();
+            if (!id || featuredIds.has(id)) return;
+            merged.push({ ...item, _market_featured: false, _market_event_match: true });
+          });
+
+          marketItems.forEach((item) => {
+            const id = String(item?.id || item?.product_id || "").trim();
+            if (id && featuredIds.has(id)) return;
+            if (id && merged.some((existing) => String(existing?.id || existing?.product_id || "") === id)) return;
+            merged.push({ ...item, _market_featured: false, _market_event_match: eventIds.has(id) });
+          });
+
+          render(merged);
+          return;
+        }
+
         const data = await fetchJson(endpoint);
 
         if (data && data.ok === false) {
@@ -638,13 +939,19 @@ const ROUTES = {
 
         render(unwrapItems(data));
       } catch (e) {
-        console.error("[category] load failed:", e);
+        if (!isMarketEducation || DEBUG_MARKET) {
+          console.error("[category] load failed:", e);
+        }
 
-        grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
-          <div class="kicker">Error</div>
-          <h3 class="h2" style="margin:6px 0 8px">Couldn’t load items</h3>
-          <p class="p">The page loaded, but the catalog API rejected the request.</p>
-        </div>`;
+        if (isMarketEducation) {
+          render([]);
+        } else {
+          grid.innerHTML = `<div class="callout" style="grid-column:1/-1">
+            <div class="kicker">Error</div>
+            <h3 class="h2" style="margin:6px 0 8px">Couldn’t load items</h3>
+            <p class="p">The page loaded, but the catalog API rejected the request.</p>
+          </div>`;
+        }
       }
     }
 
@@ -720,8 +1027,11 @@ const ROUTES = {
     }
 
     .hero--market {
-      min-height: 340px;
+      min-height: min(920px, calc(100vh - 36px));
       border-color: rgba(200,162,74,.28);
+      box-shadow:
+        0 30px 90px rgba(0,0,0,.34),
+        0 0 0 1px rgba(198,169,107,.10) inset;
     }
 
     .hero-bg {
@@ -748,11 +1058,31 @@ const ROUTES = {
         linear-gradient(180deg, rgba(6,12,9,.18), rgba(6,12,9,.86));
     }
 
+    [data-market-event="soda"] .hero-bg::after {
+      background:
+        linear-gradient(90deg, rgba(6,12,9,.88), rgba(13,32,29,.36), rgba(6,12,9,.78)),
+        linear-gradient(180deg, rgba(31,65,56,.22), rgba(6,12,9,.88));
+    }
+
+    [data-market-event="lake"] .hero-bg::after {
+      background:
+        radial-gradient(720px 420px at 72% 30%, rgba(198,169,107,.17), transparent 68%),
+        linear-gradient(90deg, rgba(6,12,9,.90), rgba(15,42,35,.45), rgba(6,12,9,.72)),
+        linear-gradient(180deg, rgba(6,12,9,.14), rgba(6,12,9,.88));
+    }
+
     .hero-inner {
       position: relative;
       z-index: 2;
       padding: 22px;
       max-width: 760px;
+    }
+
+    .hero--market .hero-inner {
+      max-width: none;
+      display: grid;
+      align-content: start;
+      min-height: min(920px, calc(100vh - 36px));
     }
 
     .kicker--light { color: rgba(233, 206, 143, 0.92); }
@@ -882,6 +1212,136 @@ const ROUTES = {
       gap: 14px;
     }
 
+    .featured-market-section {
+      position: relative;
+      overflow: hidden;
+      margin: clamp(18px, 4vw, 34px) 0 0;
+      padding: clamp(16px, 3vw, 24px);
+      border-radius: 28px;
+      border: 1px solid rgba(200,162,74,.36);
+      background:
+        linear-gradient(135deg, rgba(245,241,232,.10), rgba(245,241,232,.035)),
+        radial-gradient(740px 320px at 12% 0%, rgba(198,169,107,.18), transparent 72%),
+        rgba(5,17,13,.88);
+      box-shadow:
+        0 28px 82px rgba(0,0,0,.34),
+        0 0 0 1px rgba(245,241,232,.04) inset;
+      isolation: isolate;
+      backdrop-filter: blur(14px);
+    }
+
+    .hero--market .featured-market-section {
+      max-width: 1180px;
+      margin-top: clamp(18px, 4vh, 36px);
+      background:
+        linear-gradient(135deg, rgba(245,241,232,.13), rgba(245,241,232,.04)),
+        radial-gradient(820px 360px at 14% 0%, rgba(198,169,107,.22), transparent 72%),
+        rgba(5,17,13,.70);
+    }
+
+    .featured-glow {
+      position: absolute;
+      z-index: -1;
+      width: 42%;
+      height: 46%;
+      filter: blur(34px);
+      opacity: .42;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(198,169,107,.42), rgba(245,241,232,.05));
+    }
+
+    .featured-glow--one {
+      top: -18%;
+      right: 4%;
+      transform: rotate(-8deg);
+    }
+
+    .featured-glow--two {
+      left: -14%;
+      bottom: -20%;
+      transform: rotate(14deg);
+      background: linear-gradient(135deg, rgba(34,75,61,.45), rgba(198,169,107,.12));
+    }
+
+    :global(:root[data-market-event="soda"]) .featured-market-section {
+      background:
+        linear-gradient(135deg, rgba(245,241,232,.10), rgba(245,241,232,.035)),
+        radial-gradient(780px 320px at 18% 0%, rgba(198,169,107,.18), transparent 70%),
+        linear-gradient(160deg, rgba(5,17,13,.94), rgba(12,38,34,.92));
+    }
+
+    :global(:root[data-market-event="soda"]) .featured-market-section::after {
+      content: "";
+      position: absolute;
+      right: 20px;
+      bottom: 16px;
+      width: min(240px, 42%);
+      height: 54px;
+      opacity: .16;
+      background:
+        linear-gradient(to top, rgba(245,241,232,.72), rgba(245,241,232,.72)) 0 100% / 14px 36px no-repeat,
+        linear-gradient(to top, rgba(245,241,232,.72), rgba(245,241,232,.72)) 24px 100% / 18px 48px no-repeat,
+        linear-gradient(to top, rgba(245,241,232,.72), rgba(245,241,232,.72)) 54px 100% / 12px 30px no-repeat,
+        linear-gradient(to top, rgba(245,241,232,.72), rgba(245,241,232,.72)) 78px 100% / 22px 54px no-repeat,
+        linear-gradient(to top, rgba(245,241,232,.72), rgba(245,241,232,.72)) 114px 100% / 16px 40px no-repeat,
+        linear-gradient(to top, rgba(245,241,232,.72), rgba(245,241,232,.72)) 144px 100% / 28px 50px no-repeat;
+      pointer-events: none;
+    }
+
+    .market-section-head {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+      margin: 0 0 12px;
+    }
+
+    .market-section-head--regular {
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
+    .market-section-head h3 {
+      margin: 4px 0 0;
+      font-family: var(--font-display);
+      font-size: clamp(20px, 2.4vw, 28px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .featured-market-section .market-section-head h3 {
+      max-width: 760px;
+      color: rgba(245,241,232,.98);
+      font-size: clamp(30px, 4.5vw, 52px);
+      line-height: .98;
+    }
+
+    .featured-market-copy {
+      max-width: 680px;
+      margin: 10px 0 0;
+      color: rgba(245,241,232,.74);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .featured-section-badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 9px 12px;
+      border: 1px solid rgba(233,206,143,.42);
+      color: #07120d;
+      background:
+        radial-gradient(90px 50px at 30% 10%, rgba(255,255,255,.32), transparent 70%),
+        linear-gradient(135deg, rgba(245,225,174,.98), rgba(198,169,107,.94));
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      box-shadow: 0 16px 34px rgba(198,169,107,.20);
+    }
+
     .card {
       grid-column: span 4;
       border-radius: 22px;
@@ -902,6 +1362,34 @@ const ROUTES = {
       box-shadow:
         0 22px 60px rgba(0,0,0,.28),
         0 0 0 1px rgba(200,162,74,.12) inset;
+    }
+
+    .card--featured-market {
+      border-color: rgba(200,162,74,.48);
+      background:
+        radial-gradient(360px 160px at 30% 0%, rgba(198,169,107,.16), transparent 72%),
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(246,241,229,.94));
+      box-shadow:
+        0 24px 60px rgba(0,0,0,.28),
+        0 0 0 1px rgba(200,162,74,.16) inset;
+    }
+
+    .grid--featured .card {
+      grid-column: span 6;
+    }
+
+    .hero--market .grid--featured {
+      align-items: stretch;
+    }
+
+    .grid--featured .media {
+      aspect-ratio: 5 / 4;
+    }
+
+    .grid--featured .title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 2.8vw, 34px);
+      line-height: 1.05;
     }
 
     .card-link {
@@ -958,6 +1446,24 @@ const ROUTES = {
       background: linear-gradient(135deg, rgba(233,206,143,.98), rgba(200,162,74,.94));
     }
 
+    .badge--featured-market {
+      color: #07120d;
+      background:
+        radial-gradient(80px 44px at 28% 10%, rgba(255,255,255,.30), transparent 72%),
+        linear-gradient(135deg, rgba(245,225,174,.98), rgba(198,169,107,.96));
+      border-color: rgba(255,255,255,.42);
+    }
+
+    .badge--staff {
+      top: 10px;
+      left: auto;
+      right: 10px;
+      color: rgba(245,241,232,.94);
+      border-color: rgba(245,241,232,.22);
+      background: rgba(8,19,14,.68);
+      backdrop-filter: blur(10px);
+    }
+
     .body { padding: 12px 12px 10px; }
 
     .row {
@@ -994,6 +1500,35 @@ const ROUTES = {
       min-height: 2.9em;
     }
 
+    .card--featured-market .desc {
+      color: rgba(15,42,35,.82);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: auto;
+    }
+
+    .market-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .market-pills span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: #0f2a23;
+      border: 1px solid rgba(15,42,35,.16);
+      background: rgba(15,42,35,.055);
+      font-size: 11px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
     .actions {
       display: flex;
       gap: 10px;
@@ -1004,6 +1539,20 @@ const ROUTES = {
       flex: 1;
       min-height: 44px;
       line-height: 1.15;
+      white-space: normal;
+      text-align: center;
+    }
+
+    .card--market .actions .btn-ghost {
+      color: #0f2a23;
+      border-color: rgba(15,42,35,.28);
+      background: rgba(15,42,35,.05);
+    }
+
+    .card--market .actions .btn-ghost:hover {
+      color: #0a1e18;
+      border-color: rgba(198,169,107,.55);
+      background: rgba(198,169,107,.16);
     }
 
     .actions .btn:focus-visible {
@@ -1047,6 +1596,12 @@ const ROUTES = {
       pointer-events: none;
     }
 
+    .btn-featured-cta {
+      min-height: 50px;
+      font-size: 14px;
+      letter-spacing: .02em;
+    }
+
     .empty {
       margin-top: 14px;
       padding: 16px;
@@ -1082,7 +1637,66 @@ const ROUTES = {
     @media (max-width: 560px) {
       .card { grid-column: span 12; }
       .hero { min-height: 260px; }
+      .hero--market {
+        min-height: calc(100svh - 18px);
+        border-radius: 24px;
+      }
       .hero-inner { padding: 18px; }
+      .hero--market .hero-inner {
+        min-height: calc(100svh - 18px);
+      }
+      .hero--market .hero-title {
+        font-size: clamp(32px, 11vw, 44px);
+      }
+      .hero--market .hero-sub {
+        font-size: 14px;
+        line-height: 1.45;
+        max-width: 34ch;
+      }
+      .hero--market .hero-actions {
+        margin-top: 12px;
+      }
+      .featured-market-section {
+        width: calc(100% + 36px);
+        margin-left: -18px;
+        margin-right: -18px;
+        padding: 14px 0 14px 14px;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 24px 24px 0 0;
+      }
+      .market-section-head { align-items: flex-start; flex-direction: column; }
+      .featured-market-section .market-section-head {
+        padding-right: 14px;
+        margin-bottom: 10px;
+      }
+      .featured-market-copy {
+        display: none;
+      }
+      .actions { flex-direction: column; }
+      .actions .btn { width: 100%; }
+      .grid--featured {
+        display: flex;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: x mandatory;
+        gap: 12px;
+        padding: 2px 14px 12px 0;
+        margin: 0 -2px;
+      }
+      .grid--featured .card {
+        flex: 0 0 min(88vw, 380px);
+        scroll-snap-align: start;
+      }
+      .grid--featured .media {
+        aspect-ratio: 4 / 4.85;
+      }
+      .featured-market-section .market-section-head h3 {
+        font-size: clamp(28px, 9vw, 40px);
+      }
+      .featured-section-badge {
+        white-space: normal;
+      }
     }
   </style>
 </BaseLayout>
